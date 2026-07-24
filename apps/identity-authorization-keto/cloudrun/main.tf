@@ -188,7 +188,6 @@ module "service_write" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = 4467
-  use_http2             = true # Frame authz client uses gRPC
   args                  = ["serve", "write", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
   env                   = local.keto_common_env

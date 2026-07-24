@@ -151,9 +151,9 @@ module "migrate" {
     OTEL_METRICS_EXPORTER             = "none"
     OTEL_LOGS_EXPORTER                = "none"
     AUTHORIZATION_MODE                = "keto"
-    KETO_SERVICE_ADMIN_URI            = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
-    AUTHORIZATION_SERVICE_READ_URI    = "${data.google_cloud_run_v2_service.keto_read.uri}:443"
-    AUTHORIZATION_SERVICE_WRITE_URI   = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
+    KETO_SERVICE_ADMIN_URI            = data.google_cloud_run_v2_service.keto_write.uri
+    AUTHORIZATION_SERVICE_READ_URI    = data.google_cloud_run_v2_service.keto_read.uri
+    AUTHORIZATION_SERVICE_WRITE_URI   = data.google_cloud_run_v2_service.keto_write.uri
     PERMISSIONS_REGISTRATION_URL      = "${local.api_base}/tenancy/_internal/register/permissions"
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
