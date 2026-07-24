@@ -22,12 +22,15 @@ neon:
   account: identity   # → config/neon-accounts.yaml
 ```
 
-**One Neon project per app** under the identity Neon org. **One GCP project per env** (`stawi-identity-dev` / `stawi-identity-prod` placeholders).
+**One Neon project per app** under the identity Neon org.
+
+**Env policy (current):** apps list **`stawi-prod` only** → GCP project **`stawi-identity`**.  
+`stawi-dev` stays a registry placeholder until a real dev project is bootstrapped; then add `stawi-dev` back under each app’s `envs:`.
 
 ## Account resolution
 
 ```bash
-./.github/scripts/resolve-app-context.sh identity-authentication stawi-dev
+./.github/scripts/resolve-app-context.sh identity-authentication stawi-prod
 ```
 
 Returns `project_id`, `region`, WIF provider, deploy SA, Neon SM secret location, etc. CI uses this so **running an app is selecting accounts**, not hardcoding projects in Terraform.
