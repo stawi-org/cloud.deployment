@@ -62,5 +62,11 @@ Neon API key is loaded **only** when `app.yaml` has `neon.account`.
 
 # 3) Bootstrap accounts into SOPS (if not already)
 ./scripts/bootstrap-gcp-account.sh --account identity --env stawi-prod --project stawi-identity
-./scripts/bootstrap-neon-account.sh --account identity --api-key "$API_KEY"
+./scripts/bootstrap-neon-account.sh --account identity --api-key "$API_KEY" \
+  --org-hint "Stawi Identity" --org-id org-rapid-mountain-41505493
+
+# Platform domain (required for platform-* apps)
+./scripts/bootstrap-gcp-account.sh --account platform --env stawi-prod --project stawi-platform
+./scripts/bootstrap-neon-account.sh --account platform --api-key "$PLATFORM_NEON_API_KEY" \
+  --org-hint "Stawi Platform" --org-id org-calm-cell-68997035
 ```

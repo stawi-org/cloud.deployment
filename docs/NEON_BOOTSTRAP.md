@@ -24,7 +24,16 @@ CI decrypts the SOPS file with repository secret **`SOPS_AGE_KEY`**. No GitHub E
 export API_KEY=napi_xxx
 export GITHUB_TOKEN=ghp_xxx   # for push/PR
 
-./scripts/bootstrap-neon-account.sh --account identity
+./scripts/bootstrap-neon-account.sh --account identity \
+  --api-key "$API_KEY" \
+  --org-hint "Stawi Identity" \
+  --org-id org-rapid-mountain-41505493
+
+# Platform domain (devices/settings/geolocation/files) — use this for all platform-* apps
+./scripts/bootstrap-neon-account.sh --account platform \
+  --api-key "$API_KEY" \
+  --org-hint "Stawi Platform" \
+  --org-id org-calm-cell-68997035
 
 ./scripts/bootstrap-neon-account.sh --account payments \
   --api-key "$API_KEY" \

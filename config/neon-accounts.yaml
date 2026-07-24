@@ -14,7 +14,8 @@ accounts:
     neon_org_hint: Stawi Identity
     neon_org_id: org-rapid-mountain-41505493
     allowed_deploy_envs: [stawi-dev, stawi-prod]
-    allowed_app_prefixes: []
+    # Prevent platform/other domain apps from accidentally landing DBs here.
+    allowed_app_prefixes: [identity-]
     sensitivity: critical
     sops_auth_path: credentials/neon/identity/auth.yaml
   notifications:

@@ -34,6 +34,31 @@ while IFS= read -r -d '' app_yaml; do
       fail=1
     fi
   fi
+
+  # Domain ↔ Neon account alignment (prevents platform DBs in identity org, etc.)
+  domain=$(yq -r '.domain // ""' "$app_yaml")
+  gcp_acc="$gcp"
+  if [[ -n "$domain" && "$domain" != "null" && -n "$neon" && "$neon" != "null" ]]; then
+    if [[ "$domain" != "$neon" ]]; then
+      echo "ERROR: apps/${app} domain=${domain} but neon.account=${neon} (must match domain for multi-account isolation)" >&2
+      fail=1
+    fi
+  fi
+  if [[ -n "$domain" && "$domain" != "null" && -n "$gcp_acc" && "$gcp_acc" != "null" ]]; then
+    if [[ "$domain" != "$gcp_acc" ]]; then
+      echo "ERROR: apps/${app} domain=${domain} but gcp.account=${gcp_acc} (must match domain for multi-account isolation)" >&2
+      fail=1
+    fi
+  fi
+  # Naming convention: platform-* must use platform Neon (even if domain omitted)
+  if [[ "$app" == platform-* && -n "$neon" && "$neon" != "null" && "$neon" != "platform" ]]; then
+    echo "ERROR: apps/${app} must use neon.account=platform (got ${neon})" >&2
+    fail=1
+  fi
+  if [[ "$app" == identity-* && -n "$neon" && "$neon" != "null" && "$neon" != "identity" ]]; then
+    echo "ERROR: apps/${app} must use neon.account=identity (got ${neon})" >&2
+    fail=1
+  fi
   mapfile -t envs < <(yq -r '.envs[]?' "$app_yaml")
   for env in "${envs[@]:-}"; do
     [[ -z "$env" ]] && continue

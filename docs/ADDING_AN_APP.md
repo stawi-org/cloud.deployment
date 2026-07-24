@@ -81,7 +81,9 @@ Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform
 ## 4. Neon credentials (multi-account)
 
 1. Pick a **domain** account (`identity`, `notifications`, `payments`, `platform`, `labs`) — see [BACKEND.md](BACKEND.md).
-2. Confirm the key exists in `config/neon-accounts.yaml` and respects `allowed_deploy_envs` / `allowed_app_prefixes` (e.g. payments apps should be named `payment-*` / `checkout-*` / …).
+   - **Platform apps** (`platform-*`) must use `neon.account: platform` (org `org-calm-cell-68997035`) and `gcp.account: platform`.
+   - **Identity apps** (`identity-*`) must use `neon.account: identity` — never share the identity Neon org with platform.
+2. Confirm the key exists in `config/neon-accounts.yaml` and respects `allowed_deploy_envs` / `allowed_app_prefixes` (e.g. `platform-*`, `identity-*`, payments `payment-*` / `checkout-*` / …).
 3. Ensure SOPS file exists: `credentials/neon/<account>/auth.yaml` (from `bootstrap-neon-account.sh`).
 4. CI decrypts that file with **`SOPS_AGE_KEY`** → `TF_VAR_neon_api_key` only when the app has `neon.account`.
 5. Omit `neon:` entirely for GCP-only apps (no Neon key loaded).

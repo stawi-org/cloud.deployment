@@ -58,9 +58,19 @@ Registry: [`config/neon-accounts.yaml`](../config/neon-accounts.yaml)
 
 Domain orgs: `identity`, `notifications`, `payments`, `platform`, `labs`.
 
+| Account | Org id (when set) | App name prefixes |
+|---------|-------------------|-------------------|
+| `identity` | `org-rapid-mountain-41505493` | `identity-` |
+| `platform` | `org-calm-cell-68997035` | `platform-` |
+| `payments` | (set on bootstrap) | `payment-`, `checkout-`, `billing-`, `ledger-` |
+| `notifications` | (set on bootstrap) | (open until set) |
+| `labs` | (set on bootstrap) | (open; dev only) |
+
 **One Neon project per app** (OpenTofu module). Org API key is **deploy-time only**, from SOPS.
 
-CI: `SOPS_AGE_KEY` → decrypt `credentials/neon/<account>/auth.yaml` → `TF_VAR_neon_api_key`.
+CI: `SOPS_AGE_KEY` → decrypt `credentials/neon/<account>/auth.yaml` → `TF_VAR_neon_api_key` + `TF_VAR_neon_org_id`.
+
+Going forward, **never** create platform domain databases in the identity Neon org. See [DEPLOY_PLATFORM.md](DEPLOY_PLATFORM.md).
 
 ---
 
