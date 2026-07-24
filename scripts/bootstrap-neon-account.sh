@@ -244,23 +244,57 @@ sync_github_environment_secret() {
   local token
   token="$(github_token)" || die "GITHUB_TOKEN required for --sync-github-env"
 
-  # --- Preferred path: GitHub CLI ---
+  # --- Preferred path: GitHub CLI (no Python/pynacl) ---
   if command -v gh >/dev/null 2>&1; then
     say "setting GitHub Environment secret via gh (env=${env_name})"
-    # GH_TOKEN so gh uses the same token as the script
+    # Ensure environment exists first (gh secret set may require it).
+    # Create via API with clear errors; ignore if already exists.
+    local pre_code pre_body
+    pre_body=$(mktemp)
+    pre_code=$(curl -sS -o "$pre_body" -w '%{http_code}' -X PUT \
+      -H "Authorization: Bearer ${token}" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Content-Type: application/json" \
+      "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}" \
+      -d '{}' || echo "000")
+    if [[ "$pre_code" == "403" ]]; then
+      rm -f "$pre_body"
+      die "cannot create GitHub Environment '${env_name}' (HTTP 403).
+
+Your PAT cannot manage environments. Either:
+  • Add fine-grained permission Administration: Read and write (plus Environments), or
+  • Create '${env_name}' in the UI and set secret NEON_API_KEY manually, then re-run
+    without --sync-github-env.
+
+UI: https://github.com/${GITHUB_REPO}/settings/environments"
+    fi
+    rm -f "$pre_body"
+
+    if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
+        printf '%s' "$secret_value" \
+        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set NEON_API_KEY \
+            --repo "$GITHUB_REPO" \
+            --env "$env_name" 2>/tmp/neon-gh-secret.err; then
+      say "  set ${env_name} / NEON_API_KEY via gh"
+      return 0
+    fi
+    # older gh uses --body -
     if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
         printf '%s' "$secret_value" \
         | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set NEON_API_KEY \
             --repo "$GITHUB_REPO" \
             --env "$env_name" \
-            --body - 2>/tmp/neon-gh-secret.err; then
+            --body - 2>>/tmp/neon-gh-secret.err; then
       say "  set ${env_name} / NEON_API_KEY via gh"
       return 0
     fi
     warn "gh secret set failed:"
     head -c 500 /tmp/neon-gh-secret.err >&2 || true
     printf '\n' >&2
-    warn "falling back to REST API…"
+    warn "falling back to REST API + pynacl venv…"
+  else
+    warn "gh not installed — using REST + pynacl (install gh to avoid Python deps: https://cli.github.com)"
   fi
 
   # --- REST: create environment, then encrypt + put secret ---
@@ -505,9 +539,10 @@ auth:
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   note: "Neon org API key for OpenTofu provider only — never inject into Cloud Run"
 EOF
+  # --filename: sops matches creation_rules on this path, not the /tmp plaintext path
   (
     cd "$WORKTREE"
-    sops -e "$AUTH_PLAIN" >"$AUTH_REL"
+    sops -e --filename "$AUTH_REL" "$AUTH_PLAIN" >"$AUTH_REL"
   )
   rm -f "$AUTH_PLAIN"
   grep -q '^sops:' "$WORKTREE/$AUTH_REL" || die "SOPS encrypt failed"

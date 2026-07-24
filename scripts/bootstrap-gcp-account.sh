@@ -606,9 +606,10 @@ auth:
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 EOF
 
+# --filename: sops matches creation_rules on the intended repo path, not /tmp
 (
   cd "$WORKTREE"
-  sops -e "$AUTH_PLAIN" >"$AUTH_FILE"
+  sops -e --filename "$AUTH_REL" "$AUTH_PLAIN" >"$AUTH_FILE"
 )
 rm -f "$AUTH_PLAIN"
 if ! grep -q '^sops:' "$AUTH_FILE"; then
