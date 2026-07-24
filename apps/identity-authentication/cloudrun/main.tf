@@ -23,6 +23,7 @@ module "edge" {
 module "db" {
   source    = "../../../modules/neon-database"
   app_name  = var.app_name
+  org_id    = var.neon_org_id
   region_id = var.neon_region_id
 }
 

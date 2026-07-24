@@ -4,6 +4,7 @@
 # Cost defaults: low CU caps + short suspend + 1-day history retention.
 resource "neon_project" "this" {
   name       = var.app_name
+  org_id     = var.org_id
   region_id  = var.region_id
   pg_version = var.pg_version
 

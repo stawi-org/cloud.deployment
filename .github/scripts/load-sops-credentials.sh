@@ -68,15 +68,24 @@ DEPLOY_SA=$(jq -r '.auth.deploy_service_account // .deploy_service_account // em
 [[ -n "$REGION" ]] || REGION="europe-west1"
 
 NEON_API_KEY=""
+NEON_ORG_ID=$(jq -r '.neon_org_id // empty' <<<"$CTX")
 if [[ "$USES_NEON" == "true" ]]; then
   NEON_SOPS="$ROOT/credentials/neon/${NEON_ACCOUNT}/auth.yaml"
   if [[ ! -f "$NEON_SOPS" ]]; then
     echo "ERROR: missing $NEON_SOPS — run bootstrap-neon-account.sh for ${NEON_ACCOUNT}" >&2
     exit 1
   fi
-  NEON_API_KEY=$(sops -d "$NEON_SOPS" | yq -r '.auth.api_key // .api_key // ""')
+  NEON_JSON=$(sops -d "$NEON_SOPS" | yq -o=json '.')
+  NEON_API_KEY=$(jq -r '.auth.api_key // .api_key // empty' <<<"$NEON_JSON")
+  # Prefer SOPS neon_org_id when present; else registry
+  SOPS_ORG=$(jq -r '.auth.neon_org_id // .neon_org_id // empty' <<<"$NEON_JSON")
+  [[ -n "$SOPS_ORG" ]] && NEON_ORG_ID="$SOPS_ORG"
   [[ -n "$NEON_API_KEY" && "$NEON_API_KEY" != "null" ]] || {
     echo "ERROR: decrypted Neon auth missing api_key" >&2
+    exit 1
+  }
+  [[ -n "$NEON_ORG_ID" && "$NEON_ORG_ID" != "null" ]] || {
+    echo "ERROR: neon.account=${NEON_ACCOUNT} missing neon_org_id in registry or SOPS" >&2
     exit 1
   }
 fi
@@ -93,6 +102,7 @@ emit_gha() {
     echo "gcp_account=${GCP_ACCOUNT}"
     echo "neon_account=${NEON_ACCOUNT}"
     echo "uses_neon=${USES_NEON}"
+    echo "neon_org_id=${NEON_ORG_ID}"
   } >> "${GITHUB_OUTPUT}"
 
   # Workflow commands (add-mask) must go to stdout — never to GITHUB_ENV.
@@ -100,14 +110,15 @@ emit_gha() {
   echo "TF_VAR_region=${REGION}" >> "${GITHUB_ENV}"
   if [[ -n "$NEON_API_KEY" ]]; then
     echo "::add-mask::${NEON_API_KEY}"
-    # Multiline-safe delimiter write for env (keys are single-line but stay defensive)
     {
       echo "TF_VAR_neon_api_key<<SOPS_NEON_EOF"
       echo "${NEON_API_KEY}"
       echo "SOPS_NEON_EOF"
     } >> "${GITHUB_ENV}"
+    echo "TF_VAR_neon_org_id=${NEON_ORG_ID}" >> "${GITHUB_ENV}"
   else
     echo "TF_VAR_neon_api_key=unused" >> "${GITHUB_ENV}"
+    echo "TF_VAR_neon_org_id=" >> "${GITHUB_ENV}"
   fi
 }
 
@@ -118,6 +129,7 @@ emit_exports() {
   echo "export CLOUD_DEPLOY_SA=$(printf %q "$DEPLOY_SA")"
   if [[ -n "$NEON_API_KEY" ]]; then
     echo "export TF_VAR_neon_api_key=$(printf %q "$NEON_API_KEY")"
+    echo "export TF_VAR_neon_org_id=$(printf %q "$NEON_ORG_ID")"
   else
     echo "export TF_VAR_neon_api_key=unused"
   fi

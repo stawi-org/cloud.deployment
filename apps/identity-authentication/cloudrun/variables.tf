@@ -35,6 +35,12 @@ variable "neon_region_id" {
   default = "aws-eu-central-1"
 }
 
+variable "neon_org_id" {
+  type        = string
+  description = "Neon organization id (from neon-accounts registry / SOPS); required for project create"
+  default     = ""
+}
+
 variable "neon_api_key" {
   type        = string
   sensitive   = true

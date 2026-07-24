@@ -47,6 +47,7 @@ GCP_SOPS="credentials/gcp/${GCP_ACCOUNT}/${ENV}/auth.yaml"
 
 USES_NEON="false"
 NEON_SOPS=""
+NEON_ORG_ID=""
 if [[ -n "$NEON_ACCOUNT" ]]; then
   USES_NEON="true"
   if ! yq -e ".accounts[\"${NEON_ACCOUNT}\"]" "$NEON_REG" >/dev/null 2>&1; then
@@ -58,6 +59,8 @@ if [[ -n "$NEON_ACCOUNT" ]]; then
     exit 1
   fi
   NEON_SOPS="credentials/neon/${NEON_ACCOUNT}/auth.yaml"
+  NEON_ORG_ID=$(yq -r ".accounts[\"${NEON_ACCOUNT}\"].neon_org_id // \"\"" "$NEON_REG")
+  [[ "$NEON_ORG_ID" == "null" ]] && NEON_ORG_ID=""
 fi
 
 LABELS_JSON=$(yq -o=json -I=0 ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].labels // {}" "$GCP_REG")
@@ -74,6 +77,7 @@ CTX=$(jq -nc \
   --arg deploy_service_account "$DEPLOY_SA" \
   --arg gcp_sops_path "$GCP_SOPS" \
   --arg neon_sops_path "$NEON_SOPS" \
+  --arg neon_org_id "$NEON_ORG_ID" \
   --argjson labels "$LABELS_JSON" \
   '{
     app: $app,
@@ -87,6 +91,7 @@ CTX=$(jq -nc \
     deploy_service_account: $deploy_service_account,
     gcp_sops_path: $gcp_sops_path,
     neon_sops_path: $neon_sops_path,
+    neon_org_id: $neon_org_id,
     labels: $labels
   }')
 

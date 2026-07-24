@@ -3,6 +3,11 @@ variable "app_name" {
   description = "Application name; becomes Neon project name prefix"
 }
 
+variable "org_id" {
+  type        = string
+  description = "Neon organization id (org-…); required by Neon API for project create"
+}
+
 variable "region_id" {
   type        = string
   description = "Neon region id, e.g. aws-eu-central-1"

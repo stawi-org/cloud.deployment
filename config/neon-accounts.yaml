@@ -13,6 +13,7 @@ accounts:
     description: Identity domain Neon organization
     owners: [identity-team]
     neon_org_hint: Stawi Identity
+    neon_org_id: org-rapid-mountain-41505493
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: critical
