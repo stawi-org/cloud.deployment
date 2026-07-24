@@ -1,18 +1,27 @@
 # Encrypted credentials
 
-## GCP
-- `credentials/gcp/<account>/<env>/auth.yaml` — from `scripts/bootstrap-gcp-account.sh`
-- Non-secret project/WIF also in `config/gcp-accounts.yaml`
+SOPS age recipient is in repo `.sops.yaml` (encrypt-only on bootstrap machines).
 
-## Neon (independent of GCP)
-- `credentials/neon/<account>/auth.yaml` — from `scripts/bootstrap-neon-account.sh`
+## GCP (`scripts/bootstrap-gcp-account.sh`)
+
+- Path: `credentials/gcp/<account>/<env>/auth.yaml`
+- Non-secret project/WIF also written to `config/gcp-accounts.yaml` for CI resolve
+- Does **not** configure Neon
+
+## Neon (`scripts/bootstrap-neon-account.sh`)
+
+- Path: `credentials/neon/<account>/auth.yaml`
 - Contains org API key (SOPS). Used by operators / optional CI decrypt.
 - Non-secret registry: `config/neon-accounts.yaml`
 - CI preferred: GitHub Environment `NEON_API_KEY` (`--sync-github-env`) or Secret Manager (configured separately per deploy GCP project)
 - Apps link Neon↔GCP only via `app.yaml` (`neon.account` + `gcp.account`)
 
-Decrypt (private age key required):
+## Runtime secrets
+
+`DATABASE_URL` and app secrets live in **GCP Secret Manager**, not git.
 
 ```bash
+sops -d credentials/gcp/identity/stawi-dev/auth.yaml
+sops -d credentials/gcp/identity/stawi-prod/auth.yaml
 sops -d credentials/neon/identity/auth.yaml
 ```
