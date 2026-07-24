@@ -45,16 +45,13 @@ locals {
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
     local.generated_secret_values,
-    # Full webhook auth block (Hydra requires auth.type=api_key; config is nested).
-    # Cluster used OAUTH2_TOKEN_HOOK_AUTH_CONFIG consolidated JSON (ory/hydra#3959).
+    # Only the auth.config object — type is OAUTH2_TOKEN_HOOK_AUTH_TYPE env (see hydra_env).
+    # See ory/hydra#3959: consolidated CONFIG_VALUE style is ignored; AUTH_CONFIG is config only.
     {
       (local.token_hook_secret_id) = jsonencode({
-        type = "api_key"
-        config = {
-          in    = "header"
-          name  = "Authorization"
-          value = "Bearer ${local.generated_secret_values["hydra-webhook-psk"]}"
-        }
+        in    = "header"
+        name  = "Authorization"
+        value = "Bearer ${local.generated_secret_values["hydra-webhook-psk"]}"
       })
     },
     var.extra_secret_values,
@@ -100,8 +97,9 @@ locals {
     OAUTH2_HASHERS_BCRYPT_COST                      = "12"
     OAUTH2_SESSION_ENCRYPT_AT_REST                  = "true"
     OAUTH2_EXPOSE_INTERNAL_ERRORS                   = "false"
-    OAUTH2_TOKEN_HOOK_URL                           = "${local.accounts_origin}/webhook/enrich/token"
-    SQA_OPT_OUT                                     = "true"
+    OAUTH2_TOKEN_HOOK_URL       = "${local.accounts_origin}/webhook/enrich/token"
+    OAUTH2_TOKEN_HOOK_AUTH_TYPE = "api_key"
+    SQA_OPT_OUT                 = "true"
     LOG_LEVEL                                       = "warn"
     LOG_FORMAT                                      = "text"
   }

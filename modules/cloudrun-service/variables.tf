@@ -53,7 +53,7 @@ variable "secret_env" {
   description = "Env vars sourced from Secret Manager"
 }
 
-# Mount Secret Manager secrets as files (e.g. Keto namespaces.ts).
+# Mount Secret Manager secrets as files.
 variable "secret_volumes" {
   type = map(object({
     secret     = string
@@ -64,6 +64,17 @@ variable "secret_volumes" {
   }))
   default     = {}
   description = "Map of volume name → Secret Manager volume mount"
+}
+
+# Mount a GCS bucket (read-only) — use for files >64KB (SM limit).
+variable "gcs_volumes" {
+  type = map(object({
+    bucket     = string
+    mount_path = string
+    read_only  = optional(bool, true)
+  }))
+  default     = {}
+  description = "Map of volume name → GCS FUSE mount"
 }
 
 variable "cpu" {

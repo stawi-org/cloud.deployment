@@ -48,6 +48,17 @@ resource "google_cloud_run_v2_service" "this" {
       }
     }
 
+    dynamic "volumes" {
+      for_each = var.gcs_volumes
+      content {
+        name = volumes.key
+        gcs {
+          bucket    = volumes.value.bucket
+          read_only = volumes.value.read_only
+        }
+      }
+    }
+
     containers {
       image   = var.image
       command = var.command
@@ -66,6 +77,14 @@ resource "google_cloud_run_v2_service" "this" {
 
       dynamic "volume_mounts" {
         for_each = var.secret_volumes
+        content {
+          name       = volume_mounts.key
+          mount_path = volume_mounts.value.mount_path
+        }
+      }
+
+      dynamic "volume_mounts" {
+        for_each = var.gcs_volumes
         content {
           name       = volume_mounts.key
           mount_path = volume_mounts.value.mount_path

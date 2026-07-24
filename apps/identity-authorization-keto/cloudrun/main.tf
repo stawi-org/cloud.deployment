@@ -1,5 +1,8 @@
 # Ory Keto — self-contained. Parity: namespaces/identity/authorization/service-keto.yaml
 # Cluster read:4466 + write:4467 → two Cloud Run services.
+#
+# namespaces.ts is ~73KB (over Secret Manager 64KB). Serve it from a GCS FUSE volume.
+# keto.yml stays in SM (small).
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -23,20 +26,47 @@ resource "google_service_account" "runtime" {
   display_name = "Cloud Run runtime for ${var.app_name}"
 }
 
+# Config objects larger than SM 64KB (namespaces.ts).
+resource "google_storage_bucket" "config" {
+  name                        = "${var.project_id}-${var.app_name}-config"
+  project                     = var.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = true
+  labels                      = var.labels
+
+  # Config only — no public access, versioning for rollbacks.
+  versioning {
+    enabled = true
+  }
+}
+
+resource "google_storage_bucket_object" "namespaces_ts" {
+  name   = "namespaces.ts"
+  bucket = google_storage_bucket.config.name
+  source = "${path.module}/../files/namespaces.ts"
+  # Content hash so tofu updates the object when the file changes.
+  content_type = "text/plain"
+}
+
+resource "google_storage_bucket_iam_member" "runtime_object_viewer" {
+  bucket = google_storage_bucket.config.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  namespaces_secret_id = "${var.app_name}-namespaces-ts"
-  keto_yml_secret_id   = "${var.app_name}-keto-yml"
+  keto_yml_secret_id        = "${var.app_name}-keto-yml"
   secret_ids = setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id, local.keto_yml_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id, local.keto_yml_secret_id]),
     var.extra_secret_ids,
   )
-  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id, local.keto_yml_secret_id])
+  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.keto_yml_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
-    { (local.namespaces_secret_id) = file("${path.module}/../files/namespaces.ts") },
     { (local.keto_yml_secret_id) = file("${path.module}/../files/keto.yml") },
     var.extra_secret_values,
   )
@@ -51,16 +81,20 @@ locals {
     DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_secret_id] }
     REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
   }
-  keto_volumes = {
-    namespaces = {
-      secret     = local.namespaces_secret_id
-      mount_path = "/etc/keto-namespaces"
-      file_name  = "namespaces.ts"
-    }
+  # Small keto.yml via Secret Manager file mount.
+  keto_secret_volumes = {
     keto_config = {
       secret     = local.keto_yml_secret_id
       mount_path = "/etc/keto"
       file_name  = "keto.yml"
+    }
+  }
+  # Large namespaces.ts via GCS FUSE (bucket root → /etc/keto-namespaces/).
+  keto_gcs_volumes = {
+    namespaces = {
+      bucket     = google_storage_bucket.config.name
+      mount_path = "/etc/keto-namespaces"
+      read_only  = true
     }
   }
 }
@@ -115,8 +149,14 @@ module "service_read" {
   memory                = "512Mi"
   env                   = local.keto_common_env
   secret_env            = local.keto_secret_env
-  secret_volumes        = local.keto_volumes
-  depends_on            = [module.secrets, module.migrate]
+  secret_volumes        = local.keto_secret_volumes
+  gcs_volumes           = local.keto_gcs_volumes
+  depends_on = [
+    module.secrets,
+    module.migrate,
+    google_storage_bucket_object.namespaces_ts,
+    google_storage_bucket_iam_member.runtime_object_viewer,
+  ]
 }
 
 module "service_write" {
@@ -132,10 +172,12 @@ module "service_write" {
   memory                = "512Mi"
   env                   = local.keto_common_env
   secret_env            = local.keto_secret_env
-  secret_volumes        = local.keto_volumes
-  depends_on            = [module.secrets, module.migrate]
+  secret_volumes        = local.keto_secret_volumes
+  gcs_volumes           = local.keto_gcs_volumes
+  depends_on = [
+    module.secrets,
+    module.migrate,
+    google_storage_bucket_object.namespaces_ts,
+    google_storage_bucket_iam_member.runtime_object_viewer,
+  ]
 }
-
-# Migrate job also needs DSN + optional config
-# (migrate already set; add -c if needed via module.migrate.args below — up uses env DSN)
-
