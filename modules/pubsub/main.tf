@@ -51,10 +51,38 @@ locals {
     "gcppubsub://${var.project_id}/${local.events_topic_name}"
   ) : ""
   frame_subscribe_url = local.events_topic_name != "" ? (
-    var.default_push_endpoint != null && var.default_push_endpoint != ""
+    local.default_is_push
     ? "push://${local.events_ref}?protocol=gcppubsub"
     : "gcppubsub://${var.project_id}/${local.events_sub_name}"
   ) : ""
+
+  # Push OIDC: always configure the full FRAME_QUEUE_PUSH_OIDC_* suite for Frame
+  # when a push endpoint is used. Audience defaults to the push URL (must match
+  # the Pub/Sub subscription oidc_token.audience).
+  push_oidc_enabled = local.default_is_push && var.push_oidc_service_account_email != ""
+  push_oidc_audience = (
+    var.push_oidc_audience != ""
+    ? var.push_oidc_audience
+    : coalesce(var.default_push_endpoint, "")
+  )
+  push_oidc_issuers = (
+    var.push_oidc_issuers != ""
+    ? var.push_oidc_issuers
+    : "https://accounts.google.com,accounts.google.com"
+  )
+  push_oidc_jwks_url = (
+    var.push_oidc_jwks_url != ""
+    ? var.push_oidc_jwks_url
+    : "https://www.googleapis.com/oauth2/v3/certs"
+  )
+}
+
+# Frame push without OIDC would accept unauthenticated delivery — refuse that.
+check "frame_push_requires_oidc" {
+  assert {
+    condition     = !local.default_is_push || var.push_oidc_service_account_email != ""
+    error_message = "default_push_endpoint is set but push_oidc_service_account_email is empty; Frame apps must configure FRAME_QUEUE_PUSH_OIDC_* (pass the runtime SA used for Pub/Sub push OIDC)."
+  }
 }
 
 resource "google_pubsub_topic" "this" {

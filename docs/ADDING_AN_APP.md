@@ -69,7 +69,7 @@ Migrations use the Neon **direct** connection string; the service uses the **poo
   - `EVENTS_QUEUE_PUBLISH_URL=gcppubsub://{project}/{app}-events`
   - `EVENTS_QUEUE_SUBSCRIBE_URL=push://{app}-events?protocol=gcppubsub`
   - `EVENTS_QUEUE_NAME={app}-events` (demux ref for handlers)
-  - `FRAME_QUEUE_PUSH_AUTH=oidc` + audience / allowed SA emails
+  - Full `FRAME_QUEUE_PUSH_OIDC_*` suite: `AUTH=oidc`, `REQUIRE_AUTH=true`, `AUDIENCE` (push URL), `ISSUERS` (Google), `JWKS_URL` (Google certs), `ALLOWED_EMAILS` (runtime SA)
 - Frame apps dispatch via `WithRegisterEvents` handlers registered against that ref
 - Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate`
 - Services must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` and depend on Frame ≥ **v2.0.10** (prefer **v2.0.11+**)

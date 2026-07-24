@@ -57,7 +57,7 @@ receive  → push://{app}-events?protocol=gcppubsub (HTTP demux)
 GCP push → POST https://{service}/_frame/queue/{app}-events
 ```
 
-`service_env` emits dual URLs:
+`service_env` emits dual URLs **and the full push OIDC suite** whenever `default_push_endpoint` + `push_oidc_service_account_email` are set:
 
 | Env | Value |
 |-----|--------|
@@ -65,7 +65,14 @@ GCP push → POST https://{service}/_frame/queue/{app}-events
 | `EVENTS_QUEUE_SUBSCRIBE_URL` | `push://{app}-events?protocol=gcppubsub` |
 | `EVENTS_QUEUE_URL` | same as publish (legacy single-URL fallback) |
 | `EVENTS_QUEUE_NAME` | `{app}-events` (Frame demux ref) |
-| `FRAME_QUEUE_PUSH_*` | OIDC auth for push handler |
+| `FRAME_QUEUE_PUSH_AUTH` | `oidc` |
+| `FRAME_QUEUE_PUSH_REQUIRE_AUTH` | `true` |
+| `FRAME_QUEUE_PUSH_OIDC_AUDIENCE` | push endpoint URL (must match Pub/Sub OIDC audience) |
+| `FRAME_QUEUE_PUSH_OIDC_ISSUERS` | `https://accounts.google.com,accounts.google.com` |
+| `FRAME_QUEUE_PUSH_OIDC_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` |
+| `FRAME_QUEUE_PUSH_OIDC_ALLOWED_EMAILS` | runtime SA email used for push |
+
+Push without OIDC is rejected (`check.frame_push_requires_oidc`).
 
 Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate` (no Pub/Sub needed for schema).
 
@@ -104,8 +111,10 @@ enforce_in_transit            = true
 | `allowed_persistence_regions` | list(string) | `[]` | Regions where Pub/Sub may store messages |
 | `enforce_in_transit` | bool | `true` | Keep in-transit messages in allowed regions |
 | `default_push_endpoint` | string | `null` | Frame push URL `https://…/_frame/queue/{ref}` |
-| `push_oidc_service_account_email` | string | `""` | SA Pub/Sub uses to mint OIDC tokens |
-| `push_oidc_audience` | string | `""` | OIDC audience (defaults to push endpoint) |
+| `push_oidc_service_account_email` | string | `""` | SA Pub/Sub uses for OIDC + Frame allowlist (**required** when push endpoint set) |
+| `push_oidc_audience` | string | `""` | `FRAME_QUEUE_PUSH_OIDC_AUDIENCE` (defaults to push endpoint) |
+| `push_oidc_issuers` | string | `""` | `FRAME_QUEUE_PUSH_OIDC_ISSUERS` (defaults to Google accounts) |
+| `push_oidc_jwks_url` | string | `""` | `FRAME_QUEUE_PUSH_OIDC_JWKS_URL` (defaults to Google JWKS) |
 | `create_dead_letter_topic` | bool | `true` | Create DLQ + attach dead-letter policy |
 | `dead_letter_max_delivery_attempts` | number | `10` | Max delivery attempts before DLQ |
 | `pubsub_service_agent_email` | string | `""` | `service-{num}@gcp-sa-pubsub.iam.gserviceaccount.com` |
@@ -150,6 +159,7 @@ module "messaging" {
   allowed_persistence_regions     = [var.region]
   enforce_in_transit              = true
   default_push_endpoint           = local.events_push_endpoint
+  # Always pair push with OIDC — service_env emits full FRAME_QUEUE_PUSH_OIDC_*.
   push_oidc_service_account_email = google_service_account.runtime.email
   push_oidc_audience              = local.events_push_endpoint
   pubsub_service_agent_email      = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"

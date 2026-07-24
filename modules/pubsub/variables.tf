@@ -79,13 +79,25 @@ variable "default_push_endpoint" {
 variable "push_oidc_service_account_email" {
   type        = string
   default     = ""
-  description = "SA used by Pub/Sub to mint OIDC tokens for push auth"
+  description = "SA used by Pub/Sub to mint OIDC tokens for push auth (also FRAME_QUEUE_PUSH_OIDC_ALLOWED_EMAILS)"
 }
 
 variable "push_oidc_audience" {
   type        = string
   default     = ""
-  description = "OIDC audience for push (defaults to push endpoint URL)"
+  description = "FRAME_QUEUE_PUSH_OIDC_AUDIENCE; defaults to default_push_endpoint (must match Pub/Sub push OIDC audience)"
+}
+
+variable "push_oidc_issuers" {
+  type        = string
+  default     = ""
+  description = "FRAME_QUEUE_PUSH_OIDC_ISSUERS comma-list; empty → Google accounts issuers"
+}
+
+variable "push_oidc_jwks_url" {
+  type        = string
+  default     = ""
+  description = "FRAME_QUEUE_PUSH_OIDC_JWKS_URL; empty → Google oauth2 v3 certs"
 }
 
 variable "create_dead_letter_topic" {

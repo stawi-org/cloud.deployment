@@ -47,7 +47,7 @@ output "frame_push_handler_path" {
 }
 
 output "service_env" {
-  description = "Env for Cloud Run Frame services (gcppubsub publish + push subscribe)"
+  description = "Env for Cloud Run Frame services (gcppubsub publish + push subscribe + OIDC)"
   value = merge(
     { for k, t in google_pubsub_topic.this : "PUBSUB_TOPIC_${upper(replace(k, "-", "_"))}" => t.name },
     { for k, s in google_pubsub_subscription.this : "PUBSUB_SUBSCRIPTION_${upper(replace(k, "-", "_"))}" => s.name },
@@ -60,16 +60,33 @@ output "service_env" {
       EVENTS_QUEUE_URL           = local.frame_publish_url
       EVENTS_QUEUE_PUBLISH_URL   = local.frame_publish_url
       EVENTS_QUEUE_SUBSCRIBE_URL = local.frame_subscribe_url
-      # Frame push handler auth for Pub/Sub OIDC
       FRAME_QUEUE_PUSH_BASE_PATH = "/_frame/queue"
-      FRAME_QUEUE_PUSH_AUTH      = var.push_oidc_service_account_email != "" ? "oidc" : "none"
     } : {},
-    var.push_oidc_service_account_email != "" ? {
+    # Always emit the full FRAME_QUEUE_PUSH_OIDC_* suite when push+OIDC is enabled.
+    # Frame validates: signature (JWKS) + issuer + audience + allowed email/sub.
+    local.push_oidc_enabled ? {
+      FRAME_QUEUE_PUSH_AUTH                = "oidc"
       FRAME_QUEUE_PUSH_REQUIRE_AUTH        = "true"
+      FRAME_QUEUE_PUSH_OIDC_AUDIENCE       = local.push_oidc_audience
+      FRAME_QUEUE_PUSH_OIDC_ISSUERS        = local.push_oidc_issuers
+      FRAME_QUEUE_PUSH_OIDC_JWKS_URL       = local.push_oidc_jwks_url
       FRAME_QUEUE_PUSH_OIDC_ALLOWED_EMAILS = var.push_oidc_service_account_email
-    } : {},
-    var.push_oidc_audience != "" ? {
-      FRAME_QUEUE_PUSH_OIDC_AUDIENCE = var.push_oidc_audience
-    } : {},
+      } : (
+      # Pull-only / non-Frame: leave push auth unset (Frame defaults to none).
+      local.events_topic_name != "" && !local.default_is_push ? {
+        FRAME_QUEUE_PUSH_AUTH = "none"
+      } : {}
+    ),
   )
+}
+
+output "frame_push_oidc" {
+  description = "Resolved Frame push OIDC settings (for debugging / docs)"
+  value = local.push_oidc_enabled ? {
+    auth           = "oidc"
+    audience       = local.push_oidc_audience
+    issuers        = local.push_oidc_issuers
+    jwks_url       = local.push_oidc_jwks_url
+    allowed_emails = var.push_oidc_service_account_email
+  } : null
 }
