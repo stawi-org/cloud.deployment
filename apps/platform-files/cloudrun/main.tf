@@ -52,6 +52,11 @@ resource "google_service_account" "runtime" {
   display_name = "Cloud Run runtime for ${var.app_name}"
 }
 
+resource "random_password" "encryption_phrase" {
+  length  = 48
+  special = false
+}
+
 locals {
   service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
   events_ref           = "${var.app_name}-events"
@@ -66,11 +71,18 @@ locals {
 
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  secret_ids                = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), var.extra_secret_ids)
-  version_ids               = toset([local.database_secret_id, local.database_direct_secret_id])
+  encryption_secret_id      = "${var.app_name}-encryption-phrase"
+  secret_ids = setunion(
+    toset([local.database_secret_id, local.database_direct_secret_id, local.encryption_secret_id]),
+    var.extra_secret_ids,
+  )
+  version_ids = setunion(
+    toset([local.database_secret_id, local.database_direct_secret_id, local.encryption_secret_id]),
+  )
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
+    { (local.encryption_secret_id) = random_password.encryption_phrase.result },
     var.extra_secret_values,
   )
 
@@ -163,6 +175,7 @@ module "migrate" {
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
+  execute               = false  # CI shell runs migrate; avoid hard-fail first boot
   args                  = ["migrate"]
   env = {
     LOG_LEVEL                    = "INFO"

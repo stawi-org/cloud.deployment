@@ -161,6 +161,7 @@ module "migrate" {
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
+  execute               = false  # CI shell runs migrate; avoid hard-fail first boot
   args                  = ["migrate"]
   env = {
     LOG_LEVEL                    = "INFO"
