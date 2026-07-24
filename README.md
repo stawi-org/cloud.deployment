@@ -30,6 +30,7 @@ app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF /
 - **Pub/Sub only** for messaging (no NATS)
 - **Identity greenfield** apps under `apps/identity-*` — [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md)
 | [docs/GCP_BOOTSTRAP.md](docs/GCP_BOOTSTRAP.md) | Cloud Shell GCP account bootstrap (WIF + SOPS PR) |
+| [docs/NEON_BOOTSTRAP.md](docs/NEON_BOOTSTRAP.md) | Independent Neon org onboard (SOPS + optional GH Env) |
 
 ## Docs
 
@@ -39,5 +40,6 @@ app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF /
 | [docs/ADDING_AN_APP.md](docs/ADDING_AN_APP.md) | Add an app |
 | [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md) | Identity domain big-bang |
 | [docs/GCP_BOOTSTRAP.md](docs/GCP_BOOTSTRAP.md) | Cloud Shell GCP account bootstrap (WIF + SOPS PR) |
+| [docs/NEON_BOOTSTRAP.md](docs/NEON_BOOTSTRAP.md) | Independent Neon org onboard (SOPS + optional GH Env) |
 | [docs/MODULES.md](docs/MODULES.md) | Modules |
 | [docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md](docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md) | Platform design |

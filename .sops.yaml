@@ -4,3 +4,6 @@ creation_rules:
   - path_regex: credentials/gcp/.*/auth\.yaml$
     encrypted_regex: "^(.*)$"
     age: age1s570flcma83aa5lxzfvgz0y6gh5r3pnfmhlhlxamyux24dsquq7s6zffpt
+  - path_regex: credentials/neon/.*/auth\.yaml$
+    encrypted_regex: "^(.*)$"
+    age: age1s570flcma83aa5lxzfvgz0y6gh5r3pnfmhlhlxamyux24dsquq7s6zffpt

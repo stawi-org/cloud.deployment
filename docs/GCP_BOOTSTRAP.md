@@ -76,3 +76,7 @@ Apps with `gcp.account: identity` will deploy into that project. CI fetches Neon
 - [BACKEND.md](BACKEND.md)
 - [IDENTITY_GREENFIELD.md](IDENTITY_GREENFIELD.md)
 - Multi-account design: `docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md`
+
+## Neon (separate)
+
+Do **not** pass Neon keys to this script. Use [NEON_BOOTSTRAP.md](NEON_BOOTSTRAP.md) / `scripts/bootstrap-neon-account.sh`.
