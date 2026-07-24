@@ -1,0 +1,20 @@
+# Minimal Keto config for Cloud Run (env can still override DSN).
+# Default image path /home/ory/keto.yml is missing; we mount this file.
+version: v0.12.0
+
+serve:
+  read:
+    host: 0.0.0.0
+    port: 4466
+  write:
+    host: 0.0.0.0
+    port: 4467
+
+namespaces:
+  location: file:///etc/keto-namespaces/namespaces.ts
+
+log:
+  level: info
+  format: text
+
+# DSN is provided via environment variable DSN / DATABASE_URL

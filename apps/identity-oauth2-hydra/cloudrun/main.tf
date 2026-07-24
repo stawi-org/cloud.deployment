@@ -45,11 +45,16 @@ locals {
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
     local.generated_secret_values,
+    # Full webhook auth block (Hydra requires auth.type=api_key; config is nested).
+    # Cluster used OAUTH2_TOKEN_HOOK_AUTH_CONFIG consolidated JSON (ory/hydra#3959).
     {
       (local.token_hook_secret_id) = jsonencode({
-        in    = "header"
-        name  = "Authorization"
-        value = "Bearer ${local.generated_secret_values["hydra-webhook-psk"]}"
+        type = "api_key"
+        config = {
+          in    = "header"
+          name  = "Authorization"
+          value = "Bearer ${local.generated_secret_values["hydra-webhook-psk"]}"
+        }
       })
     },
     var.extra_secret_values,

@@ -26,26 +26,25 @@ resource "google_service_account" "runtime" {
 locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  namespaces_secret_id      = "${var.app_name}-namespaces-ts"
+  namespaces_secret_id = "${var.app_name}-namespaces-ts"
+  keto_yml_secret_id   = "${var.app_name}-keto-yml"
   secret_ids = setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id, local.keto_yml_secret_id]),
     var.extra_secret_ids,
   )
-  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id])
+  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id, local.keto_yml_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
     { (local.namespaces_secret_id) = file("${path.module}/../files/namespaces.ts") },
+    { (local.keto_yml_secret_id) = file("${path.module}/../files/keto.yml") },
     var.extra_secret_values,
   )
 
   keto_common_env = merge(module.messaging.service_env, {
-    GCP_PROJECT         = var.project_id
-    APP_NAME            = var.app_name
-    LOG_LEVEL           = "info"
-    SERVE_READ_HOST     = "0.0.0.0"
-    SERVE_WRITE_HOST    = "0.0.0.0"
-    NAMESPACES_LOCATION = "file:///etc/keto-namespaces/namespaces.ts"
+    GCP_PROJECT = var.project_id
+    APP_NAME    = var.app_name
+    LOG_LEVEL   = "info"
   })
   keto_secret_env = {
     DSN                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
@@ -57,6 +56,11 @@ locals {
       secret     = local.namespaces_secret_id
       mount_path = "/etc/keto-namespaces"
       file_name  = "namespaces.ts"
+    }
+    keto_config = {
+      secret     = local.keto_yml_secret_id
+      mount_path = "/etc/keto"
+      file_name  = "keto.yml"
     }
   }
 }
@@ -87,8 +91,9 @@ module "migrate" {
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
-  args                  = ["migrate", "up", "-y"]
-  env                   = { LOG_LEVEL = "info" }
+  # migrate up only needs DSN (no keto.yml mount on jobs yet)
+  args = ["migrate", "up", "-y"]
+  env  = { LOG_LEVEL = "info" }
   secret_env = {
     DSN          = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
     DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
@@ -105,9 +110,10 @@ module "service_read" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = 4466
-  args                  = ["serve", "read"]
+  # Image default config /home/ory/keto.yml is missing — use mounted file
+  args                  = ["serve", "read", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
-  env                   = merge(local.keto_common_env, { SERVE_READ_PORT = "4466" })
+  env                   = local.keto_common_env
   secret_env            = local.keto_secret_env
   secret_volumes        = local.keto_volumes
   depends_on            = [module.secrets, module.migrate]
@@ -122,10 +128,14 @@ module "service_write" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = 4467
-  args                  = ["serve", "write"]
+  args                  = ["serve", "write", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
-  env                   = merge(local.keto_common_env, { SERVE_WRITE_PORT = "4467" })
+  env                   = local.keto_common_env
   secret_env            = local.keto_secret_env
   secret_volumes        = local.keto_volumes
   depends_on            = [module.secrets, module.migrate]
 }
+
+# Migrate job also needs DSN + optional config
+# (migrate already set; add -c if needed via module.migrate.args below — up uses env DSN)
+
