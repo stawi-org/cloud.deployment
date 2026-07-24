@@ -1,6 +1,6 @@
 # cloud.deployment
 
-Modular **Cloud Run + Neon** deployments for Stawi edge/greenfield applications.
+Modular **Cloud Run + Neon + Cloud Pub/Sub** deployments for Stawi edge/greenfield applications.
 
 ## Boundaries
 
@@ -8,7 +8,7 @@ Modular **Cloud Run + Neon** deployments for Stawi edge/greenfield applications.
 |------|------|
 | [`deployment.infra`](https://github.com/stawi-org/deployment.infra) | Cluster foundation (Talos, nodes, Flux bootstrap, DNS foundation) |
 | [`deployment.manifests`](https://github.com/stawi-org/deployment.manifests) | **All** Kubernetes deployments (Colony, Gateway, CNPG, NATS, Flux) |
-| **This repo** | OpenTofu modules + per-app Cloud Run/Neon stacks + path-filtered CI |
+| **This repo** | OpenTofu modules + per-app Cloud Run/Neon/Pub/Sub stacks + path-filtered CI |
 | [Colony chart](https://github.com/antinvestor/charts) | Helm chart source used only by `deployment.manifests` |
 
 Kubernetes manifests do **not** live here.
@@ -24,6 +24,7 @@ See [docs/superpowers/specs/2026-07-24-cloud-deployment-architecture-design.md](
 - **One Neon project per app**, projects may live under **different Neon accounts**.
 - **Public edge only** for talking to cluster platform services (first wave).
 - Shared modules mirror the Colony idea: change once, thin app deltas.
+- **Messaging is always Cloud Pub/Sub** (cluster NATS is not used from these apps).
 
 ## Status
 

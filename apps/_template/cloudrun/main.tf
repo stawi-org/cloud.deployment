@@ -74,6 +74,18 @@ resource "google_secret_manager_secret_iam_member" "run_accessor" {
 }
 
 # ---------------------------------------------------------------------------
+# Messaging — Cloud Pub/Sub only (never NATS for apps in this repo)
+# ---------------------------------------------------------------------------
+module "messaging" {
+  source                         = "../../../modules/pubsub"
+  project_id                     = local.platform.project_id
+  app_name                       = var.app_name
+  runtime_service_account_email  = google_service_account.runtime.email
+  labels                         = local.platform.labels
+  # Default: {app}-events topic + pull subscription. Override topics/subscriptions as needed.
+}
+
+# ---------------------------------------------------------------------------
 # Cloud Run service
 # ---------------------------------------------------------------------------
 module "service" {
@@ -84,7 +96,10 @@ module "service" {
   image                 = var.image
   labels                = local.platform.labels
   service_account_email = google_service_account.runtime.email
-  env                   = module.edge.service_env
+  env = merge(
+    module.edge.service_env,
+    module.messaging.service_env,
+  )
   secret_env = {
     DATABASE_URL = {
       secret = google_secret_manager_secret.database_url.secret_id
@@ -94,5 +109,6 @@ module "service" {
   depends_on = [
     google_secret_manager_secret_version.database_url,
     google_secret_manager_secret_iam_member.run_accessor,
+    module.messaging,
   ]
 }

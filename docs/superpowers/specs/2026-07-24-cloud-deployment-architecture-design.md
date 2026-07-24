@@ -6,9 +6,11 @@
 
 ## Summary
 
-`cloud.deployment` is the modular home for **Cloud Run + Neon** application deployments and reusable OpenTofu modules. It is the Cloud Run analogue of the Colony Helm chart pattern used on Kubernetes: shared modules hold the heavy lifting; each app is a thin composition root.
+`cloud.deployment` is the modular home for **Cloud Run + Neon + Cloud Pub/Sub** application deployments and reusable OpenTofu modules. It is the Cloud Run analogue of the Colony Helm chart pattern used on Kubernetes: shared modules hold the heavy lifting; each app is a thin composition root.
 
 Kubernetes remains exclusively in `deployment.manifests`. Cluster foundation remains in `deployment.infra`. This repo does **not** hold HelmReleases, Flux Kustomizations, Gateway routes, CNPG, or NATS resources.
+
+**Messaging for apps in this repo is always Google Cloud Pub/Sub** — not NATS/JetStream (those remain cluster-only under `deployment.manifests`). Edge/greenfield services publish and subscribe via Pub/Sub topics and subscriptions provisioned with the app stack.
 
 First wave targets **greenfield / edge products** that talk to the existing platform only via **public edge** endpoints (`api.stawi.*`, `oauth2.stawi.org`, and related public hosts). No private mesh into the Talos cluster.
 
@@ -22,6 +24,7 @@ First wave targets **greenfield / edge products** that talk to the existing plat
 4. Clear repo boundaries so small platform changes do not require touching every application or the wrong repository.
 5. Support Neon projects from **different Neon accounts/orgs**, with **one Neon project per app**.
 6. Remote state on **Cloudflare R2** (aligned with `deployment.infra` state practices).
+7. **Always use Cloud Pub/Sub** for async messaging in apps owned by this repo (no NATS for Cloud Run workloads).
 
 ## Non-Goals (first wave)
 
@@ -30,6 +33,7 @@ First wave targets **greenfield / edge products** that talk to the existing plat
 - In-cluster OpenTofu / Flux TF controller reconciling Cloud Run or Neon.
 - Storing any Kubernetes deployment manifests here.
 - A single monorepo OpenTofu root that plans all apps together.
+- Using NATS/JetStream from Cloud Run apps (cluster NATS stays on K8s only).
 
 ## Key Decisions
 
@@ -47,6 +51,7 @@ First wave targets **greenfield / edge products** that talk to the existing plat
 | Neon accounts | **Multi-account / multi-org** | Projects may live under different Neon accounts |
 | State backend | **Cloudflare R2** | Match infra; S3-compatible; not tied to a single GCP project |
 | CI scope | Path + impact detection | Only changed/impacted apps run |
+| Messaging (this repo) | **Google Cloud Pub/Sub always** | Serverless-native; no NATS dependency for edge apps; cluster keeps NATS |
 
 ## Repository boundaries
 
@@ -59,7 +64,7 @@ deployment.manifests
       Gateway, CNPG, NATS, Flux Kustomizations
 
 cloud.deployment  (this repo)
-  └── OpenTofu modules + per-app Cloud Run/Neon roots + app CI
+  └── OpenTofu modules + per-app Cloud Run/Neon/Pub/Sub roots + app CI
 
 antinvestor/charts (colony)
   └── Helm chart source consumed by deployment.manifests only
@@ -82,23 +87,27 @@ antinvestor/charts (colony)
                     │  modules + apps/* + GHA plan/apply    │
                     └───────────────┬─────────────────────┘
                                     │ OpenTofu apply (per app)
-                    ┌───────────────┴───────────────┐
-                    v                               v
-            ┌───────────────┐               ┌──────────────┐
-            │  Cloud Run    │               │ Neon project │
-            │  (per app)    │──DATABASE_URL──│  (per app)   │
-            └───────┬───────┘               └──────────────┘
-                    │ HTTPS public only
-                    v
-            ┌───────────────────────────────────────┐
-            │  Public edge (Gateway / oauth2 / api)   │
-            │  owned by deployment.manifests          │
-            └───────────────────┬───────────────────┘
-                                v
-            ┌───────────────────────────────────────┐
-            │  Talos cluster platform services        │
-            │  identity, finance, … (Colony)          │
-            └───────────────────────────────────────┘
+              ┌─────────────────────┼─────────────────────┐
+              v                     v                     v
+      ┌───────────────┐     ┌──────────────┐     ┌────────────────┐
+      │  Cloud Run    │     │ Neon project │     │ Cloud Pub/Sub  │
+      │  (per app)    │─────│  (per app)   │     │ topics/subs    │
+      └───────┬───────┘ DB  └──────────────┘     │ (per app)      │
+              │                ▲                 └───────▲────────┘
+              │                │                         │
+              └────────────────┴─────────────────────────┘
+                    publish/subscribe + DATABASE_URL
+              │ HTTPS public only (sync APIs)
+              v
+      ┌───────────────────────────────────────┐
+      │  Public edge (Gateway / oauth2 / api)   │
+      │  owned by deployment.manifests          │
+      └───────────────────┬───────────────────┘
+                          v
+      ┌───────────────────────────────────────┐
+      │  Talos cluster (Colony + NATS, etc.)    │
+      │  — edge apps do not use cluster NATS    │
+      └───────────────────────────────────────┘
 ```
 
 ## Repository layout
@@ -108,6 +117,7 @@ cloud.deployment/
   modules/                          # reusable; never applied as a root
     cloudrun-service/
     neon-database/
+    pubsub/                         # topics + subscriptions (always for messaging)
     edge-contract/
   platforms/                        # env-level defaults (not apply roots)
     stawi-dev/
@@ -200,9 +210,23 @@ concurrency:
 
 **Inputs:** environment name (optional overrides).
 
-**Outputs / locals:** public API hostnames, CORS allow origin list, OTel export policy, OAuth audience base URLs, standard env key names.
+**Outputs / locals:** public API hostnames, CORS allow origin list, OTel export policy, OAuth audience base URLs, standard env key names. Messaging guidance is Pub/Sub-only (no NATS URLs).
 
 **Non-responsibility:** Creating Gateway routes or DNS in the cluster.
+
+### `pubsub`
+
+**Purpose:** Provision Google Cloud Pub/Sub **topics and subscriptions** used by the app. **All async messaging for apps in this repo uses Pub/Sub** — not NATS.
+
+**Inputs:** `project_id`, `app_name`, map of topics (optional per-topic config), map of subscriptions (topic key, ack deadline, push endpoint optional for push to Cloud Run), labels, optional dead-letter topic.
+
+**Defaults:** At least one app-scoped topic pattern (e.g. `{app_name}-events`) so a copied template is usable without inventing topology; apps override/add topics in their thin root.
+
+**IAM:** Grant the Cloud Run runtime service account `roles/pubsub.publisher` and/or `roles/pubsub.subscriber` as declared (publish-only vs consume).
+
+**Outputs:** topic ids/names, subscription ids/names, env map (e.g. `PUBSUB_TOPIC_EVENTS`, `PUBSUB_SUBSCRIPTION_…`) for injection into Cloud Run.
+
+**Non-responsibility:** Application message schemas; cross-project fan-out to cluster NATS (out of scope / bridge later if ever needed).
 
 ### `neon-database`
 
@@ -292,18 +316,27 @@ module "db" {
   # provider configured at root for var.neon_account
 }
 
+module "messaging" {
+  source     = "../../../modules/pubsub"
+  project_id = module.platform.project_id
+  app_name   = var.app_name
+  # topics/subscriptions: app deltas; defaults provide {app}-events
+}
+
 module "service" {
   source = "../../../modules/cloudrun-service"
   name   = var.app_name
   image  = var.image
-  env = merge(module.edge.service_env, {
-    # DATABASE_URL from secret ref produced by module.db
-  })
+  env = merge(
+    module.edge.service_env,
+    module.messaging.service_env,
+  )
   secret_env = module.db.secret_env
+  # runtime SA also gets pubsub publisher/subscriber from module.messaging
 }
 ```
 
-Apps declare **deltas only** (image, scaling, extra env, Neon sizing). Shared hosts/CORS/OAuth bases come from modules/platforms.
+Apps declare **deltas only** (image, scaling, extra env, Neon sizing, topic map). Shared hosts/CORS/OAuth bases come from modules/platforms. **Messaging is always Pub/Sub** via `modules/pubsub`.
 
 ## CI design
 
@@ -350,6 +383,7 @@ No long-lived cloud keys in git. No Neon admin keys in app images.
 - **Neon multi-account:** least privilege—CI only receives the Neon key for accounts needed by the matrixed apps in that run.
 - **One project per app:** deletion or compromise of one edge app’s DB project does not share Neon project scope with others.
 - **Public edge only:** treat all cluster API calls as internet-facing; use OAuth2/OIDC as existing platform requires; no reliance on cluster-internal DNS.
+- **Pub/Sub only for messaging:** apps must not depend on cluster NATS; IAM is least-privilege publisher/subscriber on app topics.
 
 ## Adding a greenfield app (happy path)
 
@@ -373,7 +407,7 @@ No edits to unrelated apps. No changes to `deployment.manifests` unless a later 
 
 ### PR 2 — Modules v1
 
-- `edge-contract`, `neon-database` (multi-account provider pattern), `cloudrun-service`.
+- `edge-contract`, `neon-database` (multi-account provider pattern), `cloudrun-service`, **`pubsub`**.
 - Unit/validation: `tofu validate` / `tflint` on modules.
 
 ### PR 3 — First pilot app (dev)
@@ -408,6 +442,7 @@ No edits to unrelated apps. No changes to `deployment.manifests` unless a later 
 | One OpenTofu stack for all apps | Violates independent workflows; huge blast radius |
 | One Neon project, many DBs | Weaker isolation; multi-account mapping harder |
 | State in GCS only | Rejected: R2 for parity with infra and multi-cloud neutrality |
+| NATS for Cloud Run messaging | Rejected: **Cloud Pub/Sub always** for apps in this repo; NATS stays cluster-only |
 
 ## Open questions (resolved)
 
@@ -419,6 +454,7 @@ No edits to unrelated apps. No changes to `deployment.manifests` unless a later 
 | K8s manifests location | **`deployment.manifests` only** |
 | First wave connectivity | Public edge only |
 | First wave apps | Greenfield edge products |
+| Messaging | **Google Cloud Pub/Sub always** (not NATS) for apps owned here |
 
 ## Success criteria
 
@@ -427,3 +463,4 @@ No edits to unrelated apps. No changes to `deployment.manifests` unless a later 
 - Two apps can use two different Neon accounts without sharing API keys in config files.
 - No Kubernetes YAML is added to this repository.
 - A new edge app can be added by copying `_template` and filling deltas—no edits to other apps’ roots.
+- Every app stack includes Pub/Sub messaging via `modules/pubsub` (no NATS client config for edge apps).
