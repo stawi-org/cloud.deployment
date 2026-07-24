@@ -1,0 +1,9 @@
+# Minimal Keto config for migrate jobs only (no namespaces file required).
+# Runtime services use keto.yml + namespaces.ts from GCS.
+version: v0.12.0
+
+log:
+  level: info
+  format: text
+
+# DSN is provided via environment variable DSN / DATABASE_URL

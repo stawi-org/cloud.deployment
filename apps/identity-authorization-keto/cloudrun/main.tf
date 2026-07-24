@@ -58,16 +58,28 @@ resource "google_storage_bucket_iam_member" "runtime_object_viewer" {
 locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  keto_yml_secret_id        = "${var.app_name}-keto-yml"
+  keto_yml_secret_id         = "${var.app_name}-keto-yml"
+  keto_migrate_yml_secret_id = "${var.app_name}-keto-migrate-yml"
   secret_ids = setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id, local.keto_yml_secret_id]),
+    toset([
+      local.database_secret_id,
+      local.database_direct_secret_id,
+      local.keto_yml_secret_id,
+      local.keto_migrate_yml_secret_id,
+    ]),
     var.extra_secret_ids,
   )
-  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.keto_yml_secret_id])
+  version_ids = toset([
+    local.database_secret_id,
+    local.database_direct_secret_id,
+    local.keto_yml_secret_id,
+    local.keto_migrate_yml_secret_id,
+  ])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
     { (local.keto_yml_secret_id) = file("${path.module}/../files/keto.yml") },
+    { (local.keto_migrate_yml_secret_id) = file("${path.module}/../files/keto-migrate.yml") },
     var.extra_secret_values,
   )
 
@@ -125,18 +137,18 @@ module "migrate" {
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
-  # Image default /home/ory/keto.yml is missing — mount SM keto.yml
-  args = ["migrate", "up", "-y", "-c", "/etc/keto/keto.yml"]
+  # Migrate config has no namespaces.ts requirement (runtime uses full keto.yml).
+  args = ["migrate", "up", "-y", "-c", "/etc/keto/keto-migrate.yml"]
   env  = { LOG_LEVEL = "info" }
   secret_env = {
     DSN          = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
     DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
   }
   secret_volumes = {
-    keto_config = {
-      secret     = local.keto_yml_secret_id
+    keto_migrate_config = {
+      secret     = local.keto_migrate_yml_secret_id
       mount_path = "/etc/keto"
-      file_name  = "keto.yml"
+      file_name  = "keto-migrate.yml"
     }
   }
   depends_on = [module.secrets]

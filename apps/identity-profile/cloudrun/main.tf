@@ -10,6 +10,13 @@ provider "google" {
   region  = var.region
 }
 
+# Hydra Cloud Run URL for OIDC discovery until oauth2.stawi.org edge is mapped.
+data "google_cloud_run_v2_service" "hydra" {
+  name     = "identity-oauth2-hydra"
+  location = var.region
+  project  = var.project_id
+}
+
 module "edge" {
   source = "../../../modules/edge-contract"
   env    = var.platform
@@ -41,7 +48,9 @@ resource "random_password" "dek_hmac" {
 locals {
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
-  oauth2_origin   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  oauth2_edge     = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  # Prefer Cloud Run Hydra until public edge (oauth2.stawi.*) is mapped.
+  oauth2_origin   = data.google_cloud_run_v2_service.hydra.uri
   api_base        = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
   issuer          = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
   token_url       = "${local.oauth2_origin}/oauth2/token"
@@ -77,6 +86,7 @@ locals {
     OAUTH2_WELL_KNOWN_OIDC_PATH      = ".well-known/openid-configuration"
     OAUTH2_AUDIENCE_BASE_URL         = local.api_base
     OAUTH2_CLIENT_ASSERTION_AUDIENCE = local.token_url
+    OAUTH2_CLIENT_ASSERTION_AUD             = local.token_url
     OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
     OAUTH2_JWT_VERIFY_ISSUER         = local.issuer
     OAUTH2_SERVICE_CLIENT_ID         = var.app_name

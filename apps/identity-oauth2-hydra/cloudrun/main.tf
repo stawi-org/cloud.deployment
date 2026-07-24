@@ -22,10 +22,17 @@ resource "google_service_account" "runtime" {
   display_name = "Cloud Run runtime for ${var.app_name}"
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 locals {
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
-  oauth2_origin   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  # Public edge host (DNS later). Until mapped, Cloud Run URL is used for discovery/token.
+  oauth2_edge     = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  oauth2_run      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  oauth2_origin   = local.oauth2_run
   api_base        = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
   issuer          = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
   cookie_domain   = local.is_prod ? "stawi.org" : "stawi.dev"
