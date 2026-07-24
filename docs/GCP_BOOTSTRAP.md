@@ -71,9 +71,30 @@ Apps with `gcp.account: identity` will deploy into that project. CI fetches Neon
 - Bootstrap machine needs **only** the public key (encrypt)
 - Decrypt requires the private age key (operators / CI with sops key — not required for normal cloud.deployment plan/apply via WIF)
 
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `no matching creation rules found` (sops) | Need current script: `sops encrypt --filename-override credentials/gcp/...` (not bare `sops -e /tmp/...`) |
+| `sops encrypt preflight failed` | Update clone so `.sops.yaml` has `credentials/gcp/` rules; install sops ≥ 3.11 |
+| WIF works but plan can’t pull images | Deploy SA has `roles/artifactregistry.reader` after latest bootstrap |
+| Want apply protection env | Create GH Environment named as in registry (`github_environment`, e.g. `gcp-identity-dev`) in UI — same PAT limits as Neon (often need Administration for create via API) |
+| Accidental Neon flag | Script rejects `--neon-api-key`; use [NEON_BOOTSTRAP.md](NEON_BOOTSTRAP.md) |
+
+## Improvements baked into the script
+
+- SOPS encrypt with `--filename-override` (same fix as Neon bootstrap)
+- Preflight encrypt before long GCP work
+- yq-only registry edit (no PyYAML)
+- Extra deploy SA roles (Artifact Registry, logging)
+- Idempotent WIF→SA binding check
+- `sops_auth_path` + labels written on registry slice
+- Clear post-merge next steps (resolve-app-context, Neon separate)
+
 ## Related
 
 - [BACKEND.md](BACKEND.md)
+- [NEON_BOOTSTRAP.md](NEON_BOOTSTRAP.md)
 - [IDENTITY_GREENFIELD.md](IDENTITY_GREENFIELD.md)
 - Multi-account design: `docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md`
 

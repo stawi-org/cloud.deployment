@@ -73,6 +73,10 @@ ATTR_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.reposi
 SOPS_VERSION="v3.11.0"
 CLONE_URL="https://github.com/${GITHUB_REPO}.git"
 DEFAULT_CLONE_DIR="${HOME}/cloud.deployment"
+# Extra APIs beyond core Cloud Run stack
+EXTRA_APIS=(
+  serviceusage.googleapis.com
+)
 
 usage() {
   if [[ -n "${BASH_SOURCE[0]:-}" && -r "${BASH_SOURCE[0]}" ]]; then
@@ -162,6 +166,48 @@ ensure_sops() {
   chmod +x "${dest}/sops"
   export PATH="${dest}:${PATH}"
   command -v sops >/dev/null 2>&1 || die "failed to install sops"
+}
+
+ensure_yq() {
+  if command -v yq >/dev/null 2>&1; then
+    return 0
+  fi
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) die "unsupported arch for yq: $arch" ;;
+  esac
+  mkdir -p "${HOME}/.local/bin"
+  say "installing yq → ${HOME}/.local/bin/yq"
+  curl -fsSL -o "${HOME}/.local/bin/yq" \
+    "https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${arch}"
+  chmod +x "${HOME}/.local/bin/yq"
+  export PATH="${HOME}/.local/bin:${PATH}"
+  command -v yq >/dev/null 2>&1 || die "yq required"
+}
+
+# Confirm sops can encrypt using .sops.yaml rules (catches misconfig early).
+preflight_sops() {
+  local repo="$1"
+  local probe plain out
+  plain=$(mktemp)
+  out=$(mktemp)
+  printf 'auth:\n  probe: true\n' >"$plain"
+  if ! (
+    cd "$repo"
+    sops encrypt --filename-override "credentials/gcp/_probe/stawi-dev/auth.yaml" "$plain" >"$out"
+  ); then
+    rm -f "$plain" "$out"
+    die "sops encrypt preflight failed — check .sops.yaml age recipient and sops version (need 'sops encrypt')"
+  fi
+  if ! grep -q '^sops:' "$out"; then
+    rm -f "$plain" "$out"
+    die "sops encrypt preflight produced non-sops output"
+  fi
+  rm -f "$plain" "$out"
+  say "sops encrypt preflight ok"
 }
 
 github_token() {
@@ -352,29 +398,14 @@ ensure_iam_binding() {
 
 # -------- prereqs --------
 ensure_sops
-for cmd in gcloud jq curl python3 git sops; do
+ensure_yq
+for cmd in gcloud jq curl git sops yq; do
   command -v "$cmd" >/dev/null 2>&1 || die "missing: $cmd"
 done
 
 resolve_repo_path
 verify_gcloud_access
-
-# Validate account/env exist in registry (structure must be planned)
-if ! command -v yq >/dev/null 2>&1; then
-  # minimal yq install for Cloud Shell
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64|amd64) arch="amd64" ;;
-    aarch64|arm64) arch="arm64" ;;
-    *) die "unsupported arch for yq: $arch" ;;
-  esac
-  mkdir -p "${HOME}/.local/bin"
-  curl -fsSL -o "${HOME}/.local/bin/yq" \
-    "https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${arch}"
-  chmod +x "${HOME}/.local/bin/yq"
-  export PATH="${HOME}/.local/bin:${PATH}"
-fi
-command -v yq >/dev/null 2>&1 || die "yq required"
+preflight_sops "$REPO_PATH"
 
 if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REPO_PATH/config/gcp-accounts.yaml" >/dev/null 2>&1; then
   die "account '${ACCOUNT}' not in config/gcp-accounts.yaml — add the key to the plan/registry first"
@@ -396,6 +427,7 @@ gcloud services enable \
   cloudresourcemanager.googleapis.com \
   sts.googleapis.com \
   artifactregistry.googleapis.com \
+  serviceusage.googleapis.com \
   --project="$PROJECT" \
   --quiet
 
