@@ -1,0 +1,17 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.DS_Store
+WORK_STATE.md
+SHARED_TASK_NOTES.md
+.env
+.env.*
+.neon
