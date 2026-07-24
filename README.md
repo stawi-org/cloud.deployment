@@ -1,41 +1,41 @@
 # cloud.deployment
 
-Modular **Cloud Run + Neon + Cloud Pub/Sub** deployments for Stawi edge/greenfield applications.
+Modular **Cloud Run + Neon + Cloud Pub/Sub** deployments.  
+**Running an app = choosing GCP + Neon accounts** in `app.yaml`. Secrets live in **GCP Secret Manager**, not git.
 
 ## Boundaries
 
 | Repo | Owns |
 |------|------|
-| [`deployment.infra`](https://github.com/stawi-org/deployment.infra) | Cluster foundation (Talos, nodes, Flux bootstrap, DNS foundation) |
-| [`deployment.manifests`](https://github.com/stawi-org/deployment.manifests) | **All** Kubernetes deployments (Colony, Gateway, CNPG, NATS, Flux) |
-| **This repo** | OpenTofu modules + per-app Cloud Run/Neon/Pub/Sub stacks + path-filtered CI |
-| [Colony chart](https://github.com/antinvestor/charts) | Helm chart source used only by `deployment.manifests` |
+| [deployment.infra](https://github.com/stawi-org/deployment.infra) | Cluster foundation (Talos, nodes, Flux bootstrap) |
+| [deployment.manifests](https://github.com/stawi-org/deployment.manifests) | Kubernetes / Colony / CNPG / NATS |
+| **This repo** | Multi-account Cloud Run stacks, Secret Manager, Pub/Sub, path-filtered CI |
 
-Kubernetes manifests do **not** live here.
+## Model
 
-## Design
+```
+app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF / region
+          →  neon.account →  config/neon-accounts.yaml  →  Neon org + SM API key
+```
 
-See [docs/superpowers/specs/2026-07-24-cloud-deployment-architecture-design.md](docs/superpowers/specs/2026-07-24-cloud-deployment-architecture-design.md).
+```bash
+./.github/scripts/resolve-app-context.sh <app> <env>
+```
 
 ### Highlights
 
-- **App-centric roots:** each app is an independent OpenTofu root with its own R2 state key.
-- **Independent CI:** only changed (or module-impacted) apps plan/apply.
-- **One Neon project per app**, projects may live under **different Neon accounts**.
-- **Public edge only** for talking to cluster platform services (first wave).
-- Shared modules mirror the Colony idea: change once, thin app deltas.
-- **Messaging is always Cloud Pub/Sub** (cluster NATS is not used from these apps).
-- **Neon multi-account:** domain orgs (`identity`, `notifications`, `payments`, …) with least-privilege GitHub Environment secrets — see [docs/BACKEND.md](docs/BACKEND.md) and [the multi-account design](docs/superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md).
+- **Multi-GCP + multi-Neon** domain accounts (identity, payments, notifications, platform, labs)
+- **Secret Manager** for database URLs and other runtime secrets; Neon org keys preferred in SM
+- **One OpenTofu root + R2 state per app per env** (independent CI)
+- **Pub/Sub only** for messaging (no NATS)
+- **Identity greenfield** apps under `apps/identity-*` — [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md)
 
-## Status
+## Docs
 
-**Scaffold ready for pilot.** Modules (edge-contract, neon-database, cloudrun-service, pubsub), platforms, app template, path-filtered plan/apply CI, and validate guardrails are in place. Next: real GCP project IDs, WIF, and first edge app — see [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md).
-
-## Operator docs
-
-| Doc | Purpose |
-|-----|---------|
-| [docs/ADDING_AN_APP.md](docs/ADDING_AN_APP.md) | Onboard a new Cloud Run + Neon + Pub/Sub app |
-| [docs/MODULES.md](docs/MODULES.md) | Module and platform contracts |
-| [docs/BACKEND.md](docs/BACKEND.md) | R2 state, secrets, Neon accounts |
-| [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md) | First-app go-live checklist |
+| Doc | Topic |
+|-----|--------|
+| [docs/BACKEND.md](docs/BACKEND.md) | Accounts, R2, Secret Manager |
+| [docs/ADDING_AN_APP.md](docs/ADDING_AN_APP.md) | Add an app |
+| [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md) | Identity domain big-bang |
+| [docs/MODULES.md](docs/MODULES.md) | Modules |
+| [docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md](docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md) | Platform design |

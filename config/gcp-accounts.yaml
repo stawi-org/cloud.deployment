@@ -1,0 +1,135 @@
+# GCP multi-account registry (NON-SECRET metadata only).
+# Spec: docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md
+#
+# app.yaml: gcp.account: <key>
+# CI resolves key + deploy env → project_id, region, WIF, deploy SA.
+# Replace placeholder project IDs / WIF resource names before first apply.
+
+version: 1
+
+accounts:
+  identity:
+    description: Identity domain GCP (auth, hydra, keto, profile, tenancy, identity)
+    owners:
+      - identity-team
+    sensitivity: critical
+    envs:
+      stawi-dev:
+        project_id: stawi-identity-dev
+        region: europe-west1
+        # Non-secret WIF identifiers (fill after bootstrap)
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-identity-dev.iam.gserviceaccount.com
+        github_environment: gcp-identity-dev
+        labels:
+          environment: dev
+          domain: identity
+          managed-by: cloud-deployment
+      stawi-prod:
+        project_id: stawi-identity-prod
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-identity-prod.iam.gserviceaccount.com
+        github_environment: gcp-identity-prod
+        labels:
+          environment: prod
+          domain: identity
+          managed-by: cloud-deployment
+
+  notifications:
+    description: Notifications domain GCP
+    owners:
+      - communications-team
+    sensitivity: high
+    envs:
+      stawi-dev:
+        project_id: stawi-notifications-dev
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-notifications-dev.iam.gserviceaccount.com
+        github_environment: gcp-notifications-dev
+        labels:
+          environment: dev
+          domain: notifications
+          managed-by: cloud-deployment
+      stawi-prod:
+        project_id: stawi-notifications-prod
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-notifications-prod.iam.gserviceaccount.com
+        github_environment: gcp-notifications-prod
+        labels:
+          environment: prod
+          domain: notifications
+          managed-by: cloud-deployment
+
+  payments:
+    description: Payments domain GCP
+    owners:
+      - finance-team
+    sensitivity: critical
+    envs:
+      stawi-dev:
+        project_id: stawi-payments-dev
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-payments-dev.iam.gserviceaccount.com
+        github_environment: gcp-payments-dev
+        labels:
+          environment: dev
+          domain: payments
+          managed-by: cloud-deployment
+      stawi-prod:
+        project_id: stawi-payments-prod
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-payments-prod.iam.gserviceaccount.com
+        github_environment: gcp-payments-prod
+        labels:
+          environment: prod
+          domain: payments
+          managed-by: cloud-deployment
+
+  platform:
+    description: Shared platform edge GCP
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-dev:
+        project_id: stawi-platform-dev
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-platform-dev.iam.gserviceaccount.com
+        github_environment: gcp-platform-dev
+        labels:
+          environment: dev
+          domain: platform
+          managed-by: cloud-deployment
+      stawi-prod:
+        project_id: stawi-platform-prod
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-platform-prod.iam.gserviceaccount.com
+        github_environment: gcp-platform-prod
+        labels:
+          environment: prod
+          domain: platform
+          managed-by: cloud-deployment
+
+  labs:
+    description: Experimental GCP project(s); no production data
+    owners:
+      - platform
+    sensitivity: low
+    envs:
+      stawi-dev:
+        project_id: stawi-labs-dev
+        region: europe-west1
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-labs-dev.iam.gserviceaccount.com
+        github_environment: gcp-labs-dev
+        labels:
+          environment: dev
+          domain: labs
+          managed-by: cloud-deployment

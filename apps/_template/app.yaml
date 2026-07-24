@@ -2,9 +2,10 @@ name: REPLACE_ME
 owners: []
 envs:
   - stawi-dev
+# Which cloud accounts supply resources (project, Neon org, secrets).
+# Registries: config/gcp-accounts.yaml, config/neon-accounts.yaml
+gcp:
+  account: labs
 neon:
-  # Domain Neon org key — must exist in config/neon-accounts.yaml
-  # identity | notifications | payments | platform | labs
-  # CI loads NEON_API_KEY only from GitHub Environment neon-<account>
   account: labs
 runtime: cloudrun

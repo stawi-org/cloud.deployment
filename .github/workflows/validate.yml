@@ -27,8 +27,10 @@ jobs:
         run: ./.github/scripts/tests/test-detect-changed-apps.sh
       - name: Run neon account policy tests
         run: ./.github/scripts/tests/test-validate-neon-accounts.sh
-      - name: Validate all apps neon.account policy
-        run: ./.github/scripts/validate-neon-accounts.sh .
+      - name: Validate neon + gcp account bindings for all apps
+        run: |
+          ./.github/scripts/validate-neon-accounts.sh .
+          ./.github/scripts/validate-accounts.sh .
 
   tofu-validate:
     name: tofu validate

@@ -72,7 +72,7 @@ jobs:
             fi
             MATRIX=$(BASE_REF="$BASE_REF" HEAD_REF="$HEAD_REF" .github/scripts/detect-changed-apps.sh)
           fi
-          ENRICHED=$(echo "$MATRIX" | .github/scripts/enrich-matrix-neon.sh .)
+          ENRICHED=$(echo "$MATRIX" | .github/scripts/enrich-matrix-context.sh .)
           echo "matrix=${ENRICHED}" >> "$GITHUB_OUTPUT"
           if [[ "$ENRICHED" == "[]" ]]; then
             echo "nonempty=false" >> "$GITHUB_OUTPUT"
@@ -93,5 +93,6 @@ jobs:
       app: ${{ matrix.app }}
       env: ${{ matrix.env }}
       mode: apply
+      gcp_github_environment: ${{ matrix.gcp_github_environment }}
       neon_github_environment: ${{ matrix.neon_github_environment }}
     secrets: inherit

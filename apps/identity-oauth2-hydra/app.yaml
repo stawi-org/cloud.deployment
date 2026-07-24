@@ -1,0 +1,12 @@
+name: identity-oauth2-hydra
+owners:
+  - identity-team
+envs:
+  - stawi-dev
+  - stawi-prod
+gcp:
+  account: identity
+neon:
+  account: identity
+runtime: cloudrun
+domain: identity

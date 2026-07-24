@@ -2,21 +2,22 @@
 
 Shared OpenTofu modules and platform packs used by app roots under `apps/*/cloudrun`.
 
-App roots are **thin**: they compose modules, own Secret Manager + runtime SA IAM, and select a platform via `var.platform` (`stawi-dev` | `stawi-prod`).
+App roots are **thin**: they compose modules. **GCP project / region** come from CI via `resolve-app-context` (`gcp.account` + env). **Secrets** go to Secret Manager via `modules/app-secrets`.
 
 ---
 
 ## Architecture (compose order)
 
 ```
-platforms/stawi-{dev,prod}   → project_id, region, labels, env name
-modules/edge-contract        → public edge service_env
-modules/neon-database        → Neon project + connection URIs
-modules/pubsub               → topics, subscriptions, publisher/subscriber IAM, MESSAGING_BACKEND
-modules/cloudrun-service     → Cloud Run service (env + secret_env)
+app.yaml gcp.account + env     → project_id, region, labels (CI vars)
+modules/edge-contract          → public edge service_env
+modules/neon-database          → Neon project + connection URIs
+modules/app-secrets            → Secret Manager (DATABASE_URL, extra secrets) + accessor IAM
+modules/pubsub                 → topics, subscriptions, publisher/subscriber IAM
+modules/cloudrun-service       → Cloud Run (env + secret_env from SM)
 ```
 
-Messaging is **always** Cloud Pub/Sub for apps in this repo (never cluster NATS).
+Messaging is **always** Cloud Pub/Sub. Runtime secrets are **always** Secret Manager references (not plain values from git).
 
 ---
 

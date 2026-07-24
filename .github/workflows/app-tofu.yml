@@ -1,7 +1,5 @@
-# Reusable plan/apply for one (app, env) against R2 state.
-# Neon API keys: GitHub Environment per domain account (see config/neon-accounts.yaml).
-# Only one NEON_API_KEY is available to each job (least privilege).
-# Messaging is always Cloud Pub/Sub (never NATS) via modules/pubsub.
+# Reusable plan/apply for one (app, env).
+# Resolves multi-account context: GCP project via WIF, Neon key via Secret Manager (preferred).
 name: app-tofu
 
 on:
@@ -10,40 +8,37 @@ on:
       app:
         required: true
         type: string
-        description: App directory name under apps/
       env:
         required: true
         type: string
-        description: Environment / platform name (stawi-dev | stawi-prod)
       mode:
         required: true
         type: string
-        description: plan | apply
-      # Resolved by caller from config/neon-accounts.yaml (e.g. neon-payments)
-      neon_github_environment:
-        required: true
+      # Pre-resolved by caller (from resolve-app-context) for environment protection
+      gcp_github_environment:
+        required: false
         type: string
-        description: GitHub Environment name that holds NEON_API_KEY for this app's neon.account
+        default: ""
+      neon_github_environment:
+        required: false
+        type: string
+        default: ""
     secrets:
-      # Repo-level secrets (R2, optional GCP). Neon keys are NOT listed here —
-      # they come only from the job GitHub Environment (see environment: below).
       R2_ACCOUNT_ID:
         required: true
       R2_ACCESS_KEY_ID:
         required: true
       R2_SECRET_ACCESS_KEY:
         required: true
-      GCP_WORKLOAD_IDENTITY_PROVIDER:
-        required: false
-      GCP_SERVICE_ACCOUNT:
+      # Fallback only if Secret Manager neon key fetch is unavailable
+      NEON_API_KEY:
         required: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    # Least privilege: Environment secrets for this domain only (NEON_API_KEY).
-    # Do not store domain Neon keys as repo secrets and dump them all into the job.
-    environment: ${{ inputs.neon_github_environment }}
+    # Prefer GCP account environment for apply protection when set
+    environment: ${{ inputs.gcp_github_environment != '' && inputs.gcp_github_environment || inputs.neon_github_environment }}
     concurrency:
       group: cloud-deploy-${{ inputs.app }}-${{ inputs.env }}
       cancel-in-progress: false
@@ -61,52 +56,55 @@ jobs:
         with:
           tofu_version: "1.10.0"
 
-      - name: Install yq
+      - name: Install yq / jq / gcloud
         working-directory: .
         run: |
           sudo wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
+          # gcloud for Secret Manager access after WIF
+          if ! command -v gcloud >/dev/null; then
+            echo "gcloud missing on runner — install google-cloud-sdk"
+            exit 1
+          fi
 
-      - name: Resolve Neon account + validate env
-        id: meta
+      - name: Resolve multi-account context
+        id: ctx
         working-directory: .
         run: |
           set -euo pipefail
-          APP="${{ inputs.app }}"
-          ENV="${{ inputs.env }}"
-          test -f "apps/${APP}/app.yaml"
-          test -d "apps/${APP}/cloudrun"
-          ACC=$(yq -r '.neon.account' "apps/${APP}/app.yaml")
-          if [[ -z "$ACC" || "$ACC" == "null" ]]; then
-            echo "::error::apps/${APP}/app.yaml missing neon.account"
-            exit 1
-          fi
-          EXPECTED_ENV=$(yq -r ".accounts[\"${ACC}\"].github_environment" config/neon-accounts.yaml)
-          if [[ -z "$EXPECTED_ENV" || "$EXPECTED_ENV" == "null" ]]; then
-            echo "::error::Unknown neon.account '${ACC}' — add it to config/neon-accounts.yaml"
-            exit 1
-          fi
-          if [[ "$EXPECTED_ENV" != "${{ inputs.neon_github_environment }}" ]]; then
-            echo "::error::neon_github_environment mismatch: got ${{ inputs.neon_github_environment }}, registry has ${EXPECTED_ENV}"
-            exit 1
-          fi
-          yq -r '.envs[]' "apps/${APP}/app.yaml" | grep -qx "${ENV}" \
-            || { echo "::error::env ${ENV} not listed in apps/${APP}/app.yaml envs"; exit 1; }
-          # Policy: deploy env allowed for account
-          yq -e ".accounts[\"${ACC}\"].allowed_deploy_envs[] | select(. == \"${ENV}\")" config/neon-accounts.yaml >/dev/null \
-            || { echo "::error::env ${ENV} not allowed for neon.account=${ACC}"; exit 1; }
-          echo "neon_account=${ACC}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Neon account=${ACC} environment=${EXPECTED_ENV}"
+          ./.github/scripts/resolve-app-context.sh \
+            "${{ inputs.app }}" "${{ inputs.env }}" --format=gha
 
-      - name: Export Neon API key (environment-scoped only)
+      - name: Authenticate to Google Cloud (WIF)
+        id: auth
+        uses: google-github-actions/auth@v2
+        continue-on-error: true
+        with:
+          workload_identity_provider: ${{ steps.ctx.outputs.workload_identity_provider }}
+          service_account: ${{ steps.ctx.outputs.deploy_service_account }}
+
+      - name: Load Neon org API key from Secret Manager
+        id: neon_sm
+        if: steps.auth.outcome == 'success' && steps.ctx.outputs.neon_sm_secret_id != ''
+        run: |
+          set -euo pipefail
+          PROJECT="${{ steps.ctx.outputs.neon_sm_project_id }}"
+          SID="${{ steps.ctx.outputs.neon_sm_secret_id }}"
+          VAL=$(gcloud secrets versions access latest --secret="${SID}" --project="${PROJECT}")
+          echo "::add-mask::${VAL}"
+          echo "TF_VAR_neon_api_key=${VAL}" >> "$GITHUB_ENV"
+          echo "source=secret-manager" >> "$GITHUB_OUTPUT"
+
+      - name: Load Neon org API key from GitHub Environment (fallback)
+        if: env.TF_VAR_neon_api_key == ''
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         run: |
           set -euo pipefail
           if [[ -z "${NEON_API_KEY:-}" ]]; then
-            echo "::error::Missing NEON_API_KEY in GitHub Environment ${{ inputs.neon_github_environment }}"
-            echo "::error::Create the Environment and set secret NEON_API_KEY (see docs/BACKEND.md)"
+            echo "::error::No Neon API key: WIF+Secret Manager failed and NEON_API_KEY empty"
+            echo "::error::Bootstrap: store neon-org-api-key in SM project ${{ steps.ctx.outputs.neon_sm_project_id }}"
             exit 1
           fi
           echo "::add-mask::${NEON_API_KEY}"
@@ -121,13 +119,6 @@ jobs:
           echo "AWS_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}" >> "$GITHUB_ENV"
           echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
           echo "AWS_REGION=auto" >> "$GITHUB_ENV"
-
-      - name: Authenticate to Google Cloud (WIF)
-        if: false
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Tofu init (R2 state)
         env:
@@ -145,10 +136,16 @@ jobs:
         if: inputs.mode == 'plan'
         run: |
           set -euo pipefail
+          # Fail plan early if WIF not configured (placeholders in registry)
+          if [[ "${{ steps.auth.outcome }}" != "success" ]]; then
+            echo "::warning::GCP WIF auth failed — plan may fail for google provider resources"
+          fi
           tofu plan \
             -var-file="envs/${{ inputs.env }}.tfvars" \
             -var="app_name=${{ inputs.app }}" \
             -var="platform=${{ inputs.env }}" \
+            -var="project_id=${{ steps.ctx.outputs.project_id }}" \
+            -var="region=${{ steps.ctx.outputs.region }}" \
             -out=tfplan
 
       - name: Upload plan
@@ -162,7 +159,13 @@ jobs:
         if: inputs.mode == 'apply'
         run: |
           set -euo pipefail
+          if [[ "${{ steps.auth.outcome }}" != "success" ]]; then
+            echo "::error::GCP WIF required for apply"
+            exit 1
+          fi
           tofu apply -auto-approve \
             -var-file="envs/${{ inputs.env }}.tfvars" \
             -var="app_name=${{ inputs.app }}" \
-            -var="platform=${{ inputs.env }}"
+            -var="platform=${{ inputs.env }}" \
+            -var="project_id=${{ steps.ctx.outputs.project_id }}" \
+            -var="region=${{ steps.ctx.outputs.region }}"

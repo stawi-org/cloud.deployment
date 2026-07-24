@@ -1,100 +1,88 @@
 # Neon multi-account registry (NON-SECRET metadata only).
-# Spec: docs/superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md
+# Specs:
+#   docs/superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md
+#   docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md
 #
-# - account key  → used in apps/<app>/app.yaml as neon.account
-# - github_environment → GitHub Actions Environment that holds secret NEON_API_KEY
-# - vault_path → canonical human/break-glass store (kv path under secret/)
-# - Never put API keys in this file.
+# app.yaml neon.account → this key.
+# Deploy-time Neon org API key resolution:
+#   1) Secret Manager at secret_manager (preferred) after GCP WIF
+#   2) GitHub Environment secret NEON_API_KEY (fallback)
+# Never put API keys in this file.
 
 version: 1
 
 accounts:
-  # ---------------------------------------------------------------------------
-  # Domain organizations (preferred for production workloads)
-  # ---------------------------------------------------------------------------
   identity:
-    description: Identity domain Neon organization (auth, profile, tenancy-related edges)
-    owners:
-      - identity-team
+    description: Identity domain Neon organization
+    owners: [identity-team]
     github_environment: neon-identity
-    vault_path: cloud-deployment/neon/identity
+    # Neon org API key lives in the identity GCP project's Secret Manager
+    secret_manager:
+      # gcp.account key whose project hosts this secret (usually same domain)
+      gcp_account: identity
+      secret_id: neon-org-api-key
     neon_org_hint: Stawi Identity
-    allowed_deploy_envs:
-      - stawi-dev
-      - stawi-prod
+    allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: critical
 
   notifications:
-    description: Notifications domain Neon organization (email/SMS/push workers and prefs)
-    owners:
-      - communications-team
+    description: Notifications domain Neon organization
+    owners: [communications-team]
     github_environment: neon-notifications
-    vault_path: cloud-deployment/neon/notifications
+    secret_manager:
+      gcp_account: notifications
+      secret_id: neon-org-api-key
     neon_org_hint: Stawi Notifications
-    allowed_deploy_envs:
-      - stawi-dev
-      - stawi-prod
+    allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: high
 
   payments:
-    description: Payments domain Neon organization (checkout, billing, payment edges)
-    owners:
-      - finance-team
+    description: Payments domain Neon organization
+    owners: [finance-team]
     github_environment: neon-payments
-    vault_path: cloud-deployment/neon/payments
+    secret_manager:
+      gcp_account: payments
+      secret_id: neon-org-api-key
     neon_org_hint: Stawi Payments
-    allowed_deploy_envs:
-      - stawi-dev
-      - stawi-prod
-    # Tighten as real app names stabilize; empty allows any name with CODEOWNERS review
-    allowed_app_prefixes:
-      - payment-
-      - checkout-
-      - billing-
-      - ledger-
+    allowed_deploy_envs: [stawi-dev, stawi-prod]
+    allowed_app_prefixes: [payment-, checkout-, billing-, ledger-]
     sensitivity: critical
 
   platform:
-    description: Shared platform edge Neon organization (non-sensitive platform helpers)
-    owners:
-      - platform
+    description: Shared platform edge Neon organization
+    owners: [platform]
     github_environment: neon-platform
-    vault_path: cloud-deployment/neon/platform
+    secret_manager:
+      gcp_account: platform
+      secret_id: neon-org-api-key
     neon_org_hint: Stawi Platform Edge
-    allowed_deploy_envs:
-      - stawi-dev
-      - stawi-prod
+    allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: medium
 
   labs:
     description: Experimental Neon organization; no production customer data
-    owners:
-      - platform
+    owners: [platform]
     github_environment: neon-labs
-    vault_path: cloud-deployment/neon/labs
+    secret_manager:
+      gcp_account: labs
+      secret_id: neon-org-api-key
     neon_org_hint: Stawi Labs
-    allowed_deploy_envs:
-      - stawi-dev
+    allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []
     sensitivity: low
 
-  # ---------------------------------------------------------------------------
-  # Legacy aliases (map to domain accounts as you migrate)
-  # Prefer identity / notifications / payments / platform / labs for new apps.
-  # ---------------------------------------------------------------------------
   stawi-org:
-    description: "LEGACY alias — prefer domain keys (identity, payments, …)"
-    owners:
-      - platform
+    description: "LEGACY alias — prefer domain keys"
+    owners: [platform]
     github_environment: neon-platform
-    vault_path: cloud-deployment/neon/platform
-    neon_org_hint: Stawi Platform Edge (legacy stawi-org)
-    allowed_deploy_envs:
-      - stawi-dev
-      - stawi-prod
+    secret_manager:
+      gcp_account: platform
+      secret_id: neon-org-api-key
+    neon_org_hint: Stawi Platform Edge (legacy)
+    allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: medium
     deprecated: true
@@ -102,13 +90,13 @@ accounts:
 
   stawi-labs:
     description: "LEGACY alias for labs"
-    owners:
-      - platform
+    owners: [platform]
     github_environment: neon-labs
-    vault_path: cloud-deployment/neon/labs
-    neon_org_hint: Stawi Labs (legacy stawi-labs)
-    allowed_deploy_envs:
-      - stawi-dev
+    secret_manager:
+      gcp_account: labs
+      secret_id: neon-org-api-key
+    neon_org_hint: Stawi Labs (legacy)
+    allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []
     sensitivity: low
     deprecated: true

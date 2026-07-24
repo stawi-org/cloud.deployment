@@ -79,15 +79,15 @@ while IFS= read -r -d '' app_yaml; do
     fi
   fi
 
-  # Registry completeness
+  # Registry completeness: github_environment and/or secret_manager
   gh_env="$(yq -r ".accounts[\"${acc}\"].github_environment // \"\"" "$REG")"
-  vault="$(yq -r ".accounts[\"${acc}\"].vault_path // \"\"" "$REG")"
+  sm_id="$(yq -r ".accounts[\"${acc}\"].secret_manager.secret_id // \"\"" "$REG")"
   if [[ -z "$gh_env" || "$gh_env" == "null" ]]; then
     echo "ERROR: registry account '${acc}' missing github_environment" >&2
     fail=1
   fi
-  if [[ -z "$vault" || "$vault" == "null" ]]; then
-    echo "ERROR: registry account '${acc}' missing vault_path" >&2
+  if [[ -z "$sm_id" || "$sm_id" == "null" ]]; then
+    echo "ERROR: registry account '${acc}' missing secret_manager.secret_id (Secret Manager for Neon API key)" >&2
     fail=1
   fi
 done < <(find "$ROOT/apps" -mindepth 2 -maxdepth 2 -name app.yaml -print0 2>/dev/null)

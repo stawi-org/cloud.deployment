@@ -15,20 +15,26 @@ Use a short DNS-/Cloud Run–safe name (lowercase, hyphens). Do not deploy `_tem
 
 ```yaml
 name: <name>
-owners: []          # optional team / CODEOWNERS-style list
+owners: []
 envs:
-  - stawi-dev       # add stawi-prod when ready
+  - stawi-dev
+gcp:
+  account: labs       # config/gcp-accounts.yaml → GCP project / WIF
 neon:
-  # Domain org: identity | notifications | payments | platform | labs
-  account: labs
+  account: labs       # config/neon-accounts.yaml → Neon org + SM API key
 runtime: cloudrun
 ```
 
 | Field | Purpose |
 |-------|---------|
-| `name` | Human / inventory name (CI uses the **directory** name as `app_name`) |
-| `envs` | Which platform envs this app deploys to; drives the plan/apply matrix |
-| `neon.account` | Domain Neon **organization** key in `config/neon-accounts.yaml` (not a project name) |
+| `name` | Inventory name (CI uses **directory** name as `app_name`) |
+| `envs` | Deploy envs; must exist under both GCP and Neon account registries |
+| `gcp.account` | Which **GCP account** supplies project, region, Secret Manager, Pub/Sub, Cloud Run |
+| `neon.account` | Which **Neon org** hosts this app’s database project |
+
+```bash
+./.github/scripts/resolve-app-context.sh <name> stawi-dev
+```
 
 ## 3. Configure OpenTofu root (`apps/<name>/cloudrun`)
 

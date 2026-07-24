@@ -1,5 +1,3 @@
-app_name = "REPLACE_ME"
-image    = "us-docker.pkg.dev/cloudrun/container/hello"
-platform = "stawi-dev"
-# neon_api_key from TF_VAR_neon_api_key / -var in CI
-# app_name is overridden by CI: -var=app_name=${{ inputs.app }}
+# Non-secret defaults only. project_id/region/neon_api_key come from CI resolve.
+image = "us-docker.pkg.dev/cloudrun/container/hello"
+# platform/env name still passed as -var=platform=stawi-dev by CI

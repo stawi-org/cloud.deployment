@@ -1,173 +1,148 @@
-# Remote state and credentials
+# Backend: accounts, state, and secrets
 
-## R2 state backend
+## Principle
 
-OpenTofu remote state is stored in **Cloudflare R2** (S3-compatible), matching `deployment.infra`.
-
-### Shared fragment
-
-Apps use the partial backend config at [`config/r2-backend.hcl`](../config/r2-backend.hcl). The state **key** is supplied at `tofu init` (not in the fragment).
-
-### State key pattern
+**Git holds registries only (non-secret).**  
+**Secret Manager holds runtime secrets and preferred deploy-time Neon org keys.**  
+**Selecting GCP + Neon accounts in `app.yaml` is how you choose where an app runs.**
 
 ```
-cloud-deployment/apps/<app>/<env>/terraform.tfstate
+app.yaml
+  gcp.account  → config/gcp-accounts.yaml  → project_id, region, WIF, deploy SA
+  neon.account → config/neon-accounts.yaml → Neon org + SM secret for API key
 ```
 
-### Init example
+Resolve anytime:
 
 ```bash
-export R2_ACCOUNT_ID=...
-export AWS_ACCESS_KEY_ID=...      # R2 access key
-export AWS_SECRET_ACCESS_KEY=...  # R2 secret key
-
-ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-KEY="cloud-deployment/apps/<app>/<env>/terraform.tfstate"
-
-tofu init \
-  -backend-config=../../../config/r2-backend.hcl \
-  -backend-config="key=${KEY}" \
-  -backend-config="endpoints={s3=\"${ENDPOINT}\"}"
+./.github/scripts/resolve-app-context.sh <app> <env>
+# or --format=exports
 ```
-
-### Bucket sharing with deployment.infra
-
-The same R2 bucket name as `deployment.infra` (`cluster-tofu-state`) is **intentional**. Isolation is by **key prefix** `cloud-deployment/apps/<app>/<env>/`.
-
-Native S3 lockfiles (`use_lockfile = true` in the backend fragment) provide state locking — no DynamoDB table.
 
 ---
 
-## Neon multi-account secrets (thorough model)
+## Multi-GCP accounts
 
-**Full design:** [docs/superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md)
+Registry: [`config/gcp-accounts.yaml`](../config/gcp-accounts.yaml)
 
-### Why multiple accounts
+| Account key | Purpose |
+|-------------|---------|
+| `identity` | Auth, Hydra, Keto, profile, tenancy, identity |
+| `notifications` | Notification workers |
+| `payments` | Checkout / billing edges |
+| `platform` | Shared platform edges |
+| `labs` | Experiments (dev only) |
 
-| Account key | Domain | Isolation purpose |
-|-------------|--------|-------------------|
-| `identity` | Auth / profile / tenancy edges | Critical identity data blast radius |
-| `notifications` | Notification workers | Volume + content isolation |
-| `payments` | Checkout / billing edges | Compliance-sensitive |
-| `platform` | Shared non-sensitive edges | Default platform |
-| `labs` | Experiments | No prod data; dev-only envs |
+Each key has **per-env** slices (`stawi-dev`, `stawi-prod`) with:
 
-Each key maps to a **separate Neon Organization** (not only projects under one org), so API keys and console membership do not span domains.
+- `project_id`, `region`
+- `workload_identity_provider`, `deploy_service_account` (not secrets)
+- `github_environment` (optional apply protection)
+- `labels`
 
-### Layer A — Registry (git, no secrets)
+Replace placeholder project IDs and WIF resource names before apply.
 
-[`config/neon-accounts.yaml`](../config/neon-accounts.yaml) holds:
+### What lives in which GCP project
 
-- `github_environment` — GitHub Actions Environment name
-- `vault_path` — canonical operator store path
-- `allowed_deploy_envs` — e.g. labs cannot use `stawi-prod`
-- `allowed_app_prefixes` — e.g. payments only `payment-*`, `checkout-*`, …
-- `owners`, `sensitivity`, deprecation flags
+For a given app env, **one project** hosts:
 
-Apps select an account:
+- Cloud Run services  
+- Pub/Sub  
+- Secret Manager (runtime secrets + optionally Neon org API key)  
+- Runtime service accounts  
+
+---
+
+## Multi-Neon accounts
+
+Registry: [`config/neon-accounts.yaml`](../config/neon-accounts.yaml)
+
+Domain orgs: `identity`, `notifications`, `payments`, `platform`, `labs`.
+
+**One Neon project per app** (OpenTofu module). Org API key is **deploy-time only**.
+
+### Neon API key storage (preferred: Secret Manager)
 
 ```yaml
-# apps/checkout-edge/app.yaml
-neon:
-  account: payments
+# in neon-accounts.yaml
+secret_manager:
+  gcp_account: identity      # which GCP account registry key
+  secret_id: neon-org-api-key
 ```
 
-### Layer B — Secret material (never git)
+CI: WIF into the app’s GCP project →  
+`gcloud secrets versions access latest --secret=neon-org-api-key --project=<resolved>` →  
+`TF_VAR_neon_api_key`.
 
-#### Primary for CI: GitHub Environments
-
-| GitHub Environment | Secret name | Content |
-|--------------------|-------------|---------|
-| `neon-identity` | `NEON_API_KEY` | Identity Neon org API key |
-| `neon-notifications` | `NEON_API_KEY` | Notifications org API key |
-| `neon-payments` | `NEON_API_KEY` | Payments org API key |
-| `neon-platform` | `NEON_API_KEY` | Platform org API key |
-| `neon-labs` | `NEON_API_KEY` | Labs org API key |
-
-**Create each Environment** in the repo settings, add secret `NEON_API_KEY`, and enable protection rules for payments/identity (required reviewers on apply).
-
-CI jobs set `environment: neon-<account>` so the job receives **only that one key**. We deliberately do **not** use repo-level `NEON_API_KEY_IDENTITY` + dump-all-keys-into-env (GitHub cannot dynamically index secrets, which forces co-location).
-
-#### Canonical / human: Vault (OpenBao)
-
-```
-secret/data/cloud-deployment/neon/<account_key>
-  api_key: "..."
-```
-
-- Rotate in Vault first, then update the matching GitHub Environment secret.
-- Team policies: finance can write `.../neon/payments` only.
-- Phase 2: GHA OIDC → Vault read of a single path (even stronger audit).
-
-#### Rejected for Neon org API keys
-
-- Committing keys (plain or SOPS in this repo) as the primary path
-- Shipping org API keys into Cloud Run runtime env
-- One shared super-key for all domains
-
-### Layer C — Injection
-
-1. Detect app → read `neon.account` → resolve `github_environment` from registry  
-2. Job `environment: <github_environment>`  
-3. `TF_VAR_neon_api_key=${{ secrets.NEON_API_KEY }}` (masked)  
-4. OpenTofu `provider "neon" { api_key = var.neon_api_key }`  
-
-Policy is enforced by `.github/scripts/validate-neon-accounts.sh` in the validate workflow.
-
-### Ops: bootstrap checklist
-
-1. Create Neon orgs (Identity, Notifications, Payments, Platform, Labs).  
-2. Create API keys labeled `cloud-deployment-gha`.  
-3. Write each key to Vault path `cloud-deployment/neon/<account>`.  
-4. Create GitHub Environments `neon-*` with secret `NEON_API_KEY`.  
-5. Restrict who can edit Environment secrets; require reviewers for `neon-payments`.  
-6. Run validate workflow green.
-
-### Rotation
-
-1. Mint new Neon key → update Vault → update GH Environment secret → canary plan → revoke old key.
+Fallback: GitHub Environment `neon-*` secret `NEON_API_KEY`.
 
 ---
 
-## Required GitHub secrets and variables
+## Secret Manager inventory (runtime)
 
-### R2 (repo secrets — all tofu jobs)
+| Secret ID pattern | Contents | Consumer |
+|-------------------|----------|----------|
+| `{app}-database-url` | Neon pooled connection URI | Cloud Run `DATABASE_URL` |
+| App-specific (Hydra system secret, OAuth client, webhook PSK, …) | Sensitive config | Cloud Run via `secret_env` / `extra_secret_ids` |
+| `neon-org-api-key` | Neon org API key | **CI only**, not Cloud Run |
 
-| Name | Purpose |
-|------|---------|
-| `R2_ACCOUNT_ID` | Cloudflare account id for R2 endpoint |
-| `R2_ACCESS_KEY_ID` | R2 access key |
-| `R2_SECRET_ACCESS_KEY` | R2 secret key |
+Module: [`modules/app-secrets`](../modules/app-secrets) creates secrets, versions (when values passed from tofu), and `secretAccessor` for the runtime SA.
 
-### Neon (Environment secrets — per domain)
+Cloud Run mounts secrets with `value_source.secret_key_ref` (see `modules/cloudrun-service`) — **not** plain env values from git.
 
-See table above. **Not** repo-level multi-key dump.
+### What must never be in git
 
-### GCP Workload Identity Federation
-
-| Name | Type | Purpose |
-|------|------|---------|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | secret/var | WIF provider resource name |
-| `GCP_SERVICE_ACCOUNT` | secret/var | Deploy SA email |
-
-Scaffold step in `app-tofu.yml` is `if: false` until WIF exists. Required for Cloud Run, Secret Manager, and **Pub/Sub**.
+- Database passwords / connection strings  
+- Neon org API keys  
+- OAuth client secrets, Hydra system secrets, session secrets  
+- R2 access keys  
+- Any private key material  
 
 ---
 
-## Platform GCP projects
+## R2 OpenTofu state
 
-| Platform | Placeholder `project_id` |
-|----------|---------------------------|
-| `stawi-dev` | `stawi-cloudrun-dev` |
-| `stawi-prod` | `stawi-cloudrun-prod` |
+| Item | Value |
+|------|--------|
+| Bucket | `cluster-tofu-state` (shared name with infra; prefix isolation) |
+| Key | `cloud-deployment/apps/<app>/<env>/terraform.tfstate` |
+| Lock | `use_lockfile = true` |
+| Creds | GitHub secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` |
 
-Replace before pilot apply. Pub/Sub resources use the same GCP project as Cloud Run.
+Fragment: [`config/r2-backend.hcl`](../config/r2-backend.hcl).
 
 ---
 
-## Local development
+## CI flow (per app job)
 
-- Never commit credentials.
-- Prefer `labs` account and `TF_VAR_neon_api_key` from Vault for experiments.
-- Payments/identity prod keys: CI only by default.
-- Validate without backend: `tofu init -backend=false && tofu validate`.
+1. Detect changed apps (path + module impact).  
+2. Enrich matrix via `resolve-app-context` (GCP + Neon).  
+3. Optional GitHub Environment = GCP account env for protection.  
+4. WIF → deploy SA for `project_id`.  
+5. Fetch Neon org key from Secret Manager (fallback GH).  
+6. `tofu init` (R2) → plan/apply with `-var project_id=… -var region=…`.  
+
+Independent concurrency: `cloud-deploy-<app>-<env>`.
+
+---
+
+## Bootstrap checklist (new GCP account)
+
+1. Create GCP project(s) for dev/prod.  
+2. Enable APIs: `run`, `secretmanager`, `pubsub`, `iam`, `iamcredentials`, `sts`.  
+3. Create deploy SA + WIF pool/provider for GitHub `stawi-org/cloud.deployment`.  
+4. IAM: deploy SA can admin Run, SM, Pub/Sub, service accounts in project.  
+5. Create SM secret `neon-org-api-key` with Neon org API key; grant deploy SA `secretAccessor`.  
+6. Update `config/gcp-accounts.yaml` with real `project_id` and WIF names.  
+7. Run `./.github/scripts/resolve-app-context.sh <app> stawi-dev` and a plan.
+
+---
+
+## Identity greenfield
+
+See [IDENTITY_GREENFIELD.md](IDENTITY_GREENFIELD.md) for the six identity apps and big-bang go-live order.
+
+## Related specs
+
+- [Multi-account platform + identity](superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md)  
+- [Neon multi-account secrets](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md)  
