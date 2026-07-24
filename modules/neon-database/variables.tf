@@ -31,8 +31,9 @@ variable "role_name" {
 
 variable "history_retention_seconds" {
   type        = number
-  default     = 86400
-  description = "PITR history window (1 day default — cost-conscious for greenfield)"
+  # Free Neon max is 21600 (6h); paid plans can raise this.
+  default     = 21600
+  description = "PITR history window in seconds (free plan max 21600)"
 }
 
 # Cost-safe compute defaults. Off by default so free Neon orgs work without
