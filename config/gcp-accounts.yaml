@@ -94,14 +94,15 @@ accounts:
           domain: platform
           managed-by: cloud-deployment
       stawi-prod:
-        project_id: stawi-platform-prod
-        region: europe-west1
-        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
-        deploy_service_account: tofu-deploy@stawi-platform-prod.iam.gserviceaccount.com
+        project_id: stawi-platform
+        region: europe-west9
+        workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-platform.iam.gserviceaccount.com
         labels:
           environment: prod
           domain: platform
           managed-by: cloud-deployment
+        sops_auth_path: credentials/gcp/platform/stawi-prod/auth.yaml
   labs:
     description: Experimental GCP project(s); no production data
     owners:
