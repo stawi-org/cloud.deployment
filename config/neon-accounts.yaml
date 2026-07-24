@@ -35,7 +35,7 @@ accounts:
     description: Shared platform Neon organization (devices, settings, geolocation, files)
     owners: [platform]
     neon_org_hint: Stawi Platform
-    # neon_org_id resolved from SOPS or Neon API at apply time when omitted
+    neon_org_id: org-calm-cell-68997035
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: [platform-]
     sensitivity: medium
