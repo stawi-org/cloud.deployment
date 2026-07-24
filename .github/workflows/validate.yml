@@ -1,0 +1,69 @@
+# Fast gates: change-detection tests, tofu validate, no K8s/Flux manifests.
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    name: change-detection tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+      - name: Run detect-changed-apps tests
+        run: ./.github/scripts/tests/test-detect-changed-apps.sh
+
+  tofu-validate:
+    name: tofu validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.10.0"
+      - name: Validate modules/*
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dir in modules/*/; do
+            echo "==> ${dir}"
+            (
+              cd "$dir"
+              tofu init -backend=false -input=false
+              tofu validate
+            )
+          done
+      - name: Validate apps/_template/cloudrun (dummy vars)
+        working-directory: apps/_template/cloudrun
+        env:
+          TF_VAR_neon_api_key: dummy-for-validate-only
+          TF_VAR_app_name: template
+          TF_VAR_image: example.com/app:validate
+          TF_VAR_platform: stawi-dev
+        run: |
+          set -euo pipefail
+          tofu init -backend=false -input=false
+          tofu validate
+
+  no-k8s-manifests:
+    name: forbid K8s / Flux under apps and modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guardrail — no HelmRelease / Flux APIs
+        run: |
+          set -euo pipefail
+          if grep -RInE 'HelmRelease|helm\.toolkit\.fluxcd\.io|kustomize\.toolkit\.fluxcd\.io' apps modules 2>/dev/null; then
+            echo "::error::Kubernetes/Flux manifests are forbidden in this repo (use deployment.manifests)"
+            exit 1
+          fi
+          echo "OK: no forbidden K8s/Flux markers under apps/ or modules/"
