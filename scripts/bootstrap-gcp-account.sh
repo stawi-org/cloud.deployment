@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/bootstrap-gcp-account.sh
 #
-# Idempotently configure a GCP project for cloud.deployment (Cloud Run + Neon +
+# Idempotently configure a GCP project for cloud.deployment (Cloud Run +
 # Pub/Sub + Secret Manager), then open a PR that:
 #   1) updates config/gcp-accounts.yaml with project/WIF/SA (non-secret registry)
 #   2) stores a SOPS-encrypted credentials/gcp/<account>/<env>/auth.yaml
@@ -114,7 +114,9 @@ while [[ $# -gt 0 ]]; do
     --account)          ACCOUNT="$2"; shift 2 ;;
     --env)              ENV_NAME="$2"; shift 2 ;;
     --region)           REGION="$2"; shift 2 ;;
-    --neon-api-key)     NEON_API_KEY_IN="$2"; shift 2 ;;
+    --neon-api-key|--neon-org-api-key)
+      die "Neon is not part of GCP bootstrap. Create Neon orgs/keys separately; link via app.yaml neon.account only."
+      ;;
     --repo-path)        REPO_PATH="$2"; shift 2 ;;
     --base-branch)      BASE_BRANCH="$2"; shift 2 ;;
     --branch)           BRANCH="$2"; shift 2 ;;
@@ -136,10 +138,6 @@ case "$ENV_NAME" in
 esac
 if [[ "$ACCOUNT" == *"/"* || "$ACCOUNT" == *".."* ]]; then
   die "--account must be a single path segment"
-fi
-
-if [[ -z "$NEON_API_KEY_IN" && -n "${NEON_ORG_API_KEY:-}" ]]; then
-  NEON_API_KEY_IN="$NEON_ORG_API_KEY"
 fi
 
 BRANCH="${BRANCH:-onboard-gcp-${ACCOUNT}-${ENV_NAME}}"
@@ -363,13 +361,17 @@ verify_gcloud_access
 
 # Validate account/env exist in registry (structure must be planned)
 if ! command -v yq >/dev/null 2>&1; then
-  # minimal yq install
-  arch=$(uname -m); case "$arch" in x86_64|amd64) arch=amd64;; aarch64|arm64) arch=arm64;; esac
-  sudo wget -qO /usr/local/bin/yq \
-    "https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${arch}" 2>/dev/null \
-    || wget -qO "${HOME}/.local/bin/yq" \
-      "https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${arch}"
-  chmod +x "${HOME}/.local/bin/yq" 2>/dev/null || true
+  # minimal yq install for Cloud Shell
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) die "unsupported arch for yq: $arch" ;;
+  esac
+  mkdir -p "${HOME}/.local/bin"
+  curl -fsSL -o "${HOME}/.local/bin/yq" \
+    "https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_${arch}"
+  chmod +x "${HOME}/.local/bin/yq"
   export PATH="${HOME}/.local/bin:${PATH}"
 fi
 command -v yq >/dev/null 2>&1 || die "yq required"
@@ -488,34 +490,6 @@ gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --quiet >/dev/null 2>&1 || true
 say "  workloadIdentityUser for ${GITHUB_REPO}"
 
-# =========================================================================
-# 4. Optional Neon org API key in Secret Manager
-# =========================================================================
-if [[ -n "$NEON_API_KEY_IN" ]]; then
-  say "Ensuring Secret Manager secret ${NEON_SM_SECRET_ID}"
-  if gcloud secrets describe "$NEON_SM_SECRET_ID" --project="$PROJECT" >/dev/null 2>&1; then
-    printf '%s' "$NEON_API_KEY_IN" | gcloud secrets versions add "$NEON_SM_SECRET_ID" \
-      --project="$PROJECT" \
-      --data-file=- \
-      --quiet
-    say "  added new secret version"
-  else
-    printf '%s' "$NEON_API_KEY_IN" | gcloud secrets create "$NEON_SM_SECRET_ID" \
-      --project="$PROJECT" \
-      --replication-policy=automatic \
-      --data-file=- \
-      --quiet
-    say "  secret created"
-  fi
-  gcloud secrets add-iam-policy-binding "$NEON_SM_SECRET_ID" \
-    --project="$PROJECT" \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/secretmanager.secretAccessor" \
-    --quiet >/dev/null 2>&1 || true
-else
-  say "No --neon-api-key / NEON_ORG_API_KEY — skip SM neon-org-api-key (create later)"
-fi
-
 say ""
 say "=========================================================="
 say "GCP ready for cloud.deployment account=${ACCOUNT} env=${ENV_NAME}"
@@ -523,6 +497,7 @@ say "  project: $PROJECT ($PROJECT_NUMBER)"
 say "  SA:      $SA_EMAIL"
 say "  WIF:     $WIF_PROVIDER_RESOURCE"
 say "  SAFETY:  no Cloud Run services deleted; IAM is additive only"
+say "  Neon:    not configured here (independent; link per app via neon.account)"
 
 if [[ "$IAM_ONLY" == "true" ]]; then
   say "--iam-only: skipping git/PR"
@@ -628,7 +603,6 @@ auth:
   workload_identity_provider: ${WIF_PROVIDER_RESOURCE}
   deploy_service_account: ${SA_EMAIL}
   github_repository: ${GITHUB_REPO}
-  neon_org_api_key_secret_id: ${NEON_SM_SECRET_ID}
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 EOF
 
@@ -650,10 +624,10 @@ cat >"$WORKTREE/credentials/README.md" <<'EOF'
 SOPS-encrypted GCP bootstrap metadata (age recipient in repo `.sops.yaml`).
 
 - Path: `credentials/gcp/<account>/<env>/auth.yaml`
-- Written by `scripts/bootstrap-gcp-account.sh`
+- Written by `scripts/bootstrap-gcp-account.sh` (GCP only — no Neon)
 - Public registry remains `config/gcp-accounts.yaml` (project/WIF for CI resolve)
 - Runtime secrets (DATABASE_URL, etc.) live in **GCP Secret Manager**, not here
-- Neon org API key preferred in Secret Manager secret `neon-org-api-key`
+- Neon orgs/keys are independent of GCP bootstrap; apps set neon.account separately
 
 Decrypt (operators with private age key only):
 
@@ -704,13 +678,13 @@ Configures cloud.deployment multi-account platform for this GCP project.
 | deploy SA | \`${SA_EMAIL}\` |
 | WIF provider | \`${WIF_PROVIDER_RESOURCE}\` |
 | SOPS auth | \`${AUTH_REL}\` |
-| Neon SM secret | \`${NEON_SM_SECRET_ID}\` (if provided at bootstrap) |
 
 ### After merge
 
 1. Apps with \`gcp.account: ${ACCOUNT}\` resolve to this project via \`resolve-app-context.sh\`.
 2. CI uses WIF → \`${SA_EMAIL}\` for plan/apply.
 3. Runtime secrets remain in Secret Manager (not git).
+4. Neon is separate: create Neon orgs/keys out-of-band; apps set \`neon.account\` independently.
 
 Architecture docs unchanged: multi-account + SM + path-filtered CI.
 EOF
