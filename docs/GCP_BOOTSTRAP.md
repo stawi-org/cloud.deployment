@@ -21,9 +21,10 @@ The multi-account plan stays intact:
 | 2 | Create WIF pool/provider bound to `stawi-org/cloud.deployment` |
 | 3 | Create SA `tofu-deploy@PROJECT` + roles (Run, SM, Pub/Sub, SA admin/user) |
 | 4 | Bind GitHub OIDC → `roles/iam.workloadIdentityUser` |
-| 5 | Optional: write Neon org API key to SM secret `neon-org-api-key` |
-| 6 | PR: update `config/gcp-accounts.yaml` for `--account` / `--env` |
-| 7 | PR: SOPS-encrypt `credentials/gcp/<account>/<env>/auth.yaml` (age key in `.sops.yaml`) |
+| 5 | PR: update `config/gcp-accounts.yaml` for `--account` / `--env` |
+| 6 | PR: SOPS-encrypt `credentials/gcp/<account>/<env>/auth.yaml` (age key in `.sops.yaml`) |
+
+**Neon is not part of this script.** Neon organizations and API keys are created independently. The only linkage is per app: `app.yaml` chooses `gcp.account` and `neon.account` separately.
 
 Safe to re-run (additive IAM). Skips git if already onboarded unless `--force-repo-write`.
 
@@ -41,9 +42,10 @@ export GITHUB_TOKEN=ghp_xxxxxxxx   # repo (or fine-grained Contents + PR)
   --project stawi-identity-dev \
   --account identity \
   --env stawi-dev \
-  --region europe-west1 \
-  --neon-api-key "$NEON_ORG_API_KEY"   # optional but recommended
+  --region europe-west1
 ```
+
+Neon (separate step, not this script): create the Neon org/API key elsewhere; register it in `config/neon-accounts.yaml` / Secret Manager or GH Environment as documented in [BACKEND.md](BACKEND.md). Apps link GCP↔Neon only via `app.yaml`.
 
 | Flag | Meaning |
 |------|---------|

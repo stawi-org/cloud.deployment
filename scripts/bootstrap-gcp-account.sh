@@ -19,7 +19,7 @@
 #
 # ── SAFETY ───────────────────────────────────────────────────────────────
 # Safe to re-run. Does NOT delete projects, Cloud Run services, or secrets.
-# Only ensures APIs, WIF, SA, IAM bindings, optional neon-org-api-key secret.
+# Only ensures APIs, WIF, SA, and IAM bindings.
 #
 # Cloud Shell (upload only this script, or curl from main):
 #   export GITHUB_TOKEN=ghp_xxx   # repo scope recommended
@@ -29,9 +29,10 @@
 #     --env stawi-dev \
 #     --region europe-west1
 #
-# Optional Neon org API key into Secret Manager:
-#   ./bootstrap-gcp-account.sh ... --neon-api-key "$NEON_ORG_API_KEY"
-#   # or: export NEON_ORG_API_KEY=...
+# Neon is independent of GCP. Do NOT pass Neon keys here.
+# Create Neon orgs/API keys separately; apps link them only via app.yaml
+# (neon.account) and config/neon-accounts.yaml. CI loads Neon credentials
+# from wherever that registry points (e.g. Secret Manager or GH Environment).
 #
 # Encryption uses the public age key in .sops.yaml — no private age key
 # is required on the bootstrap machine.
@@ -60,7 +61,6 @@ NO_PR="false"
 NO_CLONE="false"
 IAM_ONLY="false"
 FORCE_REPO_WRITE="false"
-NEON_API_KEY_IN=""  # optional: create SM secret neon-org-api-key
 
 WIF_POOL="github"
 WIF_PROVIDER="github-actions"
@@ -73,8 +73,6 @@ ATTR_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.reposi
 SOPS_VERSION="v3.11.0"
 CLONE_URL="https://github.com/${GITHUB_REPO}.git"
 DEFAULT_CLONE_DIR="${HOME}/cloud.deployment"
-
-NEON_SM_SECRET_ID="neon-org-api-key"
 
 usage() {
   if [[ -n "${BASH_SOURCE[0]:-}" && -r "${BASH_SOURCE[0]}" ]]; then
@@ -89,7 +87,6 @@ Flags:
                          e.g. identity | payments | notifications | platform | labs
   --env <NAME>           stawi-dev | stawi-prod (default: stawi-dev)
   --region <REGION>      Default europe-west1
-  --neon-api-key <KEY>   Write Neon org API key to Secret Manager (or set NEON_ORG_API_KEY)
   --repo-path <PATH>     cloud.deployment checkout (default: auto-clone ~/cloud.deployment)
   --no-clone             Fail if no checkout found
   --base-branch <NAME>   Default main
