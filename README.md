@@ -28,4 +28,13 @@ See [docs/superpowers/specs/2026-07-24-cloud-deployment-architecture-design.md](
 
 ## Status
 
-Architecture accepted. Implementation follows the PR plan in the design doc.
+**Scaffold ready for pilot.** Modules (edge-contract, neon-database, cloudrun-service, pubsub), platforms, app template, path-filtered plan/apply CI, and validate guardrails are in place. Next: real GCP project IDs, WIF, and first edge app — see [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md).
+
+## Operator docs
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/ADDING_AN_APP.md](docs/ADDING_AN_APP.md) | Onboard a new Cloud Run + Neon + Pub/Sub app |
+| [docs/MODULES.md](docs/MODULES.md) | Module and platform contracts |
+| [docs/BACKEND.md](docs/BACKEND.md) | R2 state, secrets, Neon accounts |
+| [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md) | First-app go-live checklist |

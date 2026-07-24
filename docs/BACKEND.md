@@ -72,16 +72,29 @@ Each app’s `app.yaml` sets `neon.account` to a key in [`config/neon-accounts.y
 
 Add a registry entry and matching GitHub secret when a new Neon organization is needed.
 
-### GCP Workload Identity Federation (Cloud Run apply)
+### GCP Workload Identity Federation (Cloud Run + Pub/Sub apply)
 
-Placeholder names for Task 8 (full WIF wiring):
+Wired as a scaffold step in `.github/workflows/app-tofu.yml` (`google-github-actions/auth`, currently `if: false` until secrets exist):
 
 | Name | Type | Purpose |
 |------|------|---------|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | secret/var | Workload identity provider resource name |
-| `GCP_SERVICE_ACCOUNT` | secret/var | GCP service account email to impersonate |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | secret | Workload identity provider resource name |
+| `GCP_SERVICE_ACCOUNT` | secret | GCP service account email to impersonate |
 
-These are required for apply jobs that manage Cloud Run / related GCP resources. Exact GitHub Actions `auth` wiring lands in the CI task.
+These are required for apply jobs that manage Cloud Run, Secret Manager, and Pub/Sub.
+
+---
+
+## Platform GCP projects
+
+Platform packs set `project_id` used by Cloud Run, Secret Manager, and **Pub/Sub** (same project — apps do not use a separate messaging project).
+
+| Platform | File | Placeholder `project_id` |
+|----------|------|---------------------------|
+| `stawi-dev` | `platforms/stawi-dev` | `stawi-cloudrun-dev` |
+| `stawi-prod` | `platforms/stawi-prod` | `stawi-cloudrun-prod` |
+
+Replace placeholders with real project IDs before pilot apply. CI passes `-var=platform=<env>` so the app root count-switches to the matching platform module.
 
 ---
 
