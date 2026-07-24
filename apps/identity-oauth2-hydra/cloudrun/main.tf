@@ -43,7 +43,11 @@ locals {
     toset([local.database_secret_id]),
     local.app_secret_ids,
     var.extra_secret_ids,
-    toset(keys(var.extra_secret_values)),
+  )
+  # Literals only — never keys() of sensitive maps (random_password / Neon URIs)
+  version_ids = setunion(
+    toset([local.database_secret_id]),
+    local.app_secret_ids,
   )
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
@@ -59,6 +63,7 @@ module "secrets" {
   labels     = var.labels
 
   secret_ids    = local.secret_ids
+  version_ids   = local.version_ids
   secret_values = local.secret_values
 
   accessor_members = [

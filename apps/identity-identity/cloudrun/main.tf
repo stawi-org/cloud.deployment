@@ -37,9 +37,9 @@ locals {
   secret_ids = setunion(
     toset([local.database_secret_id]),
     var.extra_secret_ids,
-    toset(keys(var.extra_secret_values)),
   )
-  # Values: always DATABASE_URL from Neon; optional extras from CI/vars (not git)
+  # Non-sensitive IDs with tofu-managed versions (never keys() of sensitive maps)
+  version_ids = toset([local.database_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     var.extra_secret_values,
@@ -53,6 +53,7 @@ module "secrets" {
   labels     = var.labels
 
   secret_ids    = local.secret_ids
+  version_ids   = local.version_ids
   secret_values = local.secret_values
 
   accessor_members = [

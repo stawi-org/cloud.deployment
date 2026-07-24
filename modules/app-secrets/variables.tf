@@ -9,9 +9,15 @@ variable "secret_ids" {
   default     = []
 }
 
+variable "version_ids" {
+  type        = set(string)
+  description = "Subset of secret_ids that get a tofu-managed version (must be non-sensitive literals/sets — never keys() of a sensitive map)"
+  default     = []
+}
+
 variable "secret_values" {
   type        = map(string)
-  description = "Optional map of secret_id → payload for versions managed in tofu"
+  description = "Map of secret_id → payload for version_ids managed in tofu"
   sensitive   = true
   default     = {}
 }

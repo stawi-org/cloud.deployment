@@ -1,5 +1,8 @@
 # GCP Secret Manager for application secrets (DB URLs, OAuth secrets, etc.).
-# secret_ids must be non-sensitive (for_each keys). Values may be sensitive.
+#
+# for_each keys MUST stay non-sensitive. Never derive for_each from maps marked
+# sensitive (e.g. secret_values or random_password results) — that panics OpenTofu
+# with "value is marked, so must be unmarked first".
 
 resource "google_secret_manager_secret" "this" {
   for_each = var.secret_ids
@@ -31,11 +34,8 @@ resource "google_secret_manager_secret" "this" {
 }
 
 resource "google_secret_manager_secret_version" "managed" {
-  # Only create versions for ids that have a value supplied
-  for_each = toset([
-    for id in var.secret_ids : id
-    if try(var.secret_values[id], null) != null
-  ])
+  # Explicit non-sensitive set of IDs that have tofu-managed values.
+  for_each = var.version_ids
 
   secret      = google_secret_manager_secret.this[each.key].id
   secret_data = var.secret_values[each.key]
