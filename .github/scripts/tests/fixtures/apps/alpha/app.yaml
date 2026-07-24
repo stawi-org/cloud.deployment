@@ -1,0 +1,5 @@
+name: alpha
+envs: [stawi-dev]
+neon:
+  account: stawi-org
+runtime: cloudrun

@@ -1,0 +1,5 @@
+name: beta
+envs: [stawi-dev, stawi-prod]
+neon:
+  account: stawi-labs
+runtime: cloudrun
