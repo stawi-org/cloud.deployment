@@ -1,9 +1,9 @@
-# Age public key for encrypting credential files (same recipient as deployment.infra).
-# Bootstrap encrypts with this public key only — no private key needed on Cloud Shell.
+# Age public key for encrypting credential files.
+# Matching private key is repository secret SOPS_AGE_KEY (never commit the private key).
 creation_rules:
   - path_regex: credentials/gcp/.*/auth\.yaml$
     encrypted_regex: "^(.*)$"
-    age: age1s570flcma83aa5lxzfvgz0y6gh5r3pnfmhlhlxamyux24dsquq7s6zffpt
+    age: age1a2a4pnyq7yhp8qntzrx3htpvp6vf7syxcuwu4qlqz3kheq4jl5vslrtrsn
   - path_regex: credentials/neon/.*/auth\.yaml$
     encrypted_regex: "^(.*)$"
-    age: age1s570flcma83aa5lxzfvgz0y6gh5r3pnfmhlhlxamyux24dsquq7s6zffpt
+    age: age1a2a4pnyq7yhp8qntzrx3htpvp6vf7syxcuwu4qlqz3kheq4jl5vslrtrsn
