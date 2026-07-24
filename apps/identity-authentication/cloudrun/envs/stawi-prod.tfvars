@@ -1,2 +1,3 @@
 # Mirrored from GHCR into project AR (Cloud Run cannot pull private GHCR cache).
-image = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication:v1.54.53"
+# v1.54.56+ ships Frame v2.0.12 (gcppubsub dual-URL); v1.54.53 was Frame 2.0.8.
+image = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication:v1.54.56"
