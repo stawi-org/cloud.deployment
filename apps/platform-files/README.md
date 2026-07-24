@@ -1,11 +1,11 @@
 # platform-files
 
-Platform-domain Cloud Run app (service-files apps/default).
+Platform-domain Cloud Run app.
 
 | Layer | Value |
 |-------|--------|
-| GCP | `platform` / `stawi-platform` |
-| Neon | `identity` org (interim) until platform Neon account is ready |
-| Image | `ghcr.io/antinvestor/service-files:v1.10.54` (bootstrap; ship via service-repo release) |
+| GCP | `platform` / `stawi-platform` (europe-west9) |
+| Neon | `platform` org (`credentials/neon/platform/auth.yaml`) |
+| Auth | Identity Hydra/Keto in `stawi-identity` |
 
-Auth depends on identity Hydra + Keto in `stawi-identity`.
+See [docs/DEPLOY_PLATFORM.md](../../docs/DEPLOY_PLATFORM.md).

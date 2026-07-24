@@ -1,35 +1,53 @@
-# Platform domain deploy (Cloud Run)
+# Platform domain deploy (Cloud Run + Neon)
 
 **GCP project:** `stawi-platform` (305282281906) · **region:** `europe-west9`  
-**Account key:** `platform` in `config/gcp-accounts.yaml`
+**GCP account key:** `platform` (`config/gcp-accounts.yaml`)  
+**Neon account key:** `platform` (`config/neon-accounts.yaml` + `credentials/neon/platform/auth.yaml`)
 
 ## Apps
 
-| App | Image (bootstrap) | Source |
-|-----|-------------------|--------|
-| `platform-devices` | `ghcr.io/antinvestor/service-profile-devices` | service-profile `apps/devices` |
-| `platform-settings` | `ghcr.io/antinvestor/service-profile-settings` | service-profile `apps/settings` |
-| `platform-geolocation` | `ghcr.io/antinvestor/service-profile-geolocation` | service-profile `apps/geolocation` |
-| `platform-files` | `ghcr.io/antinvestor/service-files` | service-files `apps/default` |
+| App | Image (AR bootstrap) | Source |
+|-----|----------------------|--------|
+| `platform-devices` | `europe-west9-docker.pkg.dev/stawi-platform/apps/service-profile-devices:v1.53.5` | service-profile `apps/devices` |
+| `platform-settings` | `…/service-profile-settings:v1.53.5` | service-profile `apps/settings` |
+| `platform-geolocation` | `…/service-profile-geolocation:v1.53.5` | service-profile `apps/geolocation` |
+| `platform-files` | `…/service-files:v1.10.54` | service-files |
 
-## Dependencies on identity
+App names must match Neon `allowed_app_prefixes: [platform-]`.
+
+## Neon (required)
+
+Every platform app uses **`neon.account: platform`** only — not identity.
+
+| Artifact | Path |
+|----------|------|
+| Registry | `config/neon-accounts.yaml` → `accounts.platform` |
+| SOPS API key | `credentials/neon/platform/auth.yaml` |
+| Org id | SOPS `auth.neon_org_id` **or** registry `neon_org_id` **or** auto-resolved at apply via Neon API |
+
+CI (`load-sops-credentials.sh`) decrypts the platform key with `SOPS_AGE_KEY` and sets `TF_VAR_neon_api_key` / `TF_VAR_neon_org_id`.
+
+If OpenTofu state still points at Neon projects created under the **identity** org (pre-switch), apply **rebinds** automatically: when `tofu refresh` of `module.db.neon_project` fails with the platform key, state drops `module.db.*` and creates fresh projects in the platform org. Orphaned projects in the identity Neon org should be deleted in the Neon console.
+
+### Bootstrap / rotate platform Neon key
+
+```bash
+export API_KEY=napi_xxx   # org API key from Neon console (Stawi Platform)
+./scripts/bootstrap-neon-account.sh --account platform --api-key "$API_KEY" \
+  --org-hint "Stawi Platform" --org-id org-xxxxx --force-repo-write
+```
+
+Prefer storing `neon_org_id` in the registry once known.
+
+## Dependencies on identity (GCP)
 
 | Dependency | Where |
 |------------|--------|
-| Hydra OIDC | `stawi-identity` Cloud Run `identity-oauth2-hydra` |
-| Keto read/write | `stawi-identity` keto-read / keto-write |
-| `hydra-webhook-psk` | Copied into `stawi-platform` Secret Manager |
+| Hydra OIDC | `stawi-identity` → `identity-oauth2-hydra` |
+| Keto read/write | `stawi-identity` keto services |
+| `hydra-webhook-psk` | Mirrored into `stawi-platform` Secret Manager |
 
-`tofu-deploy@stawi-platform` has `roles/run.viewer` on `stawi-identity` so OpenTofu can resolve Hydra/Keto URIs.
-
-## Neon
-
-Apps currently use `neon.account: identity` (shared Neon org) until a dedicated **platform** Neon org + SOPS file is bootstrapped:
-
-```bash
-./scripts/bootstrap-neon-account.sh --account platform --api-key "$NEON_API_KEY"
-# then set neon.account: platform and neon_org_id in neon-accounts.yaml
-```
+`tofu-deploy@stawi-platform` has `roles/run.viewer` on `stawi-identity`.
 
 ## Ship (decentralized)
 
@@ -38,35 +56,35 @@ ship_service_account:       cloudrun-ship@stawi-platform.iam.gserviceaccount.com
 workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-ship
 ```
 
-Service repos call `antinvestor/common` `cloudrun-ship.yml` with the platform service names after docker-release.
+| Repo | Ships |
+|------|--------|
+| service-profile | devices, settings, geolocation (+ identity-profile → stawi-identity) |
+| service-files | platform-files |
 
-## First apply (per app)
+## Apply
 
 ```bash
-# CI: merge apps/platform-* and workflow_dispatch app-apply
-# Or local (with SOPS_AGE_KEY + R2 + gcloud ADC):
-cd apps/platform-devices/cloudrun
-# tofu init with R2 backend key cloud-deployment/apps/platform-devices/stawi-prod/terraform.tfstate
-# tofu apply -var-file=envs/stawi-prod.tfvars -var=app_name=platform-devices ...
+gh workflow run app-apply.yml -f app=platform-devices -f env=stawi-prod
+# or apply all four after merging app.yaml / module changes
 ```
 
-Deploy order: any order (no migrate cross-deps between platform apps). Identity stack must already be up for OIDC/authz URLs.
+Order: independent; identity stack must already serve Hydra/Keto.
 
-## Optional secrets (later)
+## Secrets
 
 | App | Secrets |
 |-----|---------|
-| devices | Cloudflare TURN (`CLOUDFLARE_TURN_*`) |
-| files | R2/S3 (`S3_ENDPOINT`, `S3_ACCESS_KEY_*`, `ENCRYPTION_PHRASE`) |
+| all | `DATABASE_URL`, `hydra-webhook-psk`, dual-URL `EVENTS_QUEUE_*` / `FRAME_QUEUE_PUSH_OIDC_*` |
+| files | `ENCRYPTION_PHRASE` (32 bytes, generated) |
+| devices | Cloudflare TURN (optional later) |
+| files storage | R2/S3 endpoint + keys (optional later) |
 
 ## Container images
 
-Cloud Run in this org rewrites GHCR pulls through `cache.europe-docker.pkg.dev` and fails without cache credentials.
-
-**Bootstrap:** images are mirrored to:
+Org GHCR pulls via `cache.europe-docker.pkg.dev` often fail without cache credentials. Bootstrap images live in:
 
 ```text
 europe-west9-docker.pkg.dev/stawi-platform/apps/<name>:<tag>
 ```
 
-Release ship workflows can keep pushing to GHCR; either mirror into AR in CI or configure GHCR remote repository auth. Prefer AR for production Cloud Run tags until GHCR pull is fixed org-wide.
+Mirror new release tags into AR before Cloud Run ship, or fix GHCR remote auth org-wide.

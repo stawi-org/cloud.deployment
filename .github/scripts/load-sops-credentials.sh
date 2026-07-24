@@ -79,15 +79,46 @@ if [[ "$USES_NEON" == "true" ]]; then
   NEON_API_KEY=$(jq -r '.auth.api_key // .api_key // empty' <<<"$NEON_JSON")
   # Prefer SOPS neon_org_id when present; else registry
   SOPS_ORG=$(jq -r '.auth.neon_org_id // .neon_org_id // empty' <<<"$NEON_JSON")
-  [[ -n "$SOPS_ORG" ]] && NEON_ORG_ID="$SOPS_ORG"
+  if [[ -n "$SOPS_ORG" && "$SOPS_ORG" != "null" ]]; then
+    NEON_ORG_ID="$SOPS_ORG"
+  fi
   [[ -n "$NEON_API_KEY" && "$NEON_API_KEY" != "null" ]] || {
     echo "ERROR: decrypted Neon auth missing api_key" >&2
     exit 1
   }
+  # Resolve org id from Neon API when registry/SOPS omitted it (common for new org keys).
+  if [[ -z "$NEON_ORG_ID" || "$NEON_ORG_ID" == "null" ]]; then
+    if command -v curl >/dev/null 2>&1; then
+      # Org API keys are scoped; /projects lists that org's projects and includes org_id.
+      NEON_PROJ_JSON=$(curl -fsS \
+        -H "Authorization: Bearer ${NEON_API_KEY}" \
+        -H "Accept: application/json" \
+        "https://console.neon.tech/api/v2/projects?limit=1" 2>/dev/null || true)
+      NEON_ORG_ID=$(jq -r '
+          .projects[0].org_id
+          // .projects[0].organization_id
+          // .organization.id
+          // .org_id
+          // empty
+        ' <<<"${NEON_PROJ_JSON:-{}}" 2>/dev/null || true)
+      if [[ -z "$NEON_ORG_ID" || "$NEON_ORG_ID" == "null" ]]; then
+        NEON_ORG_JSON=$(curl -fsS \
+          -H "Authorization: Bearer ${NEON_API_KEY}" \
+          -H "Accept: application/json" \
+          "https://console.neon.tech/api/v2/users/me/organizations" 2>/dev/null || true)
+        NEON_ORG_ID=$(jq -r '
+            .organizations[0].id
+            // .organizations[0].org_id
+            // empty
+          ' <<<"${NEON_ORG_JSON:-{}}" 2>/dev/null || true)
+      fi
+    fi
+  fi
   [[ -n "$NEON_ORG_ID" && "$NEON_ORG_ID" != "null" ]] || {
-    echo "ERROR: neon.account=${NEON_ACCOUNT} missing neon_org_id in registry or SOPS" >&2
+    echo "ERROR: neon.account=${NEON_ACCOUNT} missing neon_org_id in registry/SOPS and could not resolve via Neon API" >&2
     exit 1
   }
+  echo "Resolved neon.account=${NEON_ACCOUNT} org_id=${NEON_ORG_ID}" >&2
 fi
 
 emit_gha() {

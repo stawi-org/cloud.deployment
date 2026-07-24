@@ -32,11 +32,12 @@ accounts:
     allowed_app_prefixes: [payment-, checkout-, billing-, ledger-]
     sensitivity: critical
   platform:
-    description: Shared platform edge Neon organization
+    description: Shared platform Neon organization (devices, settings, geolocation, files)
     owners: [platform]
     neon_org_hint: Stawi Platform
+    # neon_org_id resolved from SOPS or Neon API at apply time when omitted
     allowed_deploy_envs: [stawi-dev, stawi-prod]
-    allowed_app_prefixes: []
+    allowed_app_prefixes: [platform-]
     sensitivity: medium
     sops_auth_path: credentials/neon/platform/auth.yaml
   labs:
