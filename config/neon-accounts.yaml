@@ -7,7 +7,6 @@
 # Never put API keys in this file.
 
 version: 1
-
 accounts:
   identity:
     description: Identity domain Neon organization
@@ -18,7 +17,6 @@ accounts:
     allowed_app_prefixes: []
     sensitivity: critical
     sops_auth_path: credentials/neon/identity/auth.yaml
-
   notifications:
     description: Notifications domain Neon organization
     owners: [communications-team]
@@ -26,7 +24,6 @@ accounts:
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: high
-
   payments:
     description: Payments domain Neon organization
     owners: [finance-team]
@@ -34,15 +31,14 @@ accounts:
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: [payment-, checkout-, billing-, ledger-]
     sensitivity: critical
-
   platform:
     description: Shared platform edge Neon organization
     owners: [platform]
-    neon_org_hint: Stawi Platform Edge
+    neon_org_hint: Stawi Platform
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
     sensitivity: medium
-
+    sops_auth_path: credentials/neon/platform/auth.yaml
   labs:
     description: Experimental Neon organization; no production customer data
     owners: [platform]
@@ -50,7 +46,6 @@ accounts:
     allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []
     sensitivity: low
-
   stawi-org:
     description: "LEGACY alias — prefer domain keys"
     owners: [platform]
@@ -60,7 +55,6 @@ accounts:
     sensitivity: medium
     deprecated: true
     deprecated_message: Use a domain account key (identity, notifications, payments, platform, labs)
-
   stawi-labs:
     description: "LEGACY alias for labs"
     owners: [platform]
