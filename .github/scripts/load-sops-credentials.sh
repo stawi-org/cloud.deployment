@@ -82,6 +82,9 @@ if [[ "$USES_NEON" == "true" ]]; then
 fi
 
 emit_gha() {
+  [[ -n "${GITHUB_OUTPUT:-}" ]] || { echo "ERROR: GITHUB_OUTPUT not set" >&2; exit 1; }
+  [[ -n "${GITHUB_ENV:-}" ]] || { echo "ERROR: GITHUB_ENV not set" >&2; exit 1; }
+
   {
     echo "project_id=${PROJECT_ID}"
     echo "region=${REGION}"
@@ -91,16 +94,21 @@ emit_gha() {
     echo "neon_account=${NEON_ACCOUNT}"
     echo "uses_neon=${USES_NEON}"
   } >> "${GITHUB_OUTPUT}"
-  {
-    echo "TF_VAR_project_id=${PROJECT_ID}"
-    echo "TF_VAR_region=${REGION}"
-    if [[ -n "$NEON_API_KEY" ]]; then
-      echo "::add-mask::${NEON_API_KEY}"
-      echo "TF_VAR_neon_api_key=${NEON_API_KEY}"
-    else
-      echo "TF_VAR_neon_api_key=unused"
-    fi
-  } >> "${GITHUB_ENV}"
+
+  # Workflow commands (add-mask) must go to stdout — never to GITHUB_ENV.
+  echo "TF_VAR_project_id=${PROJECT_ID}" >> "${GITHUB_ENV}"
+  echo "TF_VAR_region=${REGION}" >> "${GITHUB_ENV}"
+  if [[ -n "$NEON_API_KEY" ]]; then
+    echo "::add-mask::${NEON_API_KEY}"
+    # Multiline-safe delimiter write for env (keys are single-line but stay defensive)
+    {
+      echo "TF_VAR_neon_api_key<<SOPS_NEON_EOF"
+      echo "${NEON_API_KEY}"
+      echo "SOPS_NEON_EOF"
+    } >> "${GITHUB_ENV}"
+  else
+    echo "TF_VAR_neon_api_key=unused" >> "${GITHUB_ENV}"
+  fi
 }
 
 emit_exports() {
