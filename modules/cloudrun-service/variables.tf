@@ -20,6 +20,12 @@ variable "container_port" {
   description = "Container listen port (Cloud Run sets PORT to this)"
 }
 
+variable "use_http2" {
+  type        = bool
+  default     = false
+  description = "If true, advertise h2c on the container port (required for gRPC clients on Cloud Run)"
+}
+
 variable "command" {
   type        = list(string)
   default     = null

@@ -64,6 +64,8 @@ resource "google_cloud_run_v2_service" "this" {
       command = var.command
       args    = var.args
       ports {
+        # name=h2c enables end-to-end HTTP/2 (gRPC) on Cloud Run.
+        name           = var.use_http2 ? "h2c" : null
         container_port = var.container_port
       }
       resources {
