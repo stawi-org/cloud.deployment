@@ -66,8 +66,10 @@ variable "allowed_persistence_regions" {
 
 variable "enforce_in_transit" {
   type        = bool
-  default     = true
-  description = "When true, Pub/Sub also keeps in-transit messages in allowed regions"
+  # false: regional *storage* still applies; publish may use the global API
+  # (Cloud Run + gocloud default clients). true requires regional Pub/Sub endpoints.
+  default     = false
+  description = "When true, Pub/Sub rejects publishes not received in allowed regions (needs regional clients)"
 }
 
 variable "default_push_endpoint" {

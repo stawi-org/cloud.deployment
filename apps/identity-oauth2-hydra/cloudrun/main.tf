@@ -132,7 +132,7 @@ module "messaging" {
 
   # Regional storage only — Hydra is not a Frame consumer (no push handler).
   allowed_persistence_regions = [var.region]
-  enforce_in_transit          = true
+  enforce_in_transit          = false
   create_dead_letter_topic    = false
 }
 

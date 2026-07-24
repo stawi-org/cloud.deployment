@@ -93,7 +93,7 @@ Prefer the workload region only so messages do not traverse continents:
 ```hcl
 region                        = var.region
 allowed_persistence_regions   = [var.region]
-enforce_in_transit            = true
+enforce_in_transit            = false  # regional storage only; avoid requiring regional Pub/Sub clients
 ```
 
 ### Inputs
@@ -109,7 +109,7 @@ enforce_in_transit            = true
 | `enable_publisher_iam` | bool | `true` | Grant `roles/pubsub.publisher` on topics |
 | `create_default_events_topic` | bool | `true` | Create default events topic when `topics` empty |
 | `allowed_persistence_regions` | list(string) | `[]` | Regions where Pub/Sub may store messages |
-| `enforce_in_transit` | bool | `true` | Keep in-transit messages in allowed regions |
+| `enforce_in_transit` | bool | `false` | If true, publishes must hit a regional Pub/Sub endpoint (breaks default gocloud/gcloud) |
 | `default_push_endpoint` | string | `null` | Frame push URL `https://…/_frame/queue/{ref}` |
 | `push_oidc_service_account_email` | string | `""` | SA Pub/Sub uses for OIDC + Frame allowlist (**required** when push endpoint set) |
 | `push_oidc_audience` | string | `""` | `FRAME_QUEUE_PUSH_OIDC_AUDIENCE` (defaults to push endpoint) |

@@ -87,7 +87,7 @@ module "messaging" {
 
   # Regional storage only (workload region) — avoid multi-continent message hops.
   allowed_persistence_regions = [var.region]
-  enforce_in_transit          = true
+  enforce_in_transit          = false
 
   # GCP Pub/Sub push → Frame demux (WithRegisterEvents handlers).
   default_push_endpoint           = local.events_push_endpoint
