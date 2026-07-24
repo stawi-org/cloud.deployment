@@ -1,10 +1,11 @@
 # Reusable plan/apply for one (app, env).
-# Model: docs/superpowers/specs/2026-07-24-account-selection-and-ci-credentials.md
 #
-# - GCP: WIF from registry (gcp.account + env) — no GCP keys in GitHub
-# - Neon: only if app has neon.account → job environment neon--{account}, secret API_KEY
-# - R2: repository secrets only
-# - Runtime secrets: Secret Manager in selected GCP project (OpenTofu)
+# Credentials model (no per-account GitHub Environments):
+#   - R2: repository secrets (state backend)
+#   - SOPS_AGE_KEY: repository secret → decrypt credentials/{gcp,neon}/…
+#   - GCP: WIF from decrypted SOPS (or registry metadata already mirrored there)
+#   - Neon API key: only if app.yaml has neon.account → credentials/neon/<account>/auth.yaml
+#   - Runtime secrets: Secret Manager in the selected GCP project (OpenTofu)
 name: app-tofu
 
 on:
@@ -19,15 +20,6 @@ on:
       mode:
         required: true
         type: string
-      # From resolve-app-context: neon--{account} or deploy--{gcp}--{env} or empty
-      job_environment:
-        required: false
-        type: string
-        default: ""
-      uses_neon:
-        required: false
-        type: boolean
-        default: false
     secrets:
       R2_ACCOUNT_ID:
         required: true
@@ -35,15 +27,12 @@ on:
         required: true
       R2_SECRET_ACCESS_KEY:
         required: true
-      # Only present when job_environment is neon--* (secret name API_KEY)
-      API_KEY:
-        required: false
+      SOPS_AGE_KEY:
+        required: true
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    # Single environment: Neon credential env when app uses Neon; else optional protection env
-    environment: ${{ inputs.job_environment != '' && inputs.job_environment || '' }}
     concurrency:
       group: cloud-deploy-${{ inputs.app }}-${{ inputs.env }}
       cancel-in-progress: false
@@ -61,12 +50,23 @@ jobs:
         with:
           tofu_version: "1.10.0"
 
-      - name: Install yq
+      - name: Install yq + sops
         working-directory: .
         run: |
+          set -euo pipefail
           sudo wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
+          SOPS_VER=v3.11.0
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64|amd64) ARCH=amd64 ;;
+            aarch64|arm64) ARCH=arm64 ;;
+            *) echo "unsupported arch: $ARCH" >&2; exit 1 ;;
+          esac
+          sudo wget -qO /usr/local/bin/sops \
+            "https://github.com/getsops/sops/releases/download/${SOPS_VER}/sops-${SOPS_VER}.linux.${ARCH}"
+          sudo chmod +x /usr/local/bin/sops
 
       - name: Resolve multi-account context
         id: ctx
@@ -76,36 +76,28 @@ jobs:
           ./.github/scripts/resolve-app-context.sh \
             "${{ inputs.app }}" "${{ inputs.env }}" --format=gha
 
-      - name: Load Neon org API key (only if app uses Neon)
-        if: inputs.uses_neon
+      - name: Decrypt SOPS credentials (GCP WIF + optional Neon)
+        id: creds
+        working-directory: .
         env:
-          API_KEY: ${{ secrets.API_KEY }}
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${API_KEY:-}" ]]; then
-            echo "::error::App uses neon.account but secret API_KEY is empty."
-            echo "::error::Create GitHub Environment '${{ inputs.job_environment }}' with secret API_KEY"
-            echo "::error::  (bootstrap-neon-account.sh --account … --sync-github-env)"
-            exit 1
+          ./.github/scripts/load-sops-credentials.sh \
+            "${{ inputs.app }}" "${{ inputs.env }}" --format=gha
+          # Registry labels (non-secret) for resource tagging
+          if [[ -n "${{ steps.ctx.outputs.labels_json }}" ]]; then
+            echo "TF_VAR_labels=${{ steps.ctx.outputs.labels_json }}" >> "$GITHUB_ENV"
           fi
-          echo "::add-mask::${API_KEY}"
-          echo "TF_VAR_neon_api_key=${API_KEY}" >> "$GITHUB_ENV"
-          echo "::notice::Neon API key loaded from environment ${{ inputs.job_environment }}"
-
-      - name: Skip Neon provider inputs
-        if: ${{ !inputs.uses_neon }}
-        run: |
-          echo "::notice::App has no neon.account — Neon provider key not loaded"
-          # Provide dummy so roots that still declare neon_api_key validate; prefer apps without neon later
-          echo "TF_VAR_neon_api_key=unused" >> "$GITHUB_ENV"
+          echo "::notice::Credentials loaded via SOPS (gcp=${{ steps.ctx.outputs.gcp_account }} neon=${{ steps.ctx.outputs.neon_account }})"
 
       - name: Authenticate to Google Cloud (WIF)
         id: auth
         uses: google-github-actions/auth@v2
-        continue-on-error: true
+        continue-on-error: ${{ inputs.mode == 'plan' }}
         with:
-          workload_identity_provider: ${{ steps.ctx.outputs.workload_identity_provider }}
-          service_account: ${{ steps.ctx.outputs.deploy_service_account }}
+          workload_identity_provider: ${{ steps.creds.outputs.workload_identity_provider }}
+          service_account: ${{ steps.creds.outputs.deploy_service_account }}
 
       - name: Configure R2 credentials for backend
         env:
@@ -117,7 +109,7 @@ jobs:
           echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
           echo "AWS_REGION=auto" >> "$GITHUB_ENV"
 
-      - name: Tofu init (R2 state)
+      - name: Tofu init (R2 state → cloud-tofu-state)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: |
@@ -140,8 +132,8 @@ jobs:
             -var-file="envs/${{ inputs.env }}.tfvars" \
             -var="app_name=${{ inputs.app }}" \
             -var="platform=${{ inputs.env }}" \
-            -var="project_id=${{ steps.ctx.outputs.project_id }}" \
-            -var="region=${{ steps.ctx.outputs.region }}" \
+            -var="project_id=${{ steps.creds.outputs.project_id }}" \
+            -var="region=${{ steps.creds.outputs.region }}" \
             -out=tfplan
 
       - name: Upload plan
@@ -163,5 +155,5 @@ jobs:
             -var-file="envs/${{ inputs.env }}.tfvars" \
             -var="app_name=${{ inputs.app }}" \
             -var="platform=${{ inputs.env }}" \
-            -var="project_id=${{ steps.ctx.outputs.project_id }}" \
-            -var="region=${{ steps.ctx.outputs.region }}"
+            -var="project_id=${{ steps.creds.outputs.project_id }}" \
+            -var="region=${{ steps.creds.outputs.region }}"

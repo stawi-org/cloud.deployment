@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Validate apps/*/app.yaml neon.account against config/neon-accounts.yaml policy.
+# Apps without neon.account are skipped (GCP-only is allowed).
 # Usage: validate-neon-accounts.sh [repo-root]
 set -euo pipefail
 
@@ -27,15 +28,10 @@ account_exists() {
 
 while IFS= read -r -d '' app_yaml; do
   app="$(basename "$(dirname "$app_yaml")")"
-  if [[ "$app" == _template ]]; then
-    # Template may use a domain placeholder; still must be a real registry key
-    :
-  fi
 
   acc="$(yq -r '.neon.account // ""' "$app_yaml")"
   if [[ -z "$acc" || "$acc" == "null" ]]; then
-    echo "ERROR: apps/${app}/app.yaml missing neon.account" >&2
-    fail=1
+    # Neon is optional — apps without neon.account skip Neon policy
     continue
   fi
 
@@ -79,26 +75,13 @@ while IFS= read -r -d '' app_yaml; do
     fi
   fi
 
-  # Registry completeness: github_environment must be neon--{account}
-  gh_env="$(yq -r ".accounts[\"${acc}\"].github_environment // \"\"" "$REG")"
-  if [[ -z "$gh_env" || "$gh_env" == "null" ]]; then
-    echo "ERROR: registry account '${acc}' missing github_environment (expect neon--${acc})" >&2
-    fail=1
-  elif [[ "$gh_env" != "neon--${acc}" ]]; then
-    echo "ERROR: registry account '${acc}' github_environment='${gh_env}' must be 'neon--${acc}'" >&2
-    fail=1
+  # Optional: SOPS path should exist once account is bootstrapped (warn only for known accounts with path set)
+  sops_path="$(yq -r ".accounts[\"${acc}\"].sops_auth_path // \"\"" "$REG")"
+  if [[ -n "$sops_path" && "$sops_path" != "null" && ! -f "$ROOT/$sops_path" ]]; then
+    echo "WARN: apps/${app} neon.account=${acc} missing SOPS file $sops_path (run bootstrap-neon-account.sh)" >&2
+    warn=1
   fi
 done < <(find "$ROOT/apps" -mindepth 2 -maxdepth 2 -name app.yaml -print0 2>/dev/null)
-
-# Registry internal consistency
-while IFS= read -r key; do
-  [[ -z "$key" ]] && continue
-  gh_env="$(yq -r ".accounts[\"${key}\"].github_environment" "$REG")"
-  if [[ -z "$gh_env" || "$gh_env" == "null" ]]; then
-    echo "ERROR: accounts.${key} missing github_environment" >&2
-    fail=1
-  fi
-done < <(yq -r '.accounts | keys | .[]' "$REG")
 
 if [[ "$fail" -ne 0 ]]; then
   echo "validate-neon-accounts: FAILED" >&2

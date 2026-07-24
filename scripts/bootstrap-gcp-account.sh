@@ -574,7 +574,6 @@ say "worktree: $WORKTREE"
 
 # --- Update gcp-accounts.yaml (public registry; yq only) ---
 REG_FILE="$WORKTREE/config/gcp-accounts.yaml"
-PROTECTION_ENV="deploy--${ACCOUNT}--${ENV_NAME}"
 LABEL_ENV="dev"
 [[ "$ENV_NAME" == "stawi-prod" ]] && LABEL_ENV="prod"
 
@@ -583,11 +582,11 @@ yq -i "
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].region = \"${REGION}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].workload_identity_provider = \"${WIF_PROVIDER_RESOURCE}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].deploy_service_account = \"${SA_EMAIL}\" |
-  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].protection_environment = \"${PROTECTION_ENV}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].sops_auth_path = \"${AUTH_REL}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.\"managed-by\" = \"cloud-deployment\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.domain = \"${ACCOUNT}\" |
-  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.environment = \"${LABEL_ENV}\"
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.environment = \"${LABEL_ENV}\" |
+  del(.accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].protection_environment)
 " "$REG_FILE"
 say "updated config/gcp-accounts.yaml → ${ACCOUNT}/${ENV_NAME} (project=${PROJECT})"
 
@@ -604,10 +603,9 @@ auth:
   region: ${REGION}
   workload_identity_provider: ${WIF_PROVIDER_RESOURCE}
   deploy_service_account: ${SA_EMAIL}
-  protection_environment: ${PROTECTION_ENV}
   github_repository: ${GITHUB_REPO}
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  note: "GCP deploy metadata only — no Neon keys; runtime secrets in Secret Manager"
+  note: "GCP deploy metadata — CI decrypts via SOPS_AGE_KEY; no Neon keys; runtime secrets in Secret Manager"
 EOF
 
 # filename-override: match .sops.yaml creation_rules (not the /tmp plaintext path)
@@ -626,7 +624,7 @@ mkdir -p "$WORKTREE/credentials"
 cat >"$WORKTREE/credentials/README.md" <<'EOF'
 # Encrypted credentials
 
-SOPS-encrypted GCP bootstrap metadata (age recipient in repo `.sops.yaml`).
+SOPS age recipient is in repo `.sops.yaml`. CI uses repository secret `SOPS_AGE_KEY`.
 
 - Path: `credentials/gcp/<account>/<env>/auth.yaml`
 - Written by `scripts/bootstrap-gcp-account.sh` (GCP only — no Neon)

@@ -5,7 +5,7 @@
 #
 # Creates nothing on GCP. Registers a Neon domain account key and stores the
 # org API key as SOPS-encrypted metadata (same age recipient as deployment.infra
-# / GCP bootstrap). Optionally syncs the key to a GitHub Environment secret for CI.
+# / GCP bootstrap). CI decrypts this file with repository secret SOPS_AGE_KEY.
 #
 # Neon org itself is created in the Neon console (or Neon API with a personal
 # key). This script only onboards the key into our registries + credential store.
@@ -20,14 +20,14 @@
 #   ./bootstrap-neon-account.sh --account identity
 #
 #   ./bootstrap-neon-account.sh --account payments --api-key "$API_KEY" \
-#     --org-hint "Stawi Payments" --sync-github-env
+#     --org-hint "Stawi Payments"
 #
 # Flags:
 #   --account <KEY>       neon-accounts.yaml key (required): identity|payments|…
 #   --api-key <KEY>       Neon org API key (or env API_KEY / NEON_ORG_API_KEY)
 #   --org-hint <NAME>     Optional human label for the Neon org
 #   --org-id <ID>         Optional Neon org id (metadata only)
-#   --sync-github-env     Create/update GH Environment secret API_KEY
+#   --sync-github-env     DEPRECATED no-op (CI uses SOPS, not neon--* GH envs)
 #   --repo-path <PATH>    cloud.deployment checkout
 #   --no-clone / --no-push / --no-pr / --force-repo-write / --metadata-only
 #
@@ -457,15 +457,6 @@ if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REPO_PATH/config/neon-accounts.yaml" >/
   die "account '${ACCOUNT}' not in config/neon-accounts.yaml — add the domain key to the registry first"
 fi
 
-GH_ENV=$(yq -r ".accounts[\"${ACCOUNT}\"].github_environment // \"\"" \
-  "$REPO_PATH/config/neon-accounts.yaml")
-# Canonical name: neon--{account}
-[[ -n "$GH_ENV" && "$GH_ENV" != "null" ]] || GH_ENV="neon--${ACCOUNT}"
-if [[ "$GH_ENV" != "neon--${ACCOUNT}" ]]; then
-  warn "registry github_environment=${GH_ENV}; canonical is neon--${ACCOUNT} — using canonical"
-  GH_ENV="neon--${ACCOUNT}"
-fi
-
 # Optional live check against Neon API
 if [[ -n "$API_KEY" && "$METADATA_ONLY" != "true" ]]; then
   say "validating Neon API key (GET /users/me)"
@@ -481,10 +472,11 @@ if [[ -n "$API_KEY" && "$METADATA_ONLY" != "true" ]]; then
   fi
 fi
 
-# Sync GH Environment before git (does not need PR)
+# GitHub Environment secrets are no longer used by CI (SOPS + SOPS_AGE_KEY).
 if [[ "$SYNC_GH_ENV" == "true" ]]; then
-  [[ -n "$API_KEY" ]] || die "--sync-github-env requires an API key"
-  sync_github_environment_secret "$GH_ENV" "$API_KEY"
+  warn "--sync-github-env is deprecated and ignored."
+  warn "CI loads Neon API keys from credentials/neon/<account>/auth.yaml via SOPS_AGE_KEY."
+  warn "Ensure repository secret SOPS_AGE_KEY is set (private age key matching .sops.yaml)."
 fi
 
 AUTH_REL="credentials/neon/${ACCOUNT}/auth.yaml"
@@ -498,7 +490,7 @@ if git -C "$REPO_PATH" rev-parse --verify "origin/${BASE_BRANCH}" >/dev/null 2>&
 fi
 if [[ "$already" == "true" && "$FORCE_REPO_WRITE" != "true" ]]; then
   say "already have ${AUTH_REL} on origin/${BASE_BRANCH}"
-  say "use --force-repo-write to refresh; --sync-github-env already applied if requested"
+  say "use --force-repo-write to refresh"
   exit 0
 fi
 
@@ -524,11 +516,11 @@ if [[ -n "$ORG_ID" ]]; then
   yq -i ".accounts[\"${ACCOUNT}\"].neon_org_id = \"${ORG_ID}\"" \
     "$WORKTREE/config/neon-accounts.yaml"
 fi
-# Document sops path for operators (non-secret)
+# Document sops path for operators (non-secret); drop legacy github_environment if present
 yq -i ".accounts[\"${ACCOUNT}\"].sops_auth_path = \"${AUTH_REL}\"" \
   "$WORKTREE/config/neon-accounts.yaml"
-yq -i ".accounts[\"${ACCOUNT}\"].github_environment = \"${GH_ENV}\"" \
-  "$WORKTREE/config/neon-accounts.yaml"
+yq -i "del(.accounts[\"${ACCOUNT}\"].github_environment)" \
+  "$WORKTREE/config/neon-accounts.yaml" 2>/dev/null || true
 
 # SOPS auth with API key (unless metadata-only)
 mkdir -p "$WORKTREE/credentials/neon/${ACCOUNT}"
@@ -538,12 +530,11 @@ if [[ "$METADATA_ONLY" != "true" ]]; then
   cat >"$AUTH_PLAIN" <<EOF
 auth:
   account_key: ${ACCOUNT}
-  github_environment: ${GH_ENV}
   neon_org_hint: ${ORG_HINT:-}
   neon_org_id: ${ORG_ID:-}
   api_key: ${API_KEY}
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  note: "Neon org API key for OpenTofu provider only — never inject into Cloud Run"
+  note: "Neon org API key for OpenTofu provider only — never inject into Cloud Run; CI decrypts via SOPS_AGE_KEY"
 EOF
   # filename-override: match .sops.yaml creation_rules (not the /tmp plaintext path)
   (
@@ -561,21 +552,24 @@ mkdir -p "$WORKTREE/credentials"
 cat >"$WORKTREE/credentials/README.md" <<'EOF'
 # Encrypted credentials
 
+SOPS age recipient is in repo `.sops.yaml`. CI uses repository secret `SOPS_AGE_KEY`.
+
 ## GCP
 - `credentials/gcp/<account>/<env>/auth.yaml` — from `scripts/bootstrap-gcp-account.sh`
 - Non-secret project/WIF also in `config/gcp-accounts.yaml`
 
 ## Neon (independent of GCP)
 - `credentials/neon/<account>/auth.yaml` — from `scripts/bootstrap-neon-account.sh`
-- Contains org API key (SOPS). Used by operators / optional CI decrypt.
+- Contains org API key (SOPS). CI decrypts when app has `neon.account`.
 - Non-secret registry: `config/neon-accounts.yaml`
-- CI preferred: GitHub Environment `API_KEY` (`--sync-github-env`) or Secret Manager (configured separately per deploy GCP project)
 - Apps link Neon↔GCP only via `app.yaml` (`neon.account` + `gcp.account`)
 
 Decrypt (private age key required):
 
 ```bash
+export SOPS_AGE_KEY='AGE-SECRET-KEY-...'
 sops -d credentials/neon/identity/auth.yaml
+sops -d credentials/gcp/identity/stawi-prod/auth.yaml
 ```
 EOF
 
@@ -611,16 +605,14 @@ Independent of GCP. Stores org API key as SOPS-encrypted credential and updates 
 | Field | Value |
 |-------|--------|
 | neon.account | \`${ACCOUNT}\` |
-| github_environment | \`${GH_ENV}\` |
 | sops path | \`${AUTH_REL}\` |
 | org hint | \`${ORG_HINT:-}\` |
-| GH env secret sync | \`${SYNC_GH_ENV}\` |
 
 ### After merge
 
 - Apps with \`neon.account: ${ACCOUNT}\` use this Neon org for database projects.
 - Pair with any \`gcp.account\` independently in \`app.yaml\`.
-- Prefer CI: Environment \`${GH_ENV}\` secret \`API_KEY\` (run bootstrap with \`--sync-github-env\`).
+- CI decrypts \`${AUTH_REL}\` with repository secret \`SOPS_AGE_KEY\` (no \`neon--*\` GitHub Environments).
 EOF
 }
 
@@ -670,6 +662,6 @@ fi
 say ""
 say "Done (Neon only — no GCP changes)."
 say "  account:  $ACCOUNT"
-say "  gh env:   $GH_ENV"
 say "  sops:     $AUTH_REL"
+say "  CI:       SOPS_AGE_KEY repo secret decrypts this file"
 say "  OPEN:     $OPEN_URL"

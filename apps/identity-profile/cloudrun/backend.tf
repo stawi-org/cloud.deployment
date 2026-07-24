@@ -5,7 +5,7 @@
 #     -backend-config="endpoints={s3=\"https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com\"}"
 terraform {
   backend "s3" {
-    bucket                      = "cluster-tofu-state"
+    bucket                      = "cloud-tofu-state"
     region                      = "auto"
     use_path_style              = true
     skip_credentials_validation = true

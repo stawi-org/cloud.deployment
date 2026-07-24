@@ -38,7 +38,7 @@ variable "neon_region_id" {
 variable "neon_api_key" {
   type        = string
   sensitive   = true
-  description = "Neon org API key (from Secret Manager or GH Environment — never commit)"
+  description = "Neon org API key (from SOPS credentials via CI (SOPS_AGE_KEY) — never commit)"
 }
 
 variable "extra_secret_values" {

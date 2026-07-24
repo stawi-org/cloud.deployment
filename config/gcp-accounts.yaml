@@ -11,7 +11,7 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-identity-dev.iam.gserviceaccount.com
-        protection_environment: deploy--identity--stawi-dev   # optional; no secrets
+        sops_auth_path: credentials/gcp/identity/stawi-dev/auth.yaml
         labels:
           environment: dev
           domain: identity
@@ -21,7 +21,7 @@ accounts:
         region: europe-west9
         workload_identity_provider: projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-identity.iam.gserviceaccount.com
-        protection_environment: deploy--identity--stawi-prod   # optional; no secrets
+        sops_auth_path: credentials/gcp/identity/stawi-prod/auth.yaml
         labels:
           environment: prod
           domain: identity
@@ -37,7 +37,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-notifications-dev.iam.gserviceaccount.com
-        protection_environment: deploy--notifications--stawi-dev   # optional; no secrets
         labels:
           environment: dev
           domain: notifications
@@ -47,7 +46,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-notifications-prod.iam.gserviceaccount.com
-        protection_environment: deploy--notifications--stawi-prod   # optional; no secrets
         labels:
           environment: prod
           domain: notifications
@@ -63,7 +61,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-payments-dev.iam.gserviceaccount.com
-        protection_environment: deploy--payments--stawi-dev   # optional; no secrets
         labels:
           environment: dev
           domain: payments
@@ -73,7 +70,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-payments-prod.iam.gserviceaccount.com
-        protection_environment: deploy--payments--stawi-prod   # optional; no secrets
         labels:
           environment: prod
           domain: payments
@@ -89,7 +85,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-platform-dev.iam.gserviceaccount.com
-        protection_environment: deploy--platform--stawi-dev   # optional; no secrets
         labels:
           environment: dev
           domain: platform
@@ -99,7 +94,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-platform-prod.iam.gserviceaccount.com
-        protection_environment: deploy--platform--stawi-prod   # optional; no secrets
         labels:
           environment: prod
           domain: platform
@@ -115,7 +109,6 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-labs-dev.iam.gserviceaccount.com
-        protection_environment: deploy--labs--stawi-dev   # optional; no secrets
         labels:
           environment: dev
           domain: labs

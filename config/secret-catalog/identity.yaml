@@ -10,14 +10,14 @@ gcp_account: identity
 env: stawi-prod
 
 # Deploy-time only (CI OpenTofu Neon provider) — not mounted on Cloud Run
+# Stored in SOPS credentials/neon/identity/auth.yaml; CI uses SOPS_AGE_KEY.
 deploy_time:
   - id: neon-org-api-key
-    description: Neon organization API key for OpenTofu kislerdm/neon provider
+    description: Neon organization API key for OpenTofu kislerdm/neon provider (SOPS path preferred)
     required: true
     source_hints:
-      - "bootstrap-neon-account.sh --sync-github-env (GH env neon-identity)"
       - "sops -d credentials/neon/identity/auth.yaml | yq .auth.api_key"
-      - "export NEON_ORG_API_KEY=... then seed script"
+      - "bootstrap-neon-account.sh --account identity --api-key …"
 
 # Shared across multiple identity apps
 shared:

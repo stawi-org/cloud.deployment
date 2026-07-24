@@ -25,6 +25,26 @@ variable "role_name" {
 }
 
 variable "history_retention_seconds" {
-  type    = number
-  default = 86400
+  type        = number
+  default     = 86400
+  description = "PITR history window (1 day default — cost-conscious for greenfield)"
+}
+
+# Cost-safe compute defaults: scale to min CU and suspend when idle.
+variable "autoscaling_min_cu" {
+  type        = number
+  default     = 0.25
+  description = "Minimum Neon compute units (0.25 = cheapest always-available floor)"
+}
+
+variable "autoscaling_max_cu" {
+  type        = number
+  default     = 1
+  description = "Maximum Neon compute units — raise per-app if load requires it"
+}
+
+variable "suspend_timeout_seconds" {
+  type        = number
+  default     = 300
+  description = "Idle seconds before compute suspends (scale-to-zero-ish)"
 }

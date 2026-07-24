@@ -2,21 +2,23 @@
 
 ## Principle
 
-**Git holds registries only (non-secret).**  
-**Secret Manager holds runtime secrets and preferred deploy-time Neon org keys.**  
+**Git holds registries + SOPS-encrypted account credentials.**  
+**Secret Manager holds runtime secrets.**  
 **Selecting GCP + Neon accounts in `app.yaml` is how you choose where an app runs.**
 
 ```
 app.yaml
   gcp.account  → config/gcp-accounts.yaml  → project_id, region, WIF, deploy SA
-  neon.account → config/neon-accounts.yaml → Neon org + SM secret for API key
+                 credentials/gcp/<account>/<env>/auth.yaml  (SOPS — CI source of truth)
+  neon.account → config/neon-accounts.yaml → policy / org hint
+                 credentials/neon/<account>/auth.yaml       (SOPS — org API key)
 ```
 
 Resolve anytime:
 
 ```bash
 ./.github/scripts/resolve-app-context.sh <app> <env>
-# or --format=exports
+eval "$(./.github/scripts/load-sops-credentials.sh <app> <env>)"  # needs SOPS_AGE_KEY
 ```
 
 ---
@@ -36,11 +38,8 @@ Registry: [`config/gcp-accounts.yaml`](../config/gcp-accounts.yaml)
 Each key has **per-env** slices (`stawi-dev`, `stawi-prod`) with:
 
 - `project_id`, `region`
-- `workload_identity_provider`, `deploy_service_account` (not secrets)
-- `github_environment` (optional apply protection)
-- `labels`
-
-Replace placeholder project IDs and WIF resource names before apply.
+- `workload_identity_provider`, `deploy_service_account` (public mirror; also in SOPS)
+- `sops_auth_path`, `labels`
 
 ### What lives in which GCP project
 
@@ -48,7 +47,7 @@ For a given app env, **one project** hosts:
 
 - Cloud Run services  
 - Pub/Sub  
-- Secret Manager (runtime secrets + optionally Neon org API key)  
+- Secret Manager (runtime secrets)  
 - Runtime service accounts  
 
 ---
@@ -59,22 +58,9 @@ Registry: [`config/neon-accounts.yaml`](../config/neon-accounts.yaml)
 
 Domain orgs: `identity`, `notifications`, `payments`, `platform`, `labs`.
 
-**One Neon project per app** (OpenTofu module). Org API key is **deploy-time only**.
+**One Neon project per app** (OpenTofu module). Org API key is **deploy-time only**, from SOPS.
 
-### Neon API key storage (preferred: Secret Manager)
-
-```yaml
-# in neon-accounts.yaml
-secret_manager:
-  gcp_account: identity      # which GCP account registry key
-  secret_id: neon-org-api-key
-```
-
-CI: WIF into the app’s GCP project →  
-`gcloud secrets versions access latest --secret=neon-org-api-key --project=<resolved>` →  
-`TF_VAR_neon_api_key`.
-
-Fallback: GitHub Environment `neon-*` secret `NEON_API_KEY`.
+CI: `SOPS_AGE_KEY` → decrypt `credentials/neon/<account>/auth.yaml` → `TF_VAR_neon_api_key`.
 
 ---
 
@@ -83,19 +69,16 @@ Fallback: GitHub Environment `neon-*` secret `NEON_API_KEY`.
 | Secret ID pattern | Contents | Consumer |
 |-------------------|----------|----------|
 | `{app}-database-url` | Neon pooled connection URI | Cloud Run `DATABASE_URL` |
-| App-specific (Hydra system secret, OAuth client, webhook PSK, …) | Sensitive config | Cloud Run via `secret_env` / `extra_secret_ids` |
-| `neon-org-api-key` | Neon org API key | **CI only**, not Cloud Run |
+| App-specific (Hydra system secret, OAuth client, webhook PSK, …) | Sensitive config | Cloud Run via `secret_env` |
 
-Module: [`modules/app-secrets`](../modules/app-secrets) creates secrets, versions (when values passed from tofu), and `secretAccessor` for the runtime SA.
+Module: [`modules/app-secrets`](../modules/app-secrets).
 
-Cloud Run mounts secrets with `value_source.secret_key_ref` (see `modules/cloudrun-service`) — **not** plain env values from git.
-
-### What must never be in git
+### What must never be in git (plaintext)
 
 - Database passwords / connection strings  
-- Neon org API keys  
+- Neon org API keys (only SOPS-encrypted)  
 - OAuth client secrets, Hydra system secrets, session secrets  
-- R2 access keys  
+- R2 access keys / `SOPS_AGE_KEY`  
 - Any private key material  
 
 ---
@@ -104,7 +87,7 @@ Cloud Run mounts secrets with `value_source.secret_key_ref` (see `modules/cloudr
 
 | Item | Value |
 |------|--------|
-| Bucket | `cluster-tofu-state` (shared name with infra; prefix isolation) |
+| Bucket | `cloud-tofu-state` |
 | Key | `cloud-deployment/apps/<app>/<env>/terraform.tfstate` |
 | Lock | `use_lockfile = true` |
 | Creds | GitHub secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` |
@@ -116,33 +99,45 @@ Fragment: [`config/r2-backend.hcl`](../config/r2-backend.hcl).
 ## CI flow (per app job)
 
 1. Detect changed apps (path + module impact).  
-2. Enrich matrix via `resolve-app-context` (GCP + Neon).  
-3. Optional GitHub Environment = GCP account env for protection.  
+2. Enrich matrix via `resolve-app-context` (GCP + optional Neon paths).  
+3. Decrypt SOPS credentials (`SOPS_AGE_KEY`).  
 4. WIF → deploy SA for `project_id`.  
-5. Fetch Neon org key from Secret Manager (fallback GH).  
-6. `tofu init` (R2) → plan/apply with `-var project_id=… -var region=…`.  
+5. `tofu init` (R2 `cloud-tofu-state`) → plan/apply.  
 
 Independent concurrency: `cloud-deploy-<app>-<env>`.
+
+**No GitHub Environments** for credentials (`neon--*`, `deploy--*` removed).
+
+---
+
+## Cost defaults (robust, not expensive)
+
+| Layer | Default | Why |
+|-------|---------|-----|
+| Cloud Run `min_instance_count` | `0` | Scale to zero |
+| Cloud Run `max_instance_count` | `5` | Cap burst cost |
+| Cloud Run `cpu_idle` | `true` | CPU only during requests |
+| Neon min/max CU | `0.25` / `1` | Cheap floor + modest ceiling |
+| Neon suspend | `300s` | Idle compute off |
+| Neon history | `86400s` (1 day) | Enough PITR without long retention bills |
+
+Override per app in module inputs when needed.
 
 ---
 
 ## Bootstrap checklist (new GCP account)
 
-1. Create GCP project(s) for dev/prod.  
-2. Enable APIs: `run`, `secretmanager`, `pubsub`, `iam`, `iamcredentials`, `sts`.  
-3. Create deploy SA + WIF pool/provider for GitHub `stawi-org/cloud.deployment`.  
-4. IAM: deploy SA can admin Run, SM, Pub/Sub, service accounts in project.  
-5. Create SM secret `neon-org-api-key` with Neon org API key; grant deploy SA `secretAccessor`.  
-6. Update `config/gcp-accounts.yaml` with real `project_id` and WIF names.  
-7. Run `./.github/scripts/resolve-app-context.sh <app> stawi-dev` and a plan.
+1. Create GCP project(s) for the env.  
+2. Run `scripts/bootstrap-gcp-account.sh` (WIF + SA + SOPS + registry).  
+3. Ensure repo secrets: R2 + `SOPS_AGE_KEY`.  
+4. Run `./.github/scripts/resolve-app-context.sh <app> stawi-prod`.
 
----
+## Bootstrap checklist (new Neon org)
+
+1. Create org + API key in Neon console.  
+2. Run `scripts/bootstrap-neon-account.sh --account <key> --api-key …`.  
+3. Merge the SOPS PR. CI picks up the key automatically.
 
 ## Identity greenfield
 
-See [IDENTITY_GREENFIELD.md](IDENTITY_GREENFIELD.md) for the six identity apps and big-bang go-live order.
-
-## Related specs
-
-- [Multi-account platform + identity](superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md)  
-- [Neon multi-account secrets](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md)  
+See [IDENTITY_GREENFIELD.md](IDENTITY_GREENFIELD.md) and [DEPLOY_IDENTITY.md](DEPLOY_IDENTITY.md).

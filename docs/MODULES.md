@@ -196,7 +196,7 @@ Current placeholders: `stawi-cloudrun-dev` / `stawi-cloudrun-prod` — replace b
 cloud-deployment/apps/<app>/<env>/terraform.tfstate
 ```
 
-Bucket: `cluster-tofu-state` (shared name with `deployment.infra`; isolated by key prefix).  
+Bucket: `cloud-tofu-state` (prefix-isolated from other repos).  
 Fragment: [`config/r2-backend.hcl`](../config/r2-backend.hcl). Details: [BACKEND.md](BACKEND.md).
 
 ---

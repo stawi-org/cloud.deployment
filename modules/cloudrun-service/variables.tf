@@ -46,18 +46,32 @@ variable "memory" {
 }
 
 variable "max_instance_count" {
-  type    = number
-  default = 10
+  type        = number
+  default     = 5
+  description = "Hard cap on instances — keep low for cost; raise per-app under load"
 }
 
 variable "min_instance_count" {
-  type    = number
-  default = 0
+  type        = number
+  default     = 0
+  description = "0 = scale to zero (no idle cost)"
 }
 
 variable "concurrency" {
   type    = number
   default = 80
+}
+
+variable "cpu_idle" {
+  type        = bool
+  default     = true
+  description = "When true, CPU is allocated only during request processing (cheaper for min_instances=0)"
+}
+
+variable "startup_cpu_boost" {
+  type        = bool
+  default     = true
+  description = "Brief CPU boost on cold start — faster wake, minimal extra cost"
 }
 
 variable "ingress" {

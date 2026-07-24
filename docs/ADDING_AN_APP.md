@@ -70,11 +70,11 @@ Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform
 
 ## 4. Neon credentials (multi-account)
 
-1. Pick a **domain** account (`identity`, `notifications`, `payments`, `platform`, `labs`) — see [BACKEND.md](BACKEND.md) and the [multi-account design](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md).
+1. Pick a **domain** account (`identity`, `notifications`, `payments`, `platform`, `labs`) — see [BACKEND.md](BACKEND.md).
 2. Confirm the key exists in `config/neon-accounts.yaml` and respects `allowed_deploy_envs` / `allowed_app_prefixes` (e.g. payments apps should be named `payment-*` / `checkout-*` / …).
-3. Ensure the GitHub **Environment** named `github_environment` (e.g. `neon-payments`) exists with secret **`NEON_API_KEY`** only.
-4. CI loads that single key into `TF_VAR_neon_api_key` for that job — never commit API keys; never put all domain keys on the job.
-5. Canonical operator copy of each key lives in Vault at `vault_path` (rotation source of truth).
+3. Ensure SOPS file exists: `credentials/neon/<account>/auth.yaml` (from `bootstrap-neon-account.sh`).
+4. CI decrypts that file with **`SOPS_AGE_KEY`** → `TF_VAR_neon_api_key` only when the app has `neon.account`.
+5. Omit `neon:` entirely for GCP-only apps (no Neon key loaded).
 
 ## 5. Independent CI
 
@@ -84,6 +84,8 @@ Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform
 | Merge to `main` | `app-apply.yml` | Applies **only** that matrix |
 | Manual | workflow_dispatch on plan/apply | Optional single `app` / `env` |
 
+Repo secrets required: `R2_*` + `SOPS_AGE_KEY` — see [GITHUB_SECRETS.md](GITHUB_SECRETS.md).
+
 Change detection: [`.github/scripts/detect-changed-apps.sh`](../.github/scripts/detect-changed-apps.sh).
 
 You do **not** need to edit monorepo-wide deploy lists. Path filters + detection keep CI independent per app.
@@ -91,10 +93,10 @@ You do **not** need to edit monorepo-wide deploy lists. Path filters + detection
 ## 6. Checklist before first PR
 
 - [ ] Copied from `_template`, not hand-rolled K8s YAML
-- [ ] `app.yaml` `neon.account` valid
+- [ ] `app.yaml` `gcp.account` (+ optional `neon.account`) valid
 - [ ] `envs/*.tfvars` image set; `platform` matches filename/env
 - [ ] No `HelmRelease`, Flux, or other cluster manifests under `apps/`
-- [ ] R2 + Neon (+ later GCP WIF) secrets present for CI
+- [ ] Repo secrets: R2 + `SOPS_AGE_KEY`; SOPS credential files for selected accounts
 - [ ] Open PR → confirm plan matrix is only your app (and envs)
 - [ ] Merge → apply; verify Cloud Run URI, Neon project, Pub/Sub topic
 

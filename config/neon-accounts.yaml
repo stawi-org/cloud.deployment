@@ -1,10 +1,9 @@
 # Neon multi-account registry (NON-SECRET metadata only).
-# Canonical model: docs/superpowers/specs/2026-07-24-account-selection-and-ci-credentials.md
+# Canonical model: docs/GITHUB_SECRETS.md + docs/BACKEND.md
 #
 # app.yaml neon.account → this key.
-# GitHub Environment name MUST be: neon--{account}
-# Secret inside that environment MUST be: API_KEY
-# Neon API key is only loaded in CI when the app selects this neon.account.
+# Org API key lives in credentials/neon/<account>/auth.yaml (SOPS).
+# CI decrypts with repository secret SOPS_AGE_KEY — no GitHub Environments.
 # Never put API keys in this file.
 
 version: 1
@@ -13,7 +12,6 @@ accounts:
   identity:
     description: Identity domain Neon organization
     owners: [identity-team]
-    github_environment: neon--identity
     neon_org_hint: Stawi Identity
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
@@ -23,7 +21,6 @@ accounts:
   notifications:
     description: Notifications domain Neon organization
     owners: [communications-team]
-    github_environment: neon--notifications
     neon_org_hint: Stawi Notifications
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
@@ -32,7 +29,6 @@ accounts:
   payments:
     description: Payments domain Neon organization
     owners: [finance-team]
-    github_environment: neon--payments
     neon_org_hint: Stawi Payments
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: [payment-, checkout-, billing-, ledger-]
@@ -41,7 +37,6 @@ accounts:
   platform:
     description: Shared platform edge Neon organization
     owners: [platform]
-    github_environment: neon--platform
     neon_org_hint: Stawi Platform Edge
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
@@ -50,7 +45,6 @@ accounts:
   labs:
     description: Experimental Neon organization; no production customer data
     owners: [platform]
-    github_environment: neon--labs
     neon_org_hint: Stawi Labs
     allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []
@@ -59,7 +53,6 @@ accounts:
   stawi-org:
     description: "LEGACY alias — prefer domain keys"
     owners: [platform]
-    github_environment: neon--platform
     neon_org_hint: Stawi Platform Edge (legacy)
     allowed_deploy_envs: [stawi-dev, stawi-prod]
     allowed_app_prefixes: []
@@ -70,7 +63,6 @@ accounts:
   stawi-labs:
     description: "LEGACY alias for labs"
     owners: [platform]
-    github_environment: neon--labs
     neon_org_hint: Stawi Labs (legacy)
     allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []

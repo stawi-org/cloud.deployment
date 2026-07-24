@@ -17,9 +17,9 @@ Every app.yaml:
 
 ```yaml
 gcp:
-  account: identity   # → config/gcp-accounts.yaml
+  account: identity   # → config/gcp-accounts.yaml + credentials/gcp/identity/…
 neon:
-  account: identity   # → config/neon-accounts.yaml
+  account: identity   # → config/neon-accounts.yaml + credentials/neon/identity/…
 ```
 
 **One Neon project per app** under the identity Neon org.
@@ -31,50 +31,39 @@ neon:
 
 ```bash
 ./.github/scripts/resolve-app-context.sh identity-authentication stawi-prod
+export SOPS_AGE_KEY='AGE-SECRET-KEY-...'
+eval "$(./.github/scripts/load-sops-credentials.sh identity-authentication stawi-prod)"
 ```
 
-Returns `project_id`, `region`, WIF provider, deploy SA, Neon SM secret location, etc. CI uses this so **running an app is selecting accounts**, not hardcoding projects in Terraform.
+Returns / exports `project_id`, `region`, WIF, deploy SA, Neon API key. **Running an app is selecting accounts**, not hardcoding projects in Terraform.
 
-## Secrets (nothing sensitive in git)
+## Secrets (nothing sensitive in git plaintext)
 
 | Secret | Where | How used |
 |--------|--------|----------|
-| Neon **org** API key | Secret Manager `neon-org-api-key` in identity GCP project (preferred) | CI → `TF_VAR_neon_api_key` only |
+| Neon **org** API key | SOPS `credentials/neon/identity/auth.yaml` | CI → `TF_VAR_neon_api_key` only |
+| GCP WIF / deploy SA | SOPS `credentials/gcp/identity/stawi-prod/auth.yaml` | CI WIF auth |
 | `DATABASE_URL` | Secret Manager `{app}-database-url` | Cloud Run `secret_key_ref` |
-| Hydra system/cookie secrets, webhook PSKs, Google OAuth | Secret Manager (`extra_secret_ids` or out-of-band versions) | Cloud Run |
-| R2 state keys | GitHub repo secrets | CI tofu backend |
-
-Bootstrap Neon org key once per env:
-
-```bash
-# After WIF / gcloud auth as admin
-echo -n "$NEON_ORG_API_KEY" | gcloud secrets create neon-org-api-key \
-  --project=stawi-identity-dev \
-  --data-file=-
-# grant tofu-deploy@… secretAccessor on that secret
-```
+| Hydra system/cookie secrets, webhook PSKs | Secret Manager (OpenTofu `random_password`) | Cloud Run |
+| R2 + age private key | GitHub repo secrets | CI backend + decrypt |
 
 ## Deploy order (build), single go-live
 
-1. Bootstrap GCP **prod**: `--account identity --env stawi-prod --project stawi-identity` (done when registry shows real WIF).  
-2. Bootstrap Neon **identity** org (independent script).  
-3. Apply apps against **`stawi-prod` only**.  
-4. Order: Hydra → Keto → authentication → tenancy/profile/identity (or parallel then re-apply).  
-5. Smoke OIDC; point DNS once.  
-6. **Later:** bootstrap `stawi-dev` when capacity allows; add `stawi-dev` back to each app’s `envs`.
+1. Bootstrap GCP **prod**: `--account identity --env stawi-prod --project stawi-identity`.  
+2. Bootstrap Neon **identity** org (SOPS file on main).  
+3. Set GitHub secrets: `R2_*` + `SOPS_AGE_KEY`.  
+4. Apply apps against **`stawi-prod` only**.  
+5. Order: Hydra → Keto → authentication → tenancy/profile/identity (or parallel then re-apply).  
+6. Smoke OIDC; point DNS once.  
+7. **Later:** bootstrap `stawi-dev` when capacity allows.
 
-## Ory (Hydra / Keto) notes
+## Cost posture
 
-Templates are the **same Cloud Run root shape**. Before production:
-
-- Replace image tags with pinned digests.  
-- Add Hydra/Keto-specific env and SM secrets (system secret, DSN already via DATABASE_URL pattern — may need Ory DSN env name mapping in a follow-up).  
-- Protect Hydra admin (IAM / ingress).  
-- Wire public URLs for issuer, login, consent, JWKS.
+Defaults are scale-to-zero Cloud Run + Neon autosuspend (see [BACKEND.md](BACKEND.md)). Six idle identity services should not run expensive always-on compute.
 
 ## Related docs
 
-- [Multi-account platform design](superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md)  
-- [Neon multi-account secrets](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md)  
+- [DEPLOY_IDENTITY.md](DEPLOY_IDENTITY.md)  
+- [GITHUB_SECRETS.md](GITHUB_SECRETS.md)  
 - [BACKEND.md](BACKEND.md)  
 - [ADDING_AN_APP.md](ADDING_AN_APP.md)  

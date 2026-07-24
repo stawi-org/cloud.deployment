@@ -10,6 +10,7 @@ on:
       - "modules/**"
       - "platforms/**"
       - "config/**"
+      - "credentials/**"
       - ".github/scripts/**"
       - ".github/workflows/app-*.yml"
   workflow_dispatch:
@@ -48,7 +49,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
       - id: d
-        name: Detect changed apps + Neon environments
+        name: Detect changed apps
         env:
           INPUT_APP: ${{ github.event_name == 'workflow_dispatch' && inputs.app || '' }}
           INPUT_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.env || '' }}
@@ -93,6 +94,4 @@ jobs:
       app: ${{ matrix.app }}
       env: ${{ matrix.env }}
       mode: apply
-      job_environment: ${{ matrix.job_environment }}
-      uses_neon: ${{ matrix.uses_neon }}
     secrets: inherit

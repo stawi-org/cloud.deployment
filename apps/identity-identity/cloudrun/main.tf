@@ -3,7 +3,7 @@
 #   app.yaml → config/gcp-accounts.yaml + config/neon-accounts.yaml → CI vars.
 #
 # Secrets that must not live in git:
-#   - neon_api_key (deploy-time provider) from Secret Manager / GH Env
+#   - neon_api_key (deploy-time provider) from SOPS credentials (CI)
 #   - DATABASE_URL and extra secrets in GCP Secret Manager for runtime
 
 provider "neon" {

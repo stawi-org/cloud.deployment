@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 # Resolve app.yaml + registries → deployment context for one (app, env).
-#
-# Model: docs/superpowers/specs/2026-07-24-account-selection-and-ci-credentials.md
-#
-# Usage:
-#   resolve-app-context.sh <app> <env> [--format=json|exports|gha]
+# Credentials themselves live in SOPS files under credentials/{gcp,neon}/…
+# Model: Neon = Postgres; GCP = compute/messaging/SM; accounts selected per app.
 set -euo pipefail
 
 APP="${1:?app name required}"
@@ -21,51 +18,35 @@ APP_YAML="$ROOT/apps/${APP}/app.yaml"
 GCP_REG="$ROOT/config/gcp-accounts.yaml"
 NEON_REG="$ROOT/config/neon-accounts.yaml"
 
-if [[ ! -f "$APP_YAML" ]]; then
-  echo "ERROR: missing $APP_YAML" >&2
-  exit 1
-fi
-if ! command -v yq >/dev/null 2>&1; then
-  echo "ERROR: yq (mikefarah) required" >&2
-  exit 1
-fi
+[[ -f "$APP_YAML" ]] || { echo "ERROR: missing $APP_YAML" >&2; exit 1; }
+command -v yq >/dev/null 2>&1 || { echo "ERROR: yq required" >&2; exit 1; }
 
 GCP_ACCOUNT=$(yq -r '.gcp.account // ""' "$APP_YAML")
 NEON_ACCOUNT=$(yq -r '.neon.account // ""' "$APP_YAML")
-# empty neon.account means app does not use Neon
-if [[ "$NEON_ACCOUNT" == "null" ]]; then
-  NEON_ACCOUNT=""
-fi
+[[ "$NEON_ACCOUNT" == "null" ]] && NEON_ACCOUNT=""
 
-if [[ -z "$GCP_ACCOUNT" || "$GCP_ACCOUNT" == "null" ]]; then
+[[ -n "$GCP_ACCOUNT" && "$GCP_ACCOUNT" != "null" ]] || {
   echo "ERROR: apps/${APP}/app.yaml missing gcp.account" >&2
   exit 1
-fi
+}
 
 if ! yq -e ".envs[] | select(. == \"${ENV}\")" "$APP_YAML" >/dev/null 2>&1; then
   echo "ERROR: env ${ENV} not in apps/${APP}/app.yaml envs" >&2
   exit 1
 fi
-
-if ! yq -e ".accounts[\"${GCP_ACCOUNT}\"]" "$GCP_REG" >/dev/null 2>&1; then
-  echo "ERROR: unknown gcp.account=${GCP_ACCOUNT}" >&2
-  exit 1
-fi
 if ! yq -e ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"]" "$GCP_REG" >/dev/null 2>&1; then
-  echo "ERROR: gcp.account=${GCP_ACCOUNT} has no env slice ${ENV}" >&2
+  echo "ERROR: gcp.account=${GCP_ACCOUNT} has no env ${ENV}" >&2
   exit 1
 fi
 
 PROJECT_ID=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].project_id" "$GCP_REG")
 REGION=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].region" "$GCP_REG")
-WIF=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].workload_identity_provider" "$GCP_REG")
-DEPLOY_SA=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].deploy_service_account" "$GCP_REG")
-# Optional protection-only GH env (no secrets): deploy--{account}--{env}
-PROTECTION_ENV=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].protection_environment // \"\"" "$GCP_REG")
-if [[ "$PROTECTION_ENV" == "null" ]]; then PROTECTION_ENV=""; fi
+WIF=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].workload_identity_provider // \"\"" "$GCP_REG")
+DEPLOY_SA=$(yq -r ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].deploy_service_account // \"\"" "$GCP_REG")
+GCP_SOPS="credentials/gcp/${GCP_ACCOUNT}/${ENV}/auth.yaml"
 
-NEON_GH_ENV=""
 USES_NEON="false"
+NEON_SOPS=""
 if [[ -n "$NEON_ACCOUNT" ]]; then
   USES_NEON="true"
   if ! yq -e ".accounts[\"${NEON_ACCOUNT}\"]" "$NEON_REG" >/dev/null 2>&1; then
@@ -73,26 +54,10 @@ if [[ -n "$NEON_ACCOUNT" ]]; then
     exit 1
   fi
   if ! yq -e ".accounts[\"${NEON_ACCOUNT}\"].allowed_deploy_envs[] | select(. == \"${ENV}\")" "$NEON_REG" >/dev/null 2>&1; then
-    echo "ERROR: neon.account=${NEON_ACCOUNT} does not allow env ${ENV}" >&2
+    echo "ERROR: neon.account=${NEON_ACCOUNT} disallows env ${ENV}" >&2
     exit 1
   fi
-  NEON_GH_ENV=$(yq -r ".accounts[\"${NEON_ACCOUNT}\"].github_environment // \"\"" "$NEON_REG")
-  if [[ -z "$NEON_GH_ENV" || "$NEON_GH_ENV" == "null" ]]; then
-    NEON_GH_ENV="neon--${NEON_ACCOUNT}"
-  fi
-  # Enforce naming convention
-  expected="neon--${NEON_ACCOUNT}"
-  if [[ "$NEON_GH_ENV" != "$expected" ]]; then
-    echo "WARNING: neon.account=${NEON_ACCOUNT} github_environment='${NEON_GH_ENV}' should be '${expected}'" >&2
-  fi
-fi
-
-# Job GH environment: Neon credential env when Neon is used; else optional protection env
-JOB_ENVIRONMENT=""
-if [[ "$USES_NEON" == "true" ]]; then
-  JOB_ENVIRONMENT="$NEON_GH_ENV"
-elif [[ -n "$PROTECTION_ENV" ]]; then
-  JOB_ENVIRONMENT="$PROTECTION_ENV"
+  NEON_SOPS="credentials/neon/${NEON_ACCOUNT}/auth.yaml"
 fi
 
 LABELS_JSON=$(yq -o=json -I=0 ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].labels // {}" "$GCP_REG")
@@ -107,9 +72,8 @@ CTX=$(jq -nc \
   --arg region "$REGION" \
   --arg workload_identity_provider "$WIF" \
   --arg deploy_service_account "$DEPLOY_SA" \
-  --arg protection_environment "$PROTECTION_ENV" \
-  --arg neon_github_environment "$NEON_GH_ENV" \
-  --arg job_environment "$JOB_ENVIRONMENT" \
+  --arg gcp_sops_path "$GCP_SOPS" \
+  --arg neon_sops_path "$NEON_SOPS" \
   --argjson labels "$LABELS_JSON" \
   '{
     app: $app,
@@ -121,9 +85,8 @@ CTX=$(jq -nc \
     region: $region,
     workload_identity_provider: $workload_identity_provider,
     deploy_service_account: $deploy_service_account,
-    protection_environment: $protection_environment,
-    neon_github_environment: $neon_github_environment,
-    job_environment: $job_environment,
+    gcp_sops_path: $gcp_sops_path,
+    neon_sops_path: $neon_sops_path,
     labels: $labels
   }')
 
@@ -134,25 +97,15 @@ case "$FORMAT" in
     echo "export TF_VAR_region=$(jq -r '.region' <<<"$CTX")"
     echo "export TF_VAR_app_name=$(jq -r '.app' <<<"$CTX")"
     echo "export TF_VAR_platform=$(jq -r '.env' <<<"$CTX")"
-    if jq -e '.uses_neon' <<<"$CTX" >/dev/null; then
-      echo "# Neon: GitHub Environment $(jq -r '.neon_github_environment' <<<"$CTX") secret API_KEY"
-    else
-      echo "# Neon: not used by this app"
-    fi
+    echo "# Decrypt: ./.github/scripts/load-sops-credentials.sh $APP $ENV"
     ;;
   gha)
-    if [[ -z "${GITHUB_OUTPUT:-}" ]]; then
-      echo "ERROR: GITHUB_OUTPUT not set" >&2
-      exit 1
-    fi
+    [[ -n "${GITHUB_OUTPUT:-}" ]] || { echo "ERROR: GITHUB_OUTPUT not set" >&2; exit 1; }
     while IFS= read -r line; do
       echo "$line" >> "${GITHUB_OUTPUT}"
     done < <(echo "$CTX" | jq -r 'to_entries[] | select(.key != "labels" and .key != "uses_neon") | "\(.key)=\(.value)"')
     echo "uses_neon=$(jq -r '.uses_neon' <<<"$CTX")" >> "${GITHUB_OUTPUT}"
     echo "labels_json=$(echo "$CTX" | jq -c '.labels')" >> "${GITHUB_OUTPUT}"
     ;;
-  *)
-    echo "ERROR: unknown format $FORMAT" >&2
-    exit 1
-    ;;
+  *) echo "ERROR: unknown format $FORMAT" >&2; exit 1 ;;
 esac
