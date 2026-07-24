@@ -94,6 +94,12 @@ Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform
 | Merge to `main` | `app-apply.yml` | Applies **only** that matrix |
 | Manual | workflow_dispatch on plan/apply | Optional single `app` / `env` |
 
+### Image updates (Frame services)
+
+**Do not** rely on OpenTofu for routine image bumps. Service repos ship directly to Cloud Run via WIF + [`cloudrun-ship`](https://github.com/antinvestor/common/blob/main/.github/workflows/cloudrun-ship.yml) on each `v*.*.*` tag. See [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md).
+
+OpenTofu ignores container image on services/migrate jobs so infra applies never clobber a ship.
+
 Repo secrets required: `R2_*` + `SOPS_AGE_KEY` — see [GITHUB_SECRETS.md](GITHUB_SECRETS.md).
 
 Change detection: [`.github/scripts/detect-changed-apps.sh`](../.github/scripts/detect-changed-apps.sh).

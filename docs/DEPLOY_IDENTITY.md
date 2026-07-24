@@ -76,7 +76,7 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 | Hydra/Keto **image config** (issuer URLs, login/consent, DSN env names) | Align container entrypoint/env with Ory |
 | Frame services **service discovery** (public Cloud Run URLs for Hydra/Keto) | Set after first apply URIs are known |
 | Custom domains / DNS | Cloudflare / Cloud Run domain mapping |
-| Pin image digests | Replace `:latest` in `envs/stawi-prod.tfvars` |
+| Ship Frame images | Service-repo release → `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)); tfvars image is initial/bootstrap only |
 | Migrations | Cloud Run Job or startup migrate for Frame services |
 
 ---

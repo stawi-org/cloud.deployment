@@ -91,6 +91,8 @@ resource "google_cloud_run_v2_job" "this" {
       # executions mutate generation; ignore client noise
       client,
       client_version,
+      # Image rolled by decentralized GH release ship alongside the service.
+      template[0].template[0].containers[0].image,
     ]
   }
 }

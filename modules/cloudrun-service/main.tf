@@ -22,6 +22,16 @@ resource "google_cloud_run_v2_service" "this" {
 
   deletion_protection = var.deletion_protection
 
+  # Image is rolled by decentralized GH release ship (cloudrun-ship workflow).
+  # OpenTofu owns infra/env/secrets; service repos own the binary tag.
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+    ]
+  }
+
   template {
     service_account = local.service_account_email
     scaling {
