@@ -19,8 +19,12 @@ accounts:
       stawi-prod:
         project_id: stawi-identity
         region: europe-west9
+        # OpenTofu apply (this repo only)
         workload_identity_provider: projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-identity.iam.gserviceaccount.com
+        # Decentralized image ship (service repos — see docs/CLOUDRUN_SHIP.md)
+        ship_workload_identity_provider: projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-ship
+        ship_service_account: cloudrun-ship@stawi-identity.iam.gserviceaccount.com
         sops_auth_path: credentials/gcp/identity/stawi-prod/auth.yaml
         labels:
           environment: prod
