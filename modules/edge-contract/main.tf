@@ -13,7 +13,7 @@ locals {
     "https://thesa-dev.stawi.org",
     "http://localhost:5173",
   ]
-  # Minimal edge defaults; identity apps prefer modules/identity-domain for full parity.
+  # Minimal shared edge defaults; apps set domain-specific env themselves.
   service_env = {
     OAUTH2_SERVICE_URI               = "https://oauth2.stawi.org"
     OAUTH2_AUDIENCE_BASE_URL         = "https://api.stawi.org"

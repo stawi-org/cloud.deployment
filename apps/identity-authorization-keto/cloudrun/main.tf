@@ -1,5 +1,5 @@
-# Ory Keto — parity with namespaces/identity/authorization/service-keto.yaml
-# Cluster runs read:4466 + write:4467. Cloud Run = one port per service → two services.
+# Ory Keto — self-contained. Parity: namespaces/identity/authorization/service-keto.yaml
+# Cluster read:4466 + write:4467 → two Cloud Run services.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -8,11 +8,6 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
-}
-
-module "domain" {
-  source = "../../../modules/identity-domain"
-  env    = var.platform
 }
 
 module "db" {
@@ -43,6 +38,25 @@ locals {
     { (local.namespaces_secret_id) = file("${path.module}/../files/namespaces.ts") },
     var.extra_secret_values,
   )
+
+  keto_common_env = merge(module.messaging.service_env, {
+    GCP_PROJECT         = var.project_id
+    APP_NAME            = var.app_name
+    LOG_LEVEL           = "info"
+    NAMESPACES_LOCATION = "file:///etc/keto-namespaces/namespaces.ts"
+  })
+  keto_secret_env = {
+    DSN                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
+  }
+  keto_volumes = {
+    namespaces = {
+      secret     = local.namespaces_secret_id
+      mount_path = "/etc/keto-namespaces"
+      file_name  = "namespaces.ts"
+    }
+  }
 }
 
 module "secrets" {
@@ -80,30 +94,6 @@ module "migrate" {
   depends_on = [module.secrets]
 }
 
-locals {
-  keto_common_env = merge(module.messaging.service_env, {
-    GCP_PROJECT                      = var.project_id
-    APP_NAME                         = var.app_name
-    LOG_LEVEL                        = "info"
-    NAMESPACES_LOCATION              = "file:///etc/keto-namespaces/namespaces.ts"
-    # Ory env form for namespaces.location
-    NAMESPACES_LOCATION_             = "file:///etc/keto-namespaces/namespaces.ts"
-  })
-  keto_secret_env = {
-    DSN                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
-    DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_secret_id] }
-    REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
-  }
-  keto_volumes = {
-    namespaces = {
-      secret     = local.namespaces_secret_id
-      mount_path = "/etc/keto-namespaces"
-      file_name  = "namespaces.ts"
-    }
-  }
-}
-
-# Read API (4466) — used by AUTHORIZATION_SERVICE_READ_URI
 module "service_read" {
   source                = "../../../modules/cloudrun-service"
   name                  = "${var.app_name}-read"
@@ -115,15 +105,12 @@ module "service_read" {
   container_port        = 4466
   args                  = ["serve", "read"]
   memory                = "512Mi"
-  env = merge(local.keto_common_env, {
-    SERVE_READ_PORT = "4466"
-  })
-  secret_env     = local.keto_secret_env
-  secret_volumes = local.keto_volumes
-  depends_on     = [module.secrets, module.migrate]
+  env                   = merge(local.keto_common_env, { SERVE_READ_PORT = "4466" })
+  secret_env            = local.keto_secret_env
+  secret_volumes        = local.keto_volumes
+  depends_on            = [module.secrets, module.migrate]
 }
 
-# Write / admin API (4467)
 module "service_write" {
   source                = "../../../modules/cloudrun-service"
   name                  = "${var.app_name}-write"
@@ -135,10 +122,8 @@ module "service_write" {
   container_port        = 4467
   args                  = ["serve", "write"]
   memory                = "512Mi"
-  env = merge(local.keto_common_env, {
-    SERVE_WRITE_PORT = "4467"
-  })
-  secret_env     = local.keto_secret_env
-  secret_volumes = local.keto_volumes
-  depends_on     = [module.secrets, module.migrate]
+  env                   = merge(local.keto_common_env, { SERVE_WRITE_PORT = "4467" })
+  secret_env            = local.keto_secret_env
+  secret_volumes        = local.keto_volumes
+  depends_on            = [module.secrets, module.migrate]
 }

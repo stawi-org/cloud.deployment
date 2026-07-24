@@ -1,4 +1,5 @@
-# service-authentication-tenancy — parity with namespaces/identity/tenancy/service-tenancy.yaml
+# service-authentication-tenancy — self-contained.
+# Parity: namespaces/identity/tenancy/service-tenancy.yaml
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -7,11 +8,6 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
-}
-
-module "domain" {
-  source = "../../../modules/identity-domain"
-  env    = var.platform
 }
 
 module "edge" {
@@ -33,6 +29,13 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
+  is_prod         = var.platform == "stawi-prod"
+  accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
+  oauth2_origin   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  api_base        = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
+  issuer          = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
+  token_url       = "${local.oauth2_origin}/oauth2/token"
+
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
   secret_ids                = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), var.extra_secret_ids)
@@ -42,20 +45,46 @@ locals {
     { (local.database_direct_secret_id) = module.db.connection_uri },
     var.extra_secret_values,
   )
-  oauth2_env = merge(module.domain.oauth2_common, {
-    OAUTH2_SERVICE_CLIENT_ID   = var.app_name
-    OAUTH2_RESOURCE_AUDIENCE   = module.domain.oauth2_resource_audience["tenancy"]
-    OAUTH2_REQUESTED_AUDIENCES = join(",", [
-      "${module.domain.api_base}/tenancy",
-      "${module.domain.api_base}/profile",
-      "${module.domain.api_base}/notification",
-    ])
+
+  app_env = {
+    HTTP_PORT                        = "8080"
+    PORT                             = "8080"
+    LOG_LEVEL                        = "INFO"
+    DATABASE_LOG_QUERIES             = "False"
+    SYNCHRONISE_PRIMARY_PARTITIONS   = "True"
+    AUTHORIZATION_MODE               = "keto"
+    OAUTH2_SERVICE_URI               = local.oauth2_origin
+    OAUTH2_SERVICE_ADMIN_URI         = local.oauth2_origin
+    OAUTH2_WELL_KNOWN_OIDC_PATH      = ".well-known/openid-configuration"
+    OAUTH2_AUDIENCE_BASE_URL         = local.api_base
+    OAUTH2_CLIENT_ASSERTION_AUDIENCE = local.token_url
+    OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
+    OAUTH2_JWT_VERIFY_ISSUER         = local.issuer
+    OAUTH2_SERVICE_CLIENT_ID         = var.app_name
+    OAUTH2_RESOURCE_AUDIENCE         = "${local.api_base}/tenancy"
+    OAUTH2_REQUESTED_AUDIENCES       = join(",", ["${local.api_base}/tenancy", "${local.api_base}/profile", "${local.api_base}/notification"])
     OAUTH2_PRIVATE_JWT_KEY = jsonencode({
       source     = "url"
-      signer_url = "${module.domain.accounts_origin}/webhook/sign/private-key-jwt"
+      signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
       key_id     = "hydra.openid.id-token"
     })
-  })
+    KETO_SERVICE_ADMIN_URI           = local.api_base
+    AUTHORIZATION_SERVICE_READ_URI   = local.api_base
+    AUTHORIZATION_SERVICE_WRITE_URI  = local.api_base
+    EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
+    EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
+    OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
+    OTEL_EXPORTER_OTLP_TRACES_TIMEOUT = "10000"
+    OTEL_EXPORTER_OTLP_METRICS_TIMEOUT = "10000"
+    OTEL_EXPORTER_OTLP_LOGS_TIMEOUT  = "10000"
+    OTEL_BSP_EXPORT_TIMEOUT          = "10000"
+    OTEL_BSP_MAX_QUEUE_SIZE          = "512"
+    OTEL_BLRP_EXPORT_TIMEOUT         = "10000"
+    OTEL_BLRP_MAX_QUEUE_SIZE         = "512"
+    OTEL_METRIC_EXPORT_TIMEOUT       = "10000"
+    GCP_PROJECT                      = var.project_id
+    APP_NAME                         = var.app_name
+  }
 }
 
 module "secrets" {
@@ -93,10 +122,14 @@ module "migrate" {
   labels                = var.labels
   args                  = ["migrate"]
   timeout               = "900s"
-  env = merge(module.domain.migrate_env, {
-    # Self registration endpoint (public API path)
-    PERMISSIONS_REGISTRATION_URL = "${module.domain.service_uris.TENANCY_SERVICE_URI}/_internal/register/permissions"
-  })
+  env = {
+    LOG_LEVEL                    = "INFO"
+    EVENTS_QUEUE_URL             = "mem://frame.events.migrate"
+    OTEL_TRACES_EXPORTER         = "none"
+    OTEL_METRICS_EXPORTER        = "none"
+    OTEL_LOGS_EXPORTER           = "none"
+    PERMISSIONS_REGISTRATION_URL = "${local.api_base}/tenancy/_internal/register/permissions"
+  }
   secret_env = {
     DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
   }
@@ -115,22 +148,8 @@ module "service" {
   memory                = "512Mi"
   env = merge(
     module.edge.service_env,
-    module.domain.frame_http,
-    local.oauth2_env,
-    module.domain.service_uris,
-    module.domain.events_mem,
-    module.domain.otel_timeouts,
     module.messaging.service_env,
-    {
-      GCP_PROJECT                  = var.project_id
-      APP_NAME                     = var.app_name
-      LOG_LEVEL                    = "INFO"
-      DATABASE_LOG_QUERIES         = "False"
-      SYNCHRONISE_PRIMARY_PARTITIONS = "True"
-      AUTHORIZATION_MODE           = "keto"
-      # Keto admin = write API (cluster KETO_SERVICE_ADMIN_URI)
-      KETO_SERVICE_ADMIN_URI       = module.domain.service_uris.KETO_SERVICE_ADMIN_URI
-    },
+    local.app_env,
   )
   secret_env = {
     DATABASE_URL          = { secret = module.secrets.secret_ids[local.database_secret_id] }
@@ -141,8 +160,7 @@ module "service" {
   depends_on = [module.secrets, module.messaging, module.migrate, google_secret_manager_secret_iam_member.hydra_webhook_psk]
 }
 
-# Hourly partition sync (cluster CronJob tenancy-sync-jobs) — Cloud Scheduler can hit this later.
-# Placeholder Cloud Run Job for manual/schedule invoke.
+# Cluster CronJob tenancy-sync-jobs — job definition only (not executed every apply).
 module "sync_job" {
   source                = "../../../modules/cloudrun-migrate-job"
   name                  = "${var.app_name}-sync-partitions"
@@ -155,9 +173,8 @@ module "sync_job" {
     "-sS", "-X", "POST",
     "--retry", "8", "--retry-all-errors",
     "-o", "/dev/null", "-w", "%%{http_code}",
-    "${module.domain.service_uris.TENANCY_SERVICE_URI}/_internal/sync/clients",
+    "${local.api_base}/tenancy/_internal/sync/clients",
   ]
-  # Do not auto-execute on every apply (hourly job); create definition only.
   execute    = false
   depends_on = [module.service]
 }

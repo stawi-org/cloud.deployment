@@ -1,4 +1,4 @@
-# Ory Hydra — parity with namespaces/identity/oauth2/service-hydra.yaml
+# Ory Hydra — self-contained. Parity: namespaces/identity/oauth2/service-hydra.yaml
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -7,11 +7,6 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
-}
-
-module "domain" {
-  source = "../../../modules/identity-domain"
-  env    = var.platform
 }
 
 module "db" {
@@ -28,6 +23,13 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
+  is_prod         = var.platform == "stawi-prod"
+  accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
+  oauth2_origin   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  api_base        = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
+  issuer          = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
+  cookie_domain   = local.is_prod ? "stawi.org" : "stawi.dev"
+
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
   token_hook_secret_id      = "${var.app_name}-token-hook-auth"
@@ -52,6 +54,50 @@ locals {
     },
     var.extra_secret_values,
   )
+
+  # Cluster Helm hydra.config → env (public edge only)
+  hydra_env = {
+    SERVE_PUBLIC_PORT                               = "4444"
+    SERVE_PUBLIC_BASE_URL                           = local.oauth2_origin
+    SERVE_PUBLIC_CORS_ENABLED                       = "false"
+    SERVE_PUBLIC_COOKIES_DOMAIN                     = local.cookie_domain
+    SERVE_PUBLIC_COOKIES_SAME_SITE_MODE             = "Lax"
+    SERVE_PUBLIC_COOKIES_SECURE                     = "true"
+    SERVE_PUBLIC_REQUEST_LOG_DISABLE_FOR_HEALTH     = "true"
+    URLS_LOGIN                                      = "${local.accounts_origin}/s/login"
+    URLS_CONSENT                                    = "${local.accounts_origin}/s/consent"
+    URLS_LOGOUT                                     = "${local.accounts_origin}/s/logout"
+    URLS_ERROR                                      = "${local.accounts_origin}/error"
+    URLS_POST_LOGOUT_REDIRECT                       = "${local.accounts_origin}/logout-successful"
+    URLS_SELF_PUBLIC                                = local.oauth2_origin
+    URLS_SELF_ISSUER                                = local.issuer
+    URLS_SELF_ADMIN                                 = local.oauth2_origin
+    WEBFINGER_OIDC_DISCOVERY_TOKEN_URL              = "${local.oauth2_origin}/oauth2/token"
+    WEBFINGER_OIDC_DISCOVERY_AUTH_URL               = "${local.oauth2_origin}/oauth2/auth"
+    WEBFINGER_OIDC_DISCOVERY_CLIENT_REGISTRATION_URL = "${local.oauth2_origin}/clients"
+    WEBFINGER_OIDC_DISCOVERY_USERINFO_URL           = "${local.api_base}/profile/public/user/info"
+    WEBFINGER_OIDC_DISCOVERY_JWKS_URL               = "${local.oauth2_origin}/.well-known/jwks.json"
+    STRATEGIES_ACCESS_TOKEN                         = "jwt"
+    STRATEGIES_SCOPE                                = "wildcard"
+    TTL_ACCESS_TOKEN                                = "1h"
+    TTL_REFRESH_TOKEN                               = "2160h"
+    TTL_ID_TOKEN                                    = "1h"
+    TTL_AUTH_CODE                                   = "10m"
+    TTL_AUTHENTICATION_SESSION                      = "2160h"
+    TTL_LOGIN_CONSENT_REQUEST                       = "1h"
+    OAUTH2_PKCE_ENFORCED                            = "true"
+    OAUTH2_PKCE_ENFORCED_FOR_PUBLIC_CLIENTS         = "true"
+    OAUTH2_EXCLUDE_NOT_BEFORE_CLAIM                 = "true"
+    OAUTH2_MIRROR_TOP_LEVEL_CLAIMS                  = "true"
+    OAUTH2_HASHERS_ALGORITHM                        = "bcrypt"
+    OAUTH2_HASHERS_BCRYPT_COST                      = "12"
+    OAUTH2_SESSION_ENCRYPT_AT_REST                  = "true"
+    OAUTH2_EXPOSE_INTERNAL_ERRORS                   = "false"
+    OAUTH2_TOKEN_HOOK_URL                           = "${local.accounts_origin}/webhook/enrich/token"
+    SQA_OPT_OUT                                     = "true"
+    LOG_LEVEL                                       = "warn"
+    LOG_FORMAT                                      = "text"
+  }
 }
 
 module "secrets" {
@@ -101,7 +147,7 @@ module "service" {
   args                  = ["serve", "public"]
   memory                = "512Mi"
   env = merge(
-    module.domain.hydra_env,
+    local.hydra_env,
     module.messaging.service_env,
     {
       GCP_PROJECT = var.project_id
@@ -109,11 +155,11 @@ module "service" {
     },
   )
   secret_env = {
-    DSN                          = { secret = module.secrets.secret_ids[local.database_secret_id] }
-    DATABASE_URL                 = { secret = module.secrets.secret_ids[local.database_secret_id] }
-    SECRETS_SYSTEM               = { secret = "identity-oauth2-hydra-secrets-system" }
-    SECRETS_COOKIE               = { secret = "identity-oauth2-hydra-secrets-cookie" }
-    WEBHOOK_BEARER_PSK           = { secret = "hydra-webhook-psk" }
+    DSN                           = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    DATABASE_URL                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    SECRETS_SYSTEM                = { secret = "identity-oauth2-hydra-secrets-system" }
+    SECRETS_COOKIE                = { secret = "identity-oauth2-hydra-secrets-cookie" }
+    WEBHOOK_BEARER_PSK            = { secret = "hydra-webhook-psk" }
     OAUTH2_TOKEN_HOOK_AUTH_CONFIG = { secret = local.token_hook_secret_id }
   }
 
