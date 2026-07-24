@@ -1,0 +1,57 @@
+name: gcloud-run-reset
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        required: true
+        type: string
+      region:
+        required: false
+        type: string
+        default: europe-west9
+      project_id:
+        required: false
+        type: string
+        default: stawi-identity
+      env:
+        required: false
+        type: string
+        default: stawi-prod
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install yq + sops
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          sudo wget -qO /usr/local/bin/sops https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64
+          sudo chmod +x /usr/local/bin/sops
+      - name: Load WIF from SOPS
+        id: creds
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          set -euo pipefail
+          ./.github/scripts/load-sops-credentials.sh identity-oauth2-hydra "${{ inputs.env }}" --format=gha
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ steps.creds.outputs.workload_identity_provider }}
+          service_account: ${{ steps.creds.outputs.deploy_service_account }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Disable protection and delete service
+        run: |
+          set -euo pipefail
+          SVC="${{ inputs.service }}"
+          REG="${{ inputs.region }}"
+          PROJ="${{ inputs.project_id }}"
+          gcloud run services update "$SVC" \
+            --project="$PROJ" --region="$REG" \
+            --no-deletion-protection || true
+          gcloud run services delete "$SVC" \
+            --project="$PROJ" --region="$REG" --quiet || true
+          echo "Service $SVC reset (or already gone)"
