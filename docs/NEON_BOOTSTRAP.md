@@ -66,6 +66,21 @@ export NEON_API_KEY=napi_xxxxxxxx   # from Neon console → Account settings →
 
 Account key must already exist in `config/neon-accounts.yaml` (planned domain). Add new domains by PR to the registry first, then bootstrap.
 
+### Token requirements for `--sync-github-env`
+
+| Auth | Needs |
+|------|--------|
+| Classic PAT | `repo` scope; you must be **admin** on `stawi-org/cloud.deployment` |
+| Fine-grained PAT | Resource owner `stawi-org`, repo `cloud.deployment`; **Environments: Read and write**; Metadata: Read |
+| Org SSO | Authorize the token for `stawi-org` (SSO authorize button on the token) |
+
+If you see **`curl: (22) … 404`** on environment create/public-key:
+
+1. Confirm `GITHUB_TOKEN` is for a user/admin that can open  
+   https://github.com/stawi-org/cloud.deployment/settings/environments  
+2. Or create the environment manually, add secret `NEON_API_KEY`, then re-run **without** `--sync-github-env` (SOPS/PR only), or with it after the env exists.  
+3. Prefer installing `gh` and re-running — the script uses `gh secret set --env` first when available.
+
 ## After merge
 
 ```bash
