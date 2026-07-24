@@ -21,6 +21,24 @@ resource "google_cloud_run_v2_job" "this" {
       timeout         = var.timeout
       max_retries     = var.max_retries
 
+      dynamic "volumes" {
+        for_each = var.secret_volumes
+        content {
+          name = volumes.key
+          secret {
+            secret       = volumes.value.secret
+            default_mode = 292 # 0444
+            dynamic "items" {
+              for_each = volumes.value.file_name != null ? [volumes.value.file_name] : []
+              content {
+                path    = items.value
+                version = volumes.value.version
+              }
+            }
+          }
+        }
+      }
+
       containers {
         image   = var.image
         command = var.command
@@ -30,6 +48,14 @@ resource "google_cloud_run_v2_job" "this" {
           limits = {
             cpu    = var.cpu
             memory = var.memory
+          }
+        }
+
+        dynamic "volume_mounts" {
+          for_each = var.secret_volumes
+          content {
+            name       = volume_mounts.key
+            mount_path = volume_mounts.value.mount_path
           }
         }
 

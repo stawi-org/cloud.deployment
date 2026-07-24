@@ -48,7 +48,6 @@ locals {
 
   app_env = {
     HTTP_PORT                        = "8080"
-    PORT                             = "8080"
     LOG_LEVEL                        = "INFO"
     DATABASE_LOG_QUERIES             = "False"
     SYNCHRONISE_PRIMARY_PARTITIONS   = "True"
@@ -122,18 +121,34 @@ module "migrate" {
   labels                = var.labels
   args                  = ["migrate"]
   timeout               = "900s"
+  # Tenancy migrate initializes profile client → needs OAuth token endpoint envs.
   env = {
-    LOG_LEVEL                    = "INFO"
-    EVENTS_QUEUE_URL             = "mem://frame.events.migrate"
-    OTEL_TRACES_EXPORTER         = "none"
-    OTEL_METRICS_EXPORTER        = "none"
-    OTEL_LOGS_EXPORTER           = "none"
-    PERMISSIONS_REGISTRATION_URL = "${local.api_base}/tenancy/_internal/register/permissions"
+    LOG_LEVEL                         = "INFO"
+    EVENTS_QUEUE_URL                  = "mem://frame.events.migrate"
+    OTEL_TRACES_EXPORTER              = "none"
+    OTEL_METRICS_EXPORTER             = "none"
+    OTEL_LOGS_EXPORTER                = "none"
+    PERMISSIONS_REGISTRATION_URL      = "${local.api_base}/tenancy/_internal/register/permissions"
+    OAUTH2_SERVICE_URI                = local.oauth2_origin
+    OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
+    OAUTH2_WELL_KNOWN_OIDC_PATH       = ".well-known/openid-configuration"
+    OAUTH2_CLIENT_ASSERTION_AUDIENCE  = local.token_url
+    OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
+    OAUTH2_JWT_VERIFY_ISSUER          = local.issuer
+    OAUTH2_SERVICE_CLIENT_ID          = var.app_name
+    OAUTH2_RESOURCE_AUDIENCE          = "${local.api_base}/tenancy"
+    OAUTH2_PRIVATE_JWT_KEY = jsonencode({
+      source     = "url"
+      signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
+      key_id     = "hydra.openid.id-token"
+    })
+    PROFILE_SERVICE_URI = "${local.api_base}/profile"
   }
   secret_env = {
-    DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    DATABASE_URL          = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    OAUTH2_SIGNER_API_KEY = { secret = "hydra-webhook-psk" }
   }
-  depends_on = [module.secrets]
+  depends_on = [module.secrets, google_secret_manager_secret_iam_member.hydra_webhook_psk]
 }
 
 module "service" {

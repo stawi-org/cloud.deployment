@@ -125,12 +125,19 @@ module "migrate" {
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
-  # migrate up only needs DSN (no keto.yml mount on jobs yet)
-  args = ["migrate", "up", "-y"]
+  # Image default /home/ory/keto.yml is missing — mount SM keto.yml
+  args = ["migrate", "up", "-y", "-c", "/etc/keto/keto.yml"]
   env  = { LOG_LEVEL = "info" }
   secret_env = {
     DSN          = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
     DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+  }
+  secret_volumes = {
+    keto_config = {
+      secret     = local.keto_yml_secret_id
+      mount_path = "/etc/keto"
+      file_name  = "keto.yml"
+    }
   }
   depends_on = [module.secrets]
 }

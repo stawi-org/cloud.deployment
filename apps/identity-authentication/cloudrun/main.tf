@@ -74,7 +74,6 @@ locals {
   # Colony oauth2 block → Frame env (this app only)
   app_env = {
     HTTP_PORT                             = "8080"
-    PORT                                  = "8080"
     LOG_LEVEL                             = "INFO"
     EXPOSE_ERRORS                         = "false"
     AUTHORIZATION_MODE                    = "keto"

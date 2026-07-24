@@ -47,6 +47,18 @@ variable "secret_env" {
   description = "Secret Manager env (prefer direct Neon URL for migrations)"
 }
 
+# Mount Secret Manager secrets as files (e.g. Keto keto.yml for migrate).
+variable "secret_volumes" {
+  type = map(object({
+    secret     = string
+    mount_path = string
+    file_name  = optional(string)
+    version    = optional(string, "latest")
+  }))
+  default     = {}
+  description = "Map of volume name → Secret Manager volume mount for the job container"
+}
+
 variable "cpu" {
   type    = string
   default = "1"

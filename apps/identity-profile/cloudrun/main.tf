@@ -68,7 +68,6 @@ locals {
 
   app_env = {
     HTTP_PORT                        = "8080"
-    PORT                             = "8080"
     LOG_LEVEL                        = "INFO"
     TRACE_REQUESTS                   = "false"
     DEK_OLD_ENCRYPTION_TOKEN         = ""

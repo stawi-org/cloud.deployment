@@ -48,7 +48,6 @@ locals {
 
   app_env = {
     HTTP_PORT                                   = "8080"
-    PORT                                        = "8080"
     LOG_LEVEL                                   = "INFO"
     PREFER_SIMPLE_PROTOCOL                      = "true"
     MAX_AGENT_DEPTH                             = "5"
