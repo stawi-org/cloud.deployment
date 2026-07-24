@@ -539,10 +539,10 @@ auth:
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   note: "Neon org API key for OpenTofu provider only — never inject into Cloud Run"
 EOF
-  # --filename: sops matches creation_rules on this path, not the /tmp plaintext path
+  # filename-override: match .sops.yaml creation_rules (not the /tmp plaintext path)
   (
     cd "$WORKTREE"
-    sops -e --filename "$AUTH_REL" "$AUTH_PLAIN" >"$AUTH_REL"
+    sops encrypt --filename-override "$AUTH_REL" "$AUTH_PLAIN" >"$AUTH_REL"
   )
   rm -f "$AUTH_PLAIN"
   grep -q '^sops:' "$WORKTREE/$AUTH_REL" || die "SOPS encrypt failed"
