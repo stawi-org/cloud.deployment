@@ -83,3 +83,9 @@ variable "labels" {
   type    = map(string)
   default = {}
 }
+
+variable "deletion_protection" {
+  type        = bool
+  default     = false
+  description = "Cloud Run deletion protection; keep false until greenfield is stable"
+}

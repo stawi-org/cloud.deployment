@@ -20,6 +20,9 @@ resource "google_cloud_run_v2_service" "this" {
   ingress  = var.ingress
   labels   = var.labels
 
+  # Allow replace/destroy during greenfield iteration. Flip to true after cutover.
+  deletion_protection = var.deletion_protection
+
   template {
     service_account = local.service_account_email
     scaling {
