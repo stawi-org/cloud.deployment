@@ -53,7 +53,8 @@ resource "google_service_account" "runtime" {
 }
 
 resource "random_password" "encryption_phrase" {
-  length  = 48
+  # service-files requires exactly 32 bytes for AES-256-GCM
+  length  = 32
   special = false
 }
 
@@ -186,7 +187,8 @@ module "migrate" {
     PERMISSIONS_REGISTRATION_URL = "${local.api_base}/tenancy/_internal/register/permissions"
   }
   secret_env = {
-    DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    DATABASE_URL       = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    ENCRYPTION_PHRASE  = { secret = local.encryption_secret_id }
   }
   depends_on = [module.secrets]
 }
@@ -211,6 +213,7 @@ module "service" {
     DATABASE_URL          = { secret = module.secrets.secret_ids[local.database_secret_id] }
     REPLICA_DATABASE_URL  = { secret = module.secrets.secret_ids[local.database_secret_id] }
     OAUTH2_SIGNER_API_KEY = { secret = "hydra-webhook-psk" }
+    ENCRYPTION_PHRASE     = { secret = local.encryption_secret_id }
   }
 
   depends_on = [
