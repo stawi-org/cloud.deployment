@@ -5,6 +5,10 @@
 # Secrets that must not live in git:
 #   - neon_api_key (deploy-time provider) from SOPS credentials (CI)
 #   - DATABASE_URL and extra secrets in GCP Secret Manager for runtime
+#
+# Frame messaging (v2.0.10+):
+#   publish  → gcppubsub://{project}/{app}-events
+#   receive  → push://{app}-events  (GCP POST /_frame/queue/{app}-events)
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -13,6 +17,10 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
+}
+
+data "google_project" "this" {
+  project_id = var.project_id
 }
 
 module "edge" {
@@ -34,6 +42,11 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
+  # Deterministic Cloud Run URL for Pub/Sub push (stable before first deploy).
+  service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  events_ref           = "${var.app_name}-events"
+  events_push_endpoint = "${local.service_run_url}/_frame/queue/${local.events_ref}"
+
   # Pooled for runtime; direct for migrations (Frame advisory locks need a real session).
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
@@ -68,8 +81,20 @@ module "messaging" {
   source                        = "../../../modules/pubsub"
   project_id                    = var.project_id
   app_name                      = var.app_name
+  region                        = var.region
   runtime_service_account_email = google_service_account.runtime.email
   labels                        = var.labels
+
+  # Regional storage only (workload region) — avoid multi-continent message hops.
+  allowed_persistence_regions = [var.region]
+  enforce_in_transit          = true
+
+  # GCP Pub/Sub push → Frame demux (WithRegisterEvents handlers).
+  default_push_endpoint           = local.events_push_endpoint
+  push_oidc_service_account_email = google_service_account.runtime.email
+  push_oidc_audience              = local.events_push_endpoint
+  pubsub_service_agent_email      = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  create_dead_letter_topic        = true
 }
 
 # Frame default: `migrate` subcommand (override per app for Hydra/Keto).
@@ -84,11 +109,11 @@ module "migrate" {
   labels                = var.labels
   args                  = ["migrate"]
   env = {
-    LOG_LEVEL              = "INFO"
-    EVENTS_QUEUE_URL       = "mem://frame.events.migrate"
-    OTEL_TRACES_EXPORTER   = "none"
-    OTEL_METRICS_EXPORTER  = "none"
-    OTEL_LOGS_EXPORTER     = "none"
+    LOG_LEVEL             = "INFO"
+    EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
+    OTEL_TRACES_EXPORTER  = "none"
+    OTEL_METRICS_EXPORTER = "none"
+    OTEL_LOGS_EXPORTER    = "none"
   }
   secret_env = {
     DATABASE_URL = {
@@ -126,4 +151,20 @@ module "service" {
     module.messaging,
     module.migrate,
   ]
+}
+
+# Pub/Sub push OIDC: allow the runtime SA to be used as push identity,
+# and allow that identity to invoke the Cloud Run service.
+resource "google_service_account_iam_member" "pubsub_push_token_creator" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "pubsub_push_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.runtime.email}"
 }

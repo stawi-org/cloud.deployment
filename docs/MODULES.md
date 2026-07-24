@@ -1,111 +1,39 @@
-# Module reference
+# Modules
 
-Shared OpenTofu modules and platform packs used by app roots under `apps/*/cloudrun`.
+Shared OpenTofu modules under `modules/`. App roots compose these; they do not create cross-app resources.
 
-App roots are **thin**: they compose modules. **GCP project / region** come from CI via `resolve-app-context` (`gcp.account` + env). **Secrets** go to Secret Manager via `modules/app-secrets`.
-
----
-
-## Architecture (compose order)
-
-```
-app.yaml gcp.account + env     → project_id, region, labels (CI vars)
-modules/edge-contract          → public edge service_env
-modules/neon-database          → Neon project + connection URIs
-modules/app-secrets            → Secret Manager (DATABASE_URL, extra secrets) + accessor IAM
-modules/pubsub                 → topics, subscriptions, publisher/subscriber IAM
-modules/cloudrun-service       → Cloud Run (env + secret_env from SM)
-```
-
-Messaging is **always** Cloud Pub/Sub. Runtime secrets are **always** Secret Manager references (not plain values from git).
+| Module | Purpose |
+|--------|---------|
+| `modules/edge-contract` | Public edge env (OAuth hosts, CORS, OTel defaults) |
+| `modules/neon-database` | One Neon project + role + DB per app |
+| `modules/app-secrets` | Secret Manager secrets + accessor IAM |
+| `modules/pubsub` | Topics, subscriptions, IAM, Frame dual-URL env |
+| `modules/cloudrun-migrate-job` | One-shot migrate job executed on apply |
+| `modules/cloudrun-service` | Cloud Run v2 service |
 
 ---
 
 ## `modules/edge-contract`
 
-Public API / OAuth / OTel defaults for Cloud Run services talking to the Stawi edge.
-
-### Inputs
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `env` | string | (required) | `stawi-dev` \| `stawi-prod` |
-
-### Outputs
-
-| Name | Description |
-|------|-------------|
-| `api_hosts` | List of public API host URLs |
-| `cors_allow_origins` | CORS allow-origin list |
-| `service_env` | Map of env vars for Cloud Run (`OAUTH2_*`, `OTEL_*`, `EDGE_ENV`, …) |
-| `oauth_token_url` | OAuth token endpoint URL |
-
-### Notes
-
-- No cloud resources — pure locals/outputs.
-- Override edge values in the app root if a single app needs different hosts.
+Local-only. Outputs `service_env` map for OAuth/CORS/OTel host defaults by `env` (`stawi-dev` / `stawi-prod`).
 
 ---
 
 ## `modules/neon-database`
 
-One **Neon project per app**. Account selection is **outside** the module: CI injects the API key from `app.yaml` → `config/neon-accounts.yaml` → GitHub secret → `TF_VAR_neon_api_key`.
+Creates a Neon project for the app. Outputs pooled + direct connection URIs.
 
-### Inputs
+---
 
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `app_name` | string | (required) | Neon project name prefix |
-| `region_id` | string | `aws-eu-central-1` | Neon region |
-| `pg_version` | number | `16` | Postgres major version |
-| `database_name` | string | `app` | Database name |
-| `role_name` | string | `app` | DB role name |
-| `history_retention_seconds` | number | `86400` | Point-in-time retention |
+## `modules/app-secrets`
 
-### Outputs
-
-| Name | Sensitive | Description |
-|------|-----------|-------------|
-| `project_id` | | Neon project id |
-| `branch_id` | | Default branch id |
-| `database_name` | | Database name |
-| `role_name` | | Role name |
-| `connection_uri` | yes | Direct connection URI |
-| `pooled_connection_uri` | yes | Pooler URI (prefer for Cloud Run) |
-
-### Multi-account Neon
-
-| `neon.account` in app.yaml | GitHub secret (via registry) |
-|----------------------------|------------------------------|
-| `stawi-org` | `NEON_API_KEY_STAWI_ORG` |
-| `stawi-labs` | `NEON_API_KEY_STAWI_LABS` |
-
-Registry: [`config/neon-accounts.yaml`](../config/neon-accounts.yaml).
+Creates Secret Manager secrets and grants `roles/secretmanager.secretAccessor` to runtime SA(s).
 
 ---
 
 ## `modules/cloudrun-service`
 
-Cloud Run v2 service with optional external runtime SA and Secret Manager env bindings.
-
-### Inputs
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `name` | string | (required) | Service name |
-| `project_id` | string | (required) | GCP project |
-| `region` | string | (required) | GCP region |
-| `image` | string | (required) | Container image |
-| `service_account_email` | string | `null` | If set, use this SA (preferred: root-managed SA for secret IAM ordering) |
-| `env` | map(string) | `{}` | Plain environment variables |
-| `secret_env` | map(object) | `{}` | Env from Secret Manager (`secret`, optional `version`) |
-| `cpu` | string | `1` | CPU limit |
-| `memory` | string | `512Mi` | Memory limit |
-| `max_instance_count` | number | `10` | Max instances |
-| `min_instance_count` | number | `0` | Min instances |
-| `concurrency` | number | `80` | Request concurrency |
-| `ingress` | string | `INGRESS_TRAFFIC_ALL` | Ingress setting |
-| `labels` | map(string) | `{}` | Resource labels |
+Cloud Run v2 service wrapper: image, scaling, secret/env, optional secret/GCS volumes, probes.
 
 ### Outputs
 
@@ -121,10 +49,45 @@ Cloud Run v2 service with optional external runtime SA and Secret Manager env bi
 
 **Required messaging plane** for every app. Creates topics/subscriptions and grants the Cloud Run runtime SA publisher (and optionally subscriber) IAM.
 
-Default when `topics` is empty and `create_default_events_topic = true`:
+### Frame pattern (v2.0.10+)
+
+```
+publish  → gcppubsub://{project}/{app}-events     (OpenTopic)
+receive  → push://{app}-events?protocol=gcppubsub (HTTP demux)
+GCP push → POST https://{service}/_frame/queue/{app}-events
+```
+
+`service_env` emits dual URLs:
+
+| Env | Value |
+|-----|--------|
+| `EVENTS_QUEUE_PUBLISH_URL` | `gcppubsub://{project}/{app}-events` |
+| `EVENTS_QUEUE_SUBSCRIBE_URL` | `push://{app}-events?protocol=gcppubsub` |
+| `EVENTS_QUEUE_URL` | same as publish (legacy single-URL fallback) |
+| `EVENTS_QUEUE_NAME` | `{app}-events` (Frame demux ref) |
+| `FRAME_QUEUE_PUSH_*` | OIDC auth for push handler |
+
+Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate` (no Pub/Sub needed for schema).
+
+### Defaults
+
+When `topics` is empty and `create_default_events_topic = true`:
 
 - Topic: `{app_name}-events`
-- Subscription: `{app_name}-events` (pull by default; set `default_push_endpoint` for Frame `POST /_frame/queue/{ref}`)
+- Subscription:
+  - **Push** (when `default_push_endpoint` set): `{app_name}-events-push` → Frame path
+  - **Pull** (otherwise): `{app_name}-events`
+- Optional DLQ topic: `{app_name}-events-dlq` (push path only when `create_dead_letter_topic`)
+
+### Regional storage
+
+Prefer the workload region only so messages do not traverse continents:
+
+```hcl
+region                        = var.region
+allowed_persistence_regions   = [var.region]
+enforce_in_transit            = true
+```
 
 ### Inputs
 
@@ -132,11 +95,20 @@ Default when `topics` is empty and `create_default_events_topic = true`:
 |------|------|---------|-------------|
 | `project_id` | string | (required) | GCP project (same as Cloud Run) |
 | `app_name` | string | (required) | Used in default topic naming |
+| `region` | string | `""` | Workload region; used as sole persistence region when list empty |
 | `topics` | map(object) | `{}` | Logical topic key → config; empty → default events topic |
-| `subscriptions` | map(object) | `{}` | Logical sub key → config; empty → default pull on events |
+| `subscriptions` | map(object) | `{}` | Logical sub key → config; empty → default sub |
 | `runtime_service_account_email` | string | (required) | Cloud Run runtime SA |
 | `enable_publisher_iam` | bool | `true` | Grant `roles/pubsub.publisher` on topics |
 | `create_default_events_topic` | bool | `true` | Create default events topic when `topics` empty |
+| `allowed_persistence_regions` | list(string) | `[]` | Regions where Pub/Sub may store messages |
+| `enforce_in_transit` | bool | `true` | Keep in-transit messages in allowed regions |
+| `default_push_endpoint` | string | `null` | Frame push URL `https://…/_frame/queue/{ref}` |
+| `push_oidc_service_account_email` | string | `""` | SA Pub/Sub uses to mint OIDC tokens |
+| `push_oidc_audience` | string | `""` | OIDC audience (defaults to push endpoint) |
+| `create_dead_letter_topic` | bool | `true` | Create DLQ + attach dead-letter policy |
+| `dead_letter_max_delivery_attempts` | number | `10` | Max delivery attempts before DLQ |
+| `pubsub_service_agent_email` | string | `""` | `service-{num}@gcp-sa-pubsub.iam.gserviceaccount.com` |
 | `labels` | map(string) | `{}` | Labels |
 
 Topic object: optional `name`, `message_retention_duration` (default `604800s`).  
@@ -148,13 +120,58 @@ Subscription object: `topic_key`, optional `name`, `ack_deadline_seconds`, `mess
 |------|-------------|
 | `topic_names` / `topic_ids` | Map logical key → name/id |
 | `subscription_names` / `subscription_ids` | Map logical key → name/id |
-| `service_env` | Env map for Cloud Run: `MESSAGING_BACKEND=pubsub`, `EVENTS_QUEUE_URL`, `EVENTS_QUEUE_NAME`, `PUBSUB_TOPIC_*`, `PUBSUB_SUBSCRIPTION_*` |
-| `events_queue_url` / `events_queue_name` | Frame `EVENTS_QUEUE_*` values |
+| `events_topic_name` / `events_subscription_name` / `events_ref` | Default events identifiers |
+| `frame_publish_url` / `frame_subscribe_url` | Dual Frame URLs |
+| `frame_push_handler_path` | `/_frame/queue/{ref}` |
+| `service_env` | Full env map for Cloud Run Frame services |
 
 ### Policy
 
 - Do **not** add NATS modules or cluster messaging URLs for apps here.
 - Pub/Sub uses the **same GCP project** as the Cloud Run service.
+- Frame apps need Frame ≥ **v2.0.10** (dual URL + GCP push codec); prefer **v2.0.11+** for OIDC SA allowlist.
+- Blank-import `_ "gocloud.dev/pubsub/gcppubsub"` in service `main` (Frame also imports it from v2.0.9+).
+
+### App wiring checklist (Frame)
+
+```hcl
+locals {
+  service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  events_ref           = "${var.app_name}-events"
+  events_push_endpoint = "${local.service_run_url}/_frame/queue/${local.events_ref}"
+}
+
+module "messaging" {
+  source                          = "../../../modules/pubsub"
+  project_id                      = var.project_id
+  app_name                        = var.app_name
+  region                          = var.region
+  runtime_service_account_email   = google_service_account.runtime.email
+  allowed_persistence_regions     = [var.region]
+  enforce_in_transit              = true
+  default_push_endpoint           = local.events_push_endpoint
+  push_oidc_service_account_email = google_service_account.runtime.email
+  push_oidc_audience              = local.events_push_endpoint
+  pubsub_service_agent_email      = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  create_dead_letter_topic        = true
+}
+
+# Pub/Sub agent can mint OIDC tokens as the runtime SA
+resource "google_service_account_iam_member" "pubsub_push_token_creator" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+# Runtime SA can invoke Cloud Run (push delivery)
+resource "google_cloud_run_v2_service_iam_member" "pubsub_push_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.runtime.email}"
+}
+```
 
 ---
 
@@ -167,47 +184,4 @@ module "platform_dev" {
   source = "../../../platforms/stawi-dev"
   count  = var.platform == "stawi-dev" ? 1 : 0
 }
-module "platform_prod" {
-  source = "../../../platforms/stawi-prod"
-  count  = var.platform == "stawi-prod" ? 1 : 0
-}
-locals {
-  platform = var.platform == "stawi-dev" ? module.platform_dev[0] : module.platform_prod[0]
-}
 ```
-
-CI passes `-var=platform=<env>` where env is `stawi-dev` or `stawi-prod`.
-
-### Outputs (both)
-
-| Name | Description |
-|------|-------------|
-| `env` | `stawi-dev` or `stawi-prod` |
-| `project_id` | GCP project id (**placeholder** until real projects are set) |
-| `region` | Default region (`europe-west1`) |
-| `labels` | Common labels (`environment`, `managed-by`) |
-
-Current placeholders: `stawi-cloudrun-dev` / `stawi-cloudrun-prod` — replace before pilot apply.
-
----
-
-## R2 state key pattern
-
-```
-cloud-deployment/apps/<app>/<env>/terraform.tfstate
-```
-
-Bucket: `cloud-tofu-state` (prefix-isolated from other repos).  
-Fragment: [`config/r2-backend.hcl`](../config/r2-backend.hcl). Details: [BACKEND.md](BACKEND.md).
-
----
-
-## App template (`apps/_template`)
-
-Canonical composition root. Copy to `apps/<name>` — see [ADDING_AN_APP.md](ADDING_AN_APP.md).
-
-Root-owned extras (not modules):
-
-- `google_secret_manager_secret` for `DATABASE_URL`
-- Runtime `google_service_account` + secret accessor IAM
-- `module.messaging` → merges `service_env` into Cloud Run

@@ -8,12 +8,18 @@ variable "app_name" {
   description = "Application name; used in default topic naming"
 }
 
+variable "region" {
+  type        = string
+  default     = ""
+  description = "Workload region — used as sole allowed_persistence_region when set and list is empty"
+}
+
 variable "topics" {
   type = map(object({
     name                       = optional(string)
-    message_retention_duration = optional(string, "604800s") # 7d
+    message_retention_duration = optional(string, "604800s")
   }))
-  description = "Map of logical topic keys to config. Empty uses default events topic."
+  description = "Map of logical topic keys. Empty uses default events topic."
   default     = {}
 }
 
@@ -21,13 +27,12 @@ variable "subscriptions" {
   type = map(object({
     topic_key                  = string
     name                       = optional(string)
-    ack_deadline_seconds       = optional(number, 20)
+    ack_deadline_seconds       = optional(number, 30)
     message_retention_duration = optional(string, "604800s")
-    # Push endpoint (e.g. https://svc/_frame/queue/{ref}). Empty = pull.
     push_endpoint              = optional(string)
     enable_subscriber_iam      = optional(bool, true)
   }))
-  description = "Map of logical subscription keys. Empty uses default on events topic."
+  description = "Map of logical subscription keys. Empty uses default events subscription."
   default     = {}
 }
 
@@ -39,7 +44,7 @@ variable "runtime_service_account_email" {
 variable "enable_publisher_iam" {
   type        = bool
   default     = true
-  description = "Grant roles/pubsub.publisher on all topics to the runtime SA"
+  description = "Grant roles/pubsub.publisher on topics to the runtime SA"
 }
 
 variable "labels" {
@@ -53,21 +58,50 @@ variable "create_default_events_topic" {
   description = "When topics map is empty, create {app_name}-events topic + subscription"
 }
 
-# When set, the default events subscription is push (to Frame /_frame/queue/{ref}).
+variable "allowed_persistence_regions" {
+  type        = list(string)
+  default     = []
+  description = "Regions where Pub/Sub may store messages. Prefer the workload region only."
+}
+
+variable "enforce_in_transit" {
+  type        = bool
+  default     = true
+  description = "When true, Pub/Sub also keeps in-transit messages in allowed regions"
+}
+
 variable "default_push_endpoint" {
   type        = string
   default     = null
-  description = "If non-null, default events subscription is push to this URL"
+  description = "If set, default subscription is push to this URL (Frame /_frame/queue/{ref})"
 }
 
 variable "push_oidc_service_account_email" {
   type        = string
   default     = ""
-  description = "SA for Pub/Sub push OIDC (must be able to mint tokens for Cloud Run invoker)"
+  description = "SA used by Pub/Sub to mint OIDC tokens for push auth"
 }
 
 variable "push_oidc_audience" {
   type        = string
   default     = ""
-  description = "OIDC audience for push (defaults to push_endpoint when empty)"
+  description = "OIDC audience for push (defaults to push endpoint URL)"
+}
+
+variable "create_dead_letter_topic" {
+  type        = bool
+  default     = true
+  description = "Create {app}-events-dlq and attach dead-letter policy to the default push sub"
+}
+
+variable "dead_letter_max_delivery_attempts" {
+  type        = number
+  default     = 10
+  description = "Max delivery attempts before dead-lettering"
+}
+
+variable "pubsub_service_agent_email" {
+  type        = string
+  default     = ""
+  description = "service-{project_number}@gcp-sa-pubsub.iam.gserviceaccount.com for DLQ publish"
 }

@@ -10,6 +10,10 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 # Hydra Cloud Run URL for OIDC discovery until oauth2.stawi.org edge is mapped.
 data "google_cloud_run_v2_service" "hydra" {
   name     = "identity-oauth2-hydra"
@@ -48,14 +52,19 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
+  # Deterministic Cloud Run URL for Pub/Sub push (stable before first deploy).
+  service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  events_ref           = "${var.app_name}-events"
+  events_push_endpoint = "${local.service_run_url}/_frame/queue/${local.events_ref}"
+
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
   oauth2_edge     = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
   # Prefer Cloud Run Hydra until public edge (oauth2.stawi.*) is mapped.
-  oauth2_origin   = data.google_cloud_run_v2_service.hydra.uri
-  api_base        = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
-  issuer          = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
-  token_url       = "${local.oauth2_origin}/oauth2/token"
+  oauth2_origin = data.google_cloud_run_v2_service.hydra.uri
+  api_base      = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
+  issuer        = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
+  token_url     = "${local.oauth2_origin}/oauth2/token"
 
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
@@ -68,42 +77,42 @@ locals {
   )
 
   app_env = {
-    HTTP_PORT                        = "8080"
-    LOG_LEVEL                        = "INFO"
-    DATABASE_LOG_QUERIES             = "False"
-    SYNCHRONISE_PRIMARY_PARTITIONS   = "True"
-    AUTHORIZATION_MODE               = "keto"
-    OAUTH2_SERVICE_URI               = local.oauth2_origin
-    OAUTH2_SERVICE_ADMIN_URI         = local.oauth2_origin
-    OAUTH2_WELL_KNOWN_OIDC_PATH      = ".well-known/openid-configuration"
-    OAUTH2_AUDIENCE_BASE_URL         = local.api_base
-    OAUTH2_CLIENT_ASSERTION_AUDIENCE = local.token_url
-    OAUTH2_CLIENT_ASSERTION_AUD             = local.token_url
+    HTTP_PORT                         = "8080"
+    LOG_LEVEL                         = "INFO"
+    DATABASE_LOG_QUERIES              = "False"
+    SYNCHRONISE_PRIMARY_PARTITIONS    = "True"
+    AUTHORIZATION_MODE                = "keto"
+    OAUTH2_SERVICE_URI                = local.oauth2_origin
+    OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
+    OAUTH2_WELL_KNOWN_OIDC_PATH       = ".well-known/openid-configuration"
+    OAUTH2_AUDIENCE_BASE_URL          = local.api_base
+    OAUTH2_CLIENT_ASSERTION_AUDIENCE  = local.token_url
+    OAUTH2_CLIENT_ASSERTION_AUD       = local.token_url
     OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
-    OAUTH2_JWT_VERIFY_ISSUER         = local.issuer
-    OAUTH2_SERVICE_CLIENT_ID         = var.app_name
-    OAUTH2_RESOURCE_AUDIENCE         = "${local.api_base}/tenancy"
-    OAUTH2_REQUESTED_AUDIENCES       = join(",", ["${local.api_base}/tenancy", "${local.api_base}/profile", "${local.api_base}/notification"])
+    OAUTH2_JWT_VERIFY_ISSUER          = local.issuer
+    OAUTH2_SERVICE_CLIENT_ID          = var.app_name
+    OAUTH2_RESOURCE_AUDIENCE          = "${local.api_base}/tenancy"
+    OAUTH2_REQUESTED_AUDIENCES        = join(",", ["${local.api_base}/tenancy", "${local.api_base}/profile", "${local.api_base}/notification"])
     OAUTH2_PRIVATE_JWT_KEY = jsonencode({
       source     = "url"
       signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
       key_id     = "hydra.openid.id-token"
     })
-    KETO_SERVICE_ADMIN_URI           = data.google_cloud_run_v2_service.keto_write.uri
-    AUTHORIZATION_SERVICE_READ_URI   = data.google_cloud_run_v2_service.keto_read.uri
-    AUTHORIZATION_SERVICE_WRITE_URI  = data.google_cloud_run_v2_service.keto_write.uri
+    KETO_SERVICE_ADMIN_URI          = data.google_cloud_run_v2_service.keto_write.uri
+    AUTHORIZATION_SERVICE_READ_URI  = data.google_cloud_run_v2_service.keto_read.uri
+    AUTHORIZATION_SERVICE_WRITE_URI = data.google_cloud_run_v2_service.keto_write.uri
     # EVENTS_QUEUE_* from module.messaging.service_env (gcppubsub + handlers)
-    OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
-    OTEL_EXPORTER_OTLP_TRACES_TIMEOUT = "10000"
+    OTEL_EXPORTER_OTLP_TIMEOUT         = "10000"
+    OTEL_EXPORTER_OTLP_TRACES_TIMEOUT  = "10000"
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT = "10000"
-    OTEL_EXPORTER_OTLP_LOGS_TIMEOUT  = "10000"
-    OTEL_BSP_EXPORT_TIMEOUT          = "10000"
-    OTEL_BSP_MAX_QUEUE_SIZE          = "512"
-    OTEL_BLRP_EXPORT_TIMEOUT         = "10000"
-    OTEL_BLRP_MAX_QUEUE_SIZE         = "512"
-    OTEL_METRIC_EXPORT_TIMEOUT       = "10000"
-    GCP_PROJECT                      = var.project_id
-    APP_NAME                         = var.app_name
+    OTEL_EXPORTER_OTLP_LOGS_TIMEOUT    = "10000"
+    OTEL_BSP_EXPORT_TIMEOUT            = "10000"
+    OTEL_BSP_MAX_QUEUE_SIZE            = "512"
+    OTEL_BLRP_EXPORT_TIMEOUT           = "10000"
+    OTEL_BLRP_MAX_QUEUE_SIZE           = "512"
+    OTEL_METRIC_EXPORT_TIMEOUT         = "10000"
+    GCP_PROJECT                        = var.project_id
+    APP_NAME                           = var.app_name
   }
 }
 
@@ -128,8 +137,20 @@ module "messaging" {
   source                        = "../../../modules/pubsub"
   project_id                    = var.project_id
   app_name                      = var.app_name
+  region                        = var.region
   runtime_service_account_email = google_service_account.runtime.email
   labels                        = var.labels
+
+  # Regional storage only (workload region) — avoid multi-continent message hops.
+  allowed_persistence_regions = [var.region]
+  enforce_in_transit          = true
+
+  # GCP Pub/Sub push → Frame demux (WithRegisterEvents handlers).
+  default_push_endpoint           = local.events_push_endpoint
+  push_oidc_service_account_email = google_service_account.runtime.email
+  push_oidc_audience              = local.events_push_endpoint
+  pubsub_service_agent_email      = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  create_dead_letter_topic        = true
 }
 
 module "migrate" {
@@ -144,7 +165,7 @@ module "migrate" {
   timeout               = "900s"
   # Schema migrate works; service-bot tuple bootstrap still fails against Cloud Run Keto
   # (Frame client EOF — grpcurl from Cloud Run works). Re-enable after client/URI fix.
-  execute               = false
+  execute = false
   env = {
     LOG_LEVEL                         = "INFO"
     EVENTS_QUEUE_URL                  = "mem://frame.events.migrate"
@@ -221,4 +242,20 @@ module "sync_job" {
   ]
   execute    = false
   depends_on = [module.service]
+}
+
+# Pub/Sub push OIDC: allow the runtime SA to be used as push identity,
+# and allow that identity to invoke the Cloud Run service.
+resource "google_service_account_iam_member" "pubsub_push_token_creator" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "pubsub_push_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.runtime.email}"
 }

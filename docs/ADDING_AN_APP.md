@@ -53,7 +53,7 @@ The template already composes:
 | `modules/edge-contract` | Public edge env (OAuth, CORS hosts, OTel) |
 | `modules/neon-database` | One Neon project per app |
 | `modules/app-secrets` | Secret Manager (pooled + **direct** DB URLs) |
-| `modules/pubsub` | Messaging — default `{app}-events` topic + pull subscription |
+| `modules/pubsub` | Messaging — regional `{app}-events` topic + Frame push subscription |
 | `modules/cloudrun-migrate-job` | **Migrations on apply** (`migrate` for Frame; override for Hydra/Keto) |
 | `modules/cloudrun-service` | Cloud Run service (starts after migrate job succeeds) |
 
@@ -63,10 +63,16 @@ Migrations use the Neon **direct** connection string; the service uses the **poo
 
 **Pub/Sub is automatic.** The template includes `module "messaging"` with defaults:
 
-- Topic: `{app_name}-events` (+ matching subscription)
-- Runtime env: `MESSAGING_BACKEND=pubsub`, app-scoped `EVENTS_QUEUE_URL=mem://{app}-events`, `EVENTS_QUEUE_NAME={app}-events`, plus `PUBSUB_TOPIC_*` / `PUBSUB_SUBSCRIPTION_*`
-- Frame apps dispatch via `WithRegisterEvents` handlers (not the Frame default name `frame.events.internal_._queue`)
-- Frame v2 has **no** `gcppubsub://` scheme; dual publish/subscribe uses `mem://` on Cloud Run. Durable push receive is `push://{ref}` → `POST /_frame/queue/{ref}` (separate publish via `ce+https` / Cloud Tasks)
+- Topic: `{app_name}-events` with **regional** `message_storage_policy` (workload region only)
+- Push subscription: `{app_name}-events-push` → `POST https://{service}/_frame/queue/{app}-events`
+- Runtime env (Frame ≥2.0.10):
+  - `EVENTS_QUEUE_PUBLISH_URL=gcppubsub://{project}/{app}-events`
+  - `EVENTS_QUEUE_SUBSCRIBE_URL=push://{app}-events?protocol=gcppubsub`
+  - `EVENTS_QUEUE_NAME={app}-events` (demux ref for handlers)
+  - `FRAME_QUEUE_PUSH_AUTH=oidc` + audience / allowed SA emails
+- Frame apps dispatch via `WithRegisterEvents` handlers registered against that ref
+- Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate`
+- Services must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` and depend on Frame ≥ **v2.0.10** (prefer **v2.0.11+**)
 
 Do **not** wire cluster NATS/JetStream into apps in this repo. Override `topics` / `subscriptions` on the pubsub module only when you need extra topics.
 

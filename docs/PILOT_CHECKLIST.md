@@ -40,8 +40,11 @@ Not a production migration of existing cluster workloads.
 14. [ ] Topic + subscription `{app}-events` exist in the GCP project
 15. [ ] Cloud Run revision env includes:
     - `MESSAGING_BACKEND=pubsub`
-    - `EVENTS_QUEUE_URL=mem://{app}-events` (app-scoped; not Frame default name)
-    - `EVENTS_QUEUE_NAME={app}-events`
+    - `EVENTS_QUEUE_PUBLISH_URL=gcppubsub://{project}/{app}-events`
+    - `EVENTS_QUEUE_SUBSCRIBE_URL=push://{app}-events?protocol=gcppubsub`
+    - `EVENTS_QUEUE_NAME={app}-events` (app-scoped; not Frame default name)
+    - Push sub targets `https://…/_frame/queue/{app}-events` with OIDC
+    - Topic `message_storage_policy` restricted to workload region
     - `PUBSUB_TOPIC_EVENTS` / `PUBSUB_SUBSCRIPTION_EVENTS` as applicable
 16. [ ] Runtime SA has `roles/pubsub.publisher` on the topic
 17. [ ] Frame apps use `WithRegisterEvents` handlers (not a bare default internal queue name)

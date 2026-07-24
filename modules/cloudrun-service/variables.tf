@@ -65,8 +65,8 @@ variable "secret_volumes" {
     secret     = string
     mount_path = string
     # filename inside the mount (Cloud Run secret volume item path)
-    file_name  = optional(string, null)
-    version    = optional(string, "latest")
+    file_name = optional(string, null)
+    version   = optional(string, "latest")
   }))
   default     = {}
   description = "Map of volume name → Secret Manager volume mount"

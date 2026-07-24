@@ -30,7 +30,7 @@ variable "role_name" {
 }
 
 variable "history_retention_seconds" {
-  type        = number
+  type = number
   # Free Neon max is 21600 (6h); paid plans can raise this.
   default     = 21600
   description = "PITR history window in seconds (free plan max 21600)"

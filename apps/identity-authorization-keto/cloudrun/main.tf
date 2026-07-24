@@ -56,8 +56,8 @@ resource "google_storage_bucket_iam_member" "runtime_object_viewer" {
 }
 
 locals {
-  database_secret_id        = "${var.app_name}-database-url"
-  database_direct_secret_id = "${var.app_name}-database-url-direct"
+  database_secret_id         = "${var.app_name}-database-url"
+  database_direct_secret_id  = "${var.app_name}-database-url-direct"
   keto_yml_secret_id         = "${var.app_name}-keto-yml"
   keto_migrate_yml_secret_id = "${var.app_name}-keto-migrate-yml"
   secret_ids = setunion(
@@ -125,8 +125,14 @@ module "messaging" {
   source                        = "../../../modules/pubsub"
   project_id                    = var.project_id
   app_name                      = var.app_name
+  region                        = var.region
   runtime_service_account_email = google_service_account.runtime.email
   labels                        = var.labels
+
+  # Regional storage only — Keto is not a Frame consumer (no push handler).
+  allowed_persistence_regions = [var.region]
+  enforce_in_transit          = true
+  create_dead_letter_topic    = false
 }
 
 module "migrate" {
@@ -165,12 +171,12 @@ module "service_read" {
   container_port        = 4466
   # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
   # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
-  args                  = ["serve", "read", "-c", "/etc/keto/keto.yml"]
-  memory                = "512Mi"
-  env                   = local.keto_common_env
-  secret_env            = local.keto_secret_env
-  secret_volumes        = local.keto_secret_volumes
-  gcs_volumes           = local.keto_gcs_volumes
+  args           = ["serve", "read", "-c", "/etc/keto/keto.yml"]
+  memory         = "512Mi"
+  env            = local.keto_common_env
+  secret_env     = local.keto_secret_env
+  secret_volumes = local.keto_secret_volumes
+  gcs_volumes    = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,
