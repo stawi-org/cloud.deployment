@@ -180,6 +180,67 @@ jobs:
             tofu state rm "$addr" || true
           done < <(grep -E '^module\.db\.' /tmp/tofu-state-list.txt || true)
 
+      # Pub/Sub topics/subs may exist in GCP while missing from R2 state (partial
+      # applies, target-only runs). Import so apply does not 409 Conflict.
+      - name: Import orphaned Pub/Sub messaging into state
+        if: inputs.mode == 'apply'
+        env:
+          APP: ${{ inputs.app }}
+          ENV_NAME: ${{ inputs.env }}
+          PROJECT_ID: ${{ steps.creds.outputs.project_id }}
+          REGION: ${{ steps.creds.outputs.region }}
+        run: |
+          set -euo pipefail
+          TF_COMMON=(
+            -var-file="envs/${ENV_NAME}.tfvars"
+            -var="app_name=${APP}"
+            -var="platform=${ENV_NAME}"
+            -var="project_id=${PROJECT_ID}"
+            -var="region=${REGION}"
+          )
+          set +e
+          tofu state list > /tmp/tofu-state-list.txt 2>/dev/null
+          set -e
+
+          import_if_missing() {
+            local addr="$1" id="$2"
+            if grep -qxF "$addr" /tmp/tofu-state-list.txt 2>/dev/null; then
+              return 0
+            fi
+            echo "Importing missing $addr <- $id"
+            set +e
+            tofu import "${TF_COMMON[@]}" "$addr" "$id" >/tmp/tofu-import.log 2>&1
+            RC=$?
+            set -e
+            if [[ $RC -eq 0 ]]; then
+              echo "  imported $addr"
+              echo "$addr" >> /tmp/tofu-state-list.txt
+            else
+              echo "::warning::import $addr failed (resource may not exist yet)"
+              cat /tmp/tofu-import.log || true
+            fi
+          }
+
+          # Default Frame/Ory events topic + optional push sub + DLQ
+          TOPIC="${APP}-events"
+          DLQ="${APP}-events-dlq"
+          if gcloud pubsub topics describe "$TOPIC" --project="$PROJECT_ID" >/dev/null 2>&1; then
+            import_if_missing 'module.messaging.google_pubsub_topic.this["events"]' \
+              "projects/${PROJECT_ID}/topics/${TOPIC}"
+          fi
+          if gcloud pubsub topics describe "$DLQ" --project="$PROJECT_ID" >/dev/null 2>&1; then
+            import_if_missing 'module.messaging.google_pubsub_topic.dlq[0]' \
+              "projects/${PROJECT_ID}/topics/${DLQ}"
+          fi
+          # Push subscription (Frame) or pull (same name as topic for Ory)
+          for SUB in "${TOPIC}-push" "$TOPIC"; do
+            if gcloud pubsub subscriptions describe "$SUB" --project="$PROJECT_ID" >/dev/null 2>&1; then
+              import_if_missing 'module.messaging.google_pubsub_subscription.this["events"]' \
+                "projects/${PROJECT_ID}/subscriptions/${SUB}"
+              break
+            fi
+          done
+
       - name: Tofu plan
         if: inputs.mode == 'plan'
         run: |

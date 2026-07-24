@@ -60,10 +60,11 @@ locals {
   # when a push endpoint is used. Audience defaults to the push URL (must match
   # the Pub/Sub subscription oidc_token.audience).
   push_oidc_enabled = local.default_is_push && var.push_oidc_service_account_email != ""
+  # coalesce() rejects null and "" — hydra/keto pass a null push endpoint.
   push_oidc_audience = (
     var.push_oidc_audience != ""
     ? var.push_oidc_audience
-    : coalesce(var.default_push_endpoint, "")
+    : (var.default_push_endpoint != null && var.default_push_endpoint != "" ? var.default_push_endpoint : "")
   )
   push_oidc_issuers = (
     var.push_oidc_issuers != ""
