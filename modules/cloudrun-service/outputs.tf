@@ -3,7 +3,7 @@ output "uri" {
 }
 
 output "service_account_email" {
-  value = google_service_account.runtime.email
+  value = local.service_account_email
 }
 
 output "name" {

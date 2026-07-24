@@ -1,0 +1,7 @@
+name: REPLACE_ME
+owners: []
+envs:
+  - stawi-dev
+neon:
+  account: stawi-org   # must exist in config/neon-accounts.yaml
+runtime: cloudrun

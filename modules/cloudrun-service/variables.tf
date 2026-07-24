@@ -14,6 +14,12 @@ variable "image" {
   type = string
 }
 
+variable "service_account_email" {
+  type        = string
+  default     = null
+  description = "If set, use this SA instead of creating one in the module. Prefer root-managed SA so secret IAM can be granted before the service."
+}
+
 variable "env" {
   type        = map(string)
   default     = {}
