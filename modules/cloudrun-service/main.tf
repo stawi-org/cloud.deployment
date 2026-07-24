@@ -31,7 +31,12 @@ resource "google_cloud_run_v2_service" "this" {
     }
     max_instance_request_concurrency = var.concurrency
     containers {
-      image = var.image
+      image   = var.image
+      command = var.command
+      args    = var.args
+      ports {
+        container_port = var.container_port
+      }
       resources {
         limits = {
           cpu    = var.cpu

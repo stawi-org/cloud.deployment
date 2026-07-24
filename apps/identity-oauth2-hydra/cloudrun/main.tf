@@ -88,19 +88,30 @@ module "service" {
   image                 = var.image
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
+  # Cloud Run single-port: public API only for edge (admin is separate follow-up)
+  container_port = 4444
+  args           = ["serve", "public"]
   env = merge(
     module.edge.service_env,
     module.messaging.service_env,
     {
-      GCP_PROJECT = var.project_id
-      APP_NAME    = var.app_name
+      GCP_PROJECT          = var.project_id
+      APP_NAME             = var.app_name
+      SERVE_PUBLIC_PORT    = "4444"
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS = "https://accounts.stawi.org"
+      # Issuer/public URL filled after first deploy URI is known; placeholder avoids boot panic
+      URLS_SELF_ISSUER     = "https://oauth2.stawi.org"
+      URLS_CONSENT         = "https://accounts.stawi.org/consent"
+      URLS_LOGIN           = "https://accounts.stawi.org/login"
+      URLS_LOGOUT          = "https://accounts.stawi.org/logout"
+      STRATEGIES_ACCESS_TOKEN = "jwt"
+      LOG_LEVEL            = "info"
     },
   )
   secret_env = {
     DATABASE_URL = {
       secret = module.secrets.secret_ids[local.database_secret_id]
     }
-    # Hydra chart/env often expects DSN — same payload as DATABASE_URL
     DSN = {
       secret = module.secrets.secret_ids[local.database_secret_id]
     }

@@ -14,6 +14,24 @@ variable "image" {
   type = string
 }
 
+variable "container_port" {
+  type        = number
+  default     = 8080
+  description = "Container listen port (Cloud Run sets PORT to this)"
+}
+
+variable "command" {
+  type        = list(string)
+  default     = null
+  description = "Optional container entrypoint override"
+}
+
+variable "args" {
+  type        = list(string)
+  default     = null
+  description = "Optional container args"
+}
+
 variable "service_account_email" {
   type        = string
   default     = null
