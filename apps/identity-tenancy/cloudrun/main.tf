@@ -143,7 +143,9 @@ module "migrate" {
   labels                = var.labels
   args                  = ["migrate"]
   timeout               = "900s"
-  # Tenancy migrate needs OAuth for profile client; skip Keto bootstrap until write API is up.
+  # Schema migrate works; service-bot tuple bootstrap still fails against Cloud Run Keto
+  # (Frame client EOF — grpcurl from Cloud Run works). Re-enable after client/URI fix.
+  execute               = false
   env = {
     LOG_LEVEL                         = "INFO"
     EVENTS_QUEUE_URL                  = "mem://frame.events.migrate"

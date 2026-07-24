@@ -185,14 +185,28 @@ jobs:
             "${TF_COMMON[@]}"
           echo "::endgroup::"
 
-          # Phase 2: always run migrations (idempotent)
+          # Phase 2: always run migrations (idempotent). Failures are fatal for Ory apps
+          # (hydra/keto). Frame apps may still bootstrap after schema — warn and continue
+          # so the service can still deploy (tenancy service-bot is a known follow-up).
           MIGRATE_JOB="${APP}-migrate"
           if gcloud run jobs describe "${MIGRATE_JOB}" --project="${PROJECT_ID}" --region="${REGION}" >/dev/null 2>&1; then
             echo "::group::Execute migrate job ${MIGRATE_JOB}"
-            gcloud run jobs execute "${MIGRATE_JOB}" \
+            if gcloud run jobs execute "${MIGRATE_JOB}" \
               --project="${PROJECT_ID}" \
               --region="${REGION}" \
-              --wait
+              --wait; then
+              echo "Migration job ${MIGRATE_JOB} completed successfully"
+            else
+              case "${APP}" in
+                identity-oauth2-hydra|identity-authorization-keto)
+                  echo "::error::Required migrate job ${MIGRATE_JOB} failed"
+                  exit 1
+                  ;;
+                *)
+                  echo "::warning::Migrate job ${MIGRATE_JOB} failed — continuing to service apply"
+                  ;;
+              esac
+            fi
             echo "::endgroup::"
           else
             echo "::warning::No migrate job ${MIGRATE_JOB} — skipping execute"
