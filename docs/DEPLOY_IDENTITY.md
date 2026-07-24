@@ -25,6 +25,18 @@ See **[GITHUB_SECRETS.md](GITHUB_SECRETS.md)**.
 
 ---
 
+## Migrations (automatic on apply)
+
+Each app root runs a **Cloud Run Job** (`{app}-migrate`) before the service:
+
+| App | Migrate command | DB URL |
+|-----|-----------------|--------|
+| Frame services (auth, identity, profile, tenancy) | `migrate` | Neon **direct** (advisory locks) |
+| Hydra | `migrate sql -e --yes` | Neon direct as `DSN` |
+| Keto | `migrate up -y` | Neon direct as `DSN` |
+
+Runtime services use the **pooled** Neon URL. Re-apply re-runs the job when the image or migrate args change.
+
 ## Deploy order (apply)
 
 1. Confirm **R2** + **SOPS_AGE_KEY** on the repo.  

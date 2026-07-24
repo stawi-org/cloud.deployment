@@ -50,11 +50,14 @@ The template already composes:
 
 | Module | Role |
 |--------|------|
-| `platforms/stawi-dev` / `stawi-prod` | GCP project, region, labels (count-switch on `var.platform`) |
 | `modules/edge-contract` | Public edge env (OAuth, CORS hosts, OTel) |
 | `modules/neon-database` | One Neon project per app |
-| `modules/pubsub` | **Always-on** messaging — default `{app}-events` topic + pull subscription |
-| `modules/cloudrun-service` | Cloud Run service + runtime wiring |
+| `modules/app-secrets` | Secret Manager (pooled + **direct** DB URLs) |
+| `modules/pubsub` | Messaging — default `{app}-events` topic + pull subscription |
+| `modules/cloudrun-migrate-job` | **Migrations on apply** (`migrate` for Frame; override for Hydra/Keto) |
+| `modules/cloudrun-service` | Cloud Run service (starts after migrate job succeeds) |
+
+Migrations use the Neon **direct** connection string; the service uses the **pooled** URL.
 
 ### Messaging (automatic)
 

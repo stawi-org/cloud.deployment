@@ -104,6 +104,11 @@ jobs:
           workload_identity_provider: ${{ steps.creds.outputs.workload_identity_provider }}
           service_account: ${{ steps.creds.outputs.deploy_service_account }}
 
+      # Required for modules/cloudrun-migrate-job local-exec (gcloud run jobs execute --wait)
+      - name: Set up gcloud CLI
+        if: steps.auth.outcome == 'success'
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Configure R2 credentials for backend
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

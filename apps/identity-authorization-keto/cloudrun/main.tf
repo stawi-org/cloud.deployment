@@ -1,10 +1,5 @@
-# Repeatable Cloud Run + Neon + Pub/Sub app root.
-# Account selection (which GCP project / Neon org) is OUTSIDE this file:
-#   app.yaml → config/gcp-accounts.yaml + config/neon-accounts.yaml → CI vars.
-#
-# Secrets that must not live in git:
-#   - neon_api_key (deploy-time provider) from SOPS credentials (CI)
-#   - DATABASE_URL and extra secrets in GCP Secret Manager for runtime
+# Ory Keto on Cloud Run + Neon + Pub/Sub.
+# Migrations: Cloud Run Job runs `keto migrate up -y` before serve.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -34,15 +29,16 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
-  database_secret_id = "${var.app_name}-database-url"
+  database_secret_id        = "${var.app_name}-database-url"
+  database_direct_secret_id = "${var.app_name}-database-url-direct"
   secret_ids = setunion(
-    toset([local.database_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id]),
     var.extra_secret_ids,
   )
-  # Non-sensitive IDs with tofu-managed versions (never keys() of sensitive maps)
-  version_ids = toset([local.database_secret_id])
+  version_ids = toset([local.database_secret_id, local.database_direct_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
+    { (local.database_direct_secret_id) = module.db.connection_uri },
     var.extra_secret_values,
   )
 }
@@ -70,6 +66,32 @@ module "messaging" {
   labels                        = var.labels
 }
 
+module "migrate" {
+  source = "../../../modules/cloudrun-migrate-job"
+
+  name                  = "${var.app_name}-migrate"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.image
+  service_account_email = google_service_account.runtime.email
+  labels                = var.labels
+  # keto entrypoint is already "keto"
+  args = ["migrate", "up", "-y"]
+  env = {
+    LOG_LEVEL = "info"
+  }
+  secret_env = {
+    DSN = {
+      secret = module.secrets.secret_ids[local.database_direct_secret_id]
+    }
+    DATABASE_URL = {
+      secret = module.secrets.secret_ids[local.database_direct_secret_id]
+    }
+  }
+
+  depends_on = [module.secrets]
+}
+
 module "service" {
   source                = "../../../modules/cloudrun-service"
   name                  = var.app_name
@@ -78,16 +100,23 @@ module "service" {
   image                 = var.image
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
+  # Keto read API default port
+  container_port = 4466
+  args           = ["serve", "read"]
   env = merge(
     module.edge.service_env,
     module.messaging.service_env,
     {
       GCP_PROJECT = var.project_id
       APP_NAME    = var.app_name
+      LOG_LEVEL   = "info"
     },
   )
   secret_env = {
     DATABASE_URL = {
+      secret = module.secrets.secret_ids[local.database_secret_id]
+    }
+    DSN = {
       secret = module.secrets.secret_ids[local.database_secret_id]
     }
   }
@@ -95,5 +124,6 @@ module "service" {
   depends_on = [
     module.secrets,
     module.messaging,
+    module.migrate,
   ]
 }

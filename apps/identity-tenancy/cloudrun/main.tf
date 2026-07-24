@@ -34,15 +34,17 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
-  database_secret_id = "${var.app_name}-database-url"
+  # Pooled for runtime; direct for migrations (Frame advisory locks need a real session).
+  database_secret_id        = "${var.app_name}-database-url"
+  database_direct_secret_id = "${var.app_name}-database-url-direct"
   secret_ids = setunion(
-    toset([local.database_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id]),
     var.extra_secret_ids,
   )
-  # Non-sensitive IDs with tofu-managed versions (never keys() of sensitive maps)
-  version_ids = toset([local.database_secret_id])
+  version_ids = toset([local.database_secret_id, local.database_direct_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
+    { (local.database_direct_secret_id) = module.db.connection_uri },
     var.extra_secret_values,
   )
 }
@@ -70,6 +72,33 @@ module "messaging" {
   labels                        = var.labels
 }
 
+# Frame default: `migrate` subcommand (override per app for Hydra/Keto).
+module "migrate" {
+  source = "../../../modules/cloudrun-migrate-job"
+
+  name                  = "${var.app_name}-migrate"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.image
+  service_account_email = google_service_account.runtime.email
+  labels                = var.labels
+  args                  = ["migrate"]
+  env = {
+    LOG_LEVEL              = "INFO"
+    EVENTS_QUEUE_URL       = "mem://frame.events.migrate"
+    OTEL_TRACES_EXPORTER   = "none"
+    OTEL_METRICS_EXPORTER  = "none"
+    OTEL_LOGS_EXPORTER     = "none"
+  }
+  secret_env = {
+    DATABASE_URL = {
+      secret = module.secrets.secret_ids[local.database_direct_secret_id]
+    }
+  }
+
+  depends_on = [module.secrets]
+}
+
 module "service" {
   source                = "../../../modules/cloudrun-service"
   name                  = var.app_name
@@ -95,5 +124,6 @@ module "service" {
   depends_on = [
     module.secrets,
     module.messaging,
+    module.migrate,
   ]
 }

@@ -1,10 +1,6 @@
 # Repeatable Cloud Run + Neon + Pub/Sub app root.
 # Account selection (which GCP project / Neon org) is OUTSIDE this file:
 #   app.yaml → config/gcp-accounts.yaml + config/neon-accounts.yaml → CI vars.
-#
-# Secrets that must not live in git:
-#   - neon_api_key (deploy-time provider) from SOPS credentials (CI)
-#   - DATABASE_URL and extra secrets in GCP Secret Manager for runtime
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -34,8 +30,8 @@ resource "google_service_account" "runtime" {
 }
 
 locals {
-  database_secret_id = "${var.app_name}-database-url"
-  # Secret IDs created in SM (values seeded by scripts/seed-gcp-secrets.sh except DATABASE_URL)
+  database_secret_id        = "${var.app_name}-database-url"
+  database_direct_secret_id = "${var.app_name}-database-url-direct"
   app_secret_ids = toset([
     "identity-authentication-csrf-secret",
     "identity-authentication-cookie-hash-key",
@@ -47,19 +43,19 @@ locals {
     var.google_oauth_client_secret != "" ? "identity-authentication-google-oauth-client-secret" : null,
   ]))
   secret_ids = setunion(
-    toset([local.database_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id]),
     local.app_secret_ids,
     local.google_secret_ids,
     var.extra_secret_ids,
   )
-  # Literals only — never keys() of sensitive maps
   version_ids = setunion(
-    toset([local.database_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id]),
     local.app_secret_ids,
     local.google_secret_ids,
   )
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
+    { (local.database_direct_secret_id) = module.db.connection_uri },
     local.generated_secret_values,
     var.google_oauth_client_id != "" ? {
       "identity-authentication-google-oauth-client-id" = var.google_oauth_client_id
@@ -92,6 +88,32 @@ module "messaging" {
   app_name                      = var.app_name
   runtime_service_account_email = google_service_account.runtime.email
   labels                        = var.labels
+}
+
+module "migrate" {
+  source = "../../../modules/cloudrun-migrate-job"
+
+  name                  = "${var.app_name}-migrate"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.image
+  service_account_email = google_service_account.runtime.email
+  labels                = var.labels
+  args                  = ["migrate"]
+  env = {
+    LOG_LEVEL             = "INFO"
+    EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
+    OTEL_TRACES_EXPORTER  = "none"
+    OTEL_METRICS_EXPORTER = "none"
+    OTEL_LOGS_EXPORTER    = "none"
+  }
+  secret_env = {
+    DATABASE_URL = {
+      secret = module.secrets.secret_ids[local.database_direct_secret_id]
+    }
+  }
+
+  depends_on = [module.secrets]
 }
 
 module "service" {
@@ -139,5 +161,6 @@ module "service" {
   depends_on = [
     module.secrets,
     module.messaging,
+    module.migrate,
   ]
 }
