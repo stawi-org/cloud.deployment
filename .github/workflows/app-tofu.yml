@@ -1,0 +1,168 @@
+# Reusable plan/apply for one (app, env) against R2 state.
+# Messaging is always Cloud Pub/Sub (never NATS) via modules/pubsub.
+name: app-tofu
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        required: true
+        type: string
+        description: App directory name under apps/
+      env:
+        required: true
+        type: string
+        description: Environment / platform name (stawi-dev | stawi-prod)
+      mode:
+        required: true
+        type: string
+        description: plan | apply
+    secrets:
+      R2_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+      # Neon — job selects one secret via app.yaml neon.account + config/neon-accounts.yaml
+      NEON_API_KEY_STAWI_ORG:
+        required: false
+      NEON_API_KEY_STAWI_LABS:
+        required: false
+      # GCP Workload Identity Federation (enable auth step when ready for real apply)
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GCP_SERVICE_ACCOUNT:
+        required: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cloud-deploy-${{ inputs.app }}-${{ inputs.env }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}/cloudrun
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.10.0"
+
+      - name: Install yq
+        working-directory: .
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Resolve Neon account + validate env
+        id: meta
+        working-directory: .
+        run: |
+          set -euo pipefail
+          APP="${{ inputs.app }}"
+          ENV="${{ inputs.env }}"
+          test -f "apps/${APP}/app.yaml"
+          test -d "apps/${APP}/cloudrun"
+          ACC=$(yq -r '.neon.account' "apps/${APP}/app.yaml")
+          if [[ -z "$ACC" || "$ACC" == "null" ]]; then
+            echo "::error::apps/${APP}/app.yaml missing neon.account"
+            exit 1
+          fi
+          SECRET_NAME=$(yq -r ".accounts[\"${ACC}\"].api_key_secret" config/neon-accounts.yaml)
+          if [[ -z "$SECRET_NAME" || "$SECRET_NAME" == "null" ]]; then
+            echo "::error::Unknown neon.account '${ACC}' — add it to config/neon-accounts.yaml"
+            exit 1
+          fi
+          # platform var is stawi-dev|stawi-prod and must match env names listed in app.yaml
+          yq -r '.envs[]' "apps/${APP}/app.yaml" | grep -qx "${ENV}" \
+            || { echo "::error::env ${ENV} not listed in apps/${APP}/app.yaml envs"; exit 1; }
+          echo "neon_account=${ACC}" >> "$GITHUB_OUTPUT"
+          echo "neon_secret_name=${SECRET_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Export Neon API key
+        env:
+          NEON_API_KEY_STAWI_ORG: ${{ secrets.NEON_API_KEY_STAWI_ORG }}
+          NEON_API_KEY_STAWI_LABS: ${{ secrets.NEON_API_KEY_STAWI_LABS }}
+        run: |
+          set -euo pipefail
+          name="${{ steps.meta.outputs.neon_secret_name }}"
+          # Indirect expansion: secret env var named by neon-accounts.yaml
+          val="${!name:-}"
+          if [[ -z "$val" ]]; then
+            echo "::error::Missing secret ${name} for Neon account ${{ steps.meta.outputs.neon_account }}"
+            exit 1
+          fi
+          echo "::add-mask::${val}"
+          echo "TF_VAR_neon_api_key=${val}" >> "$GITHUB_ENV"
+
+      - name: Configure R2 credentials for backend
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}" >> "$GITHUB_ENV"
+          echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
+          echo "AWS_REGION=auto" >> "$GITHUB_ENV"
+
+      # GCP Workload Identity Federation — wire before real plan/apply against GCP.
+      # Secrets: GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT
+      # Flip if: to true (or remove) once WIF is configured in the repo.
+      - name: Authenticate to Google Cloud (WIF)
+        if: false
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # - name: Authenticate to Google Cloud (WIF) — alternative fully-commented form
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Tofu init (R2 state)
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          KEY="cloud-deployment/apps/${{ inputs.app }}/${{ inputs.env }}/terraform.tfstate"
+          tofu init \
+            -backend-config="../../../config/r2-backend.hcl" \
+            -backend-config="key=${KEY}" \
+            -backend-config="endpoints={s3=\"${ENDPOINT}\"}"
+
+      - name: Tofu plan
+        if: inputs.mode == 'plan'
+        run: |
+          set -euo pipefail
+          tofu plan \
+            -var-file="envs/${{ inputs.env }}.tfvars" \
+            -var="app_name=${{ inputs.app }}" \
+            -var="platform=${{ inputs.env }}" \
+            -out=tfplan
+
+      - name: Upload plan
+        if: inputs.mode == 'plan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ inputs.app }}-${{ inputs.env }}
+          path: apps/${{ inputs.app }}/cloudrun/tfplan
+
+      - name: Tofu apply
+        if: inputs.mode == 'apply'
+        run: |
+          set -euo pipefail
+          tofu apply -auto-approve \
+            -var-file="envs/${{ inputs.env }}.tfvars" \
+            -var="app_name=${{ inputs.app }}" \
+            -var="platform=${{ inputs.env }}"
