@@ -74,7 +74,7 @@ if [[ "$USES_NEON" == "true" ]]; then
     echo "ERROR: missing $NEON_SOPS — run bootstrap-neon-account.sh for ${NEON_ACCOUNT}" >&2
     exit 1
   fi
-  NEON_API_KEY=$(sops -d "$NEON_SOPS" | yq -r '.auth.api_key // .api_key // empty')
+  NEON_API_KEY=$(sops -d "$NEON_SOPS" | yq -r '.auth.api_key // .api_key // ""')
   [[ -n "$NEON_API_KEY" && "$NEON_API_KEY" != "null" ]] || {
     echo "ERROR: decrypted Neon auth missing api_key" >&2
     exit 1

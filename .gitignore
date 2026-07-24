@@ -19,3 +19,8 @@ secrets*.local.env
 *.local.env
 !scripts/generate-identity-secrets.env.example
 .worktrees/
+
+# never commit age private keys
+**/sops_keys.txt
+**/keys.txt
+!**/age-recipients.txt
