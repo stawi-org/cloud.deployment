@@ -18,3 +18,4 @@ SHARED_TASK_NOTES.md
 secrets*.local.env
 *.local.env
 !scripts/generate-identity-secrets.env.example
+.worktrees/
