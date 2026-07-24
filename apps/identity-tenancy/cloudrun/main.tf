@@ -131,13 +131,14 @@ module "migrate" {
   labels                = var.labels
   args                  = ["migrate"]
   timeout               = "900s"
-  # Tenancy migrate initializes profile client → needs OAuth token endpoint envs.
+  # Tenancy migrate needs OAuth for profile client; skip Keto bootstrap until write API is up.
   env = {
     LOG_LEVEL                         = "INFO"
     EVENTS_QUEUE_URL                  = "mem://frame.events.migrate"
     OTEL_TRACES_EXPORTER              = "none"
     OTEL_METRICS_EXPORTER             = "none"
     OTEL_LOGS_EXPORTER                = "none"
+    AUTHORIZATION_MODE                = "none"
     PERMISSIONS_REGISTRATION_URL      = "${local.api_base}/tenancy/_internal/register/permissions"
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
