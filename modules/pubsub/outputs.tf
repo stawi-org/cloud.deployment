@@ -28,32 +28,41 @@ output "events_subscription_name" {
   value       = local.events_sub_name
 }
 
-# Frame gocloud URL — same short name for topic and subscription so OpenTopic
-# and OpenSubscription both resolve. Consume path: Frame WithRegisterEvents
-# registers handlers; setupEventsQueue wires SubscribeWorker (not mem://).
-output "events_queue_url" {
-  description = "gcppubsub:// URL for Frame EVENTS_QUEUE_URL"
-  value = local.events_topic_name != "" ? (
-    "gcppubsub://${var.project_id}/${local.events_topic_name}"
-  ) : ""
+# Frame dual-mode self-events (publish + subscribe + WithRegisterEvents handlers).
+# App-scoped mem URL — not the Frame default frame.events.internal_._queue name.
+output "frame_events_queue_url" {
+  description = "Frame EVENTS_QUEUE_URL for dual publish/subscribe (mem://, handlers)"
+  value       = local.events_topic_name != "" ? "mem://${local.events_topic_name}" : ""
 }
 
-output "events_queue_name" {
-  description = "Frame EVENTS_QUEUE_NAME (publisher/subscriber reference)"
+output "frame_events_queue_name" {
+  description = "Frame EVENTS_QUEUE_NAME (reference for handlers / push demux)"
   value       = local.events_topic_name
 }
 
+# Frame push-mode subscriber URL (DeliveryModePush → /_frame/queue/{ref}).
+output "frame_push_queue_url" {
+  description = "Frame EVENTS_QUEUE_URL for push-only receive (push://{ref})"
+  value       = local.events_topic_name != "" ? "push://${local.events_topic_name}" : ""
+}
+
+output "frame_push_handler_path" {
+  description = "HTTP path Pub/Sub should push to for this app's events ref"
+  value       = local.events_topic_name != "" ? "/_frame/queue/${local.events_topic_name}" : ""
+}
+
 output "service_env" {
-  description = "Env vars to inject into Cloud Run (Frame + generic Pub/Sub)"
+  description = "Env vars for Cloud Run Frame apps (handler path, not gcppubsub scheme)"
   value = merge(
     { for k, t in google_pubsub_topic.this : "PUBSUB_TOPIC_${upper(replace(k, "-", "_"))}" => t.name },
     { for k, s in google_pubsub_subscription.this : "PUBSUB_SUBSCRIPTION_${upper(replace(k, "-", "_"))}" => s.name },
     {
       MESSAGING_BACKEND = "pubsub"
-      GCP_PROJECT       = var.project_id
     },
+    # Dual-mode mem:// so Frame setupEventsQueue can both publish and dispatch
+    # to WithRegisterEvents handlers. Name is app-scoped (not frame default).
     local.events_topic_name != "" ? {
-      EVENTS_QUEUE_URL  = "gcppubsub://${var.project_id}/${local.events_topic_name}"
+      EVENTS_QUEUE_URL  = "mem://${local.events_topic_name}"
       EVENTS_QUEUE_NAME = local.events_topic_name
     } : {},
   )

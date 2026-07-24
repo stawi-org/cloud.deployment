@@ -1,16 +1,18 @@
-# Google Cloud Pub/Sub is the only messaging plane for apps in cloud.deployment.
+# Google Cloud Pub/Sub is the durable messaging plane for cloud.deployment.
 # Cluster NATS/JetStream must not be wired into Cloud Run apps.
 #
-# Frame apps use gocloud gcppubsub with a single EVENTS_QUEUE_URL for both
-# OpenTopic (publish) and OpenSubscription (consume → event handlers). The
-# shortened form gcppubsub://{project}/{name} requires the topic name and the
-# subscription name to be identical.
+# Frame v2 queue schemes (frame/v2/docs/queue.md):
+#   subscribe: mem:// | nats:// | push://{ref} | http(s)://…
+#   publish:   mem:// | nats:// | ce+http(s)://… | cloudtasks://…
+# There is no gcppubsub:// scheme in Frame. Self-events use mem:// (dual
+# publish+subscribe) with WithRegisterEvents handlers. Durable ingress uses
+# Pub/Sub push → POST /_frame/queue/{ref} when EVENTS_QUEUE_URL is push://
+# (requires separate publish URL — see outputs and app docs).
 
 locals {
-  default_topic_key = "events"
+  default_topic_key   = "events"
   default_events_name = "${var.app_name}-events"
 
-  # Effective topics: explicit map, or default single events topic
   topics = length(var.topics) > 0 ? var.topics : (
     var.create_default_events_topic ? {
       (local.default_topic_key) = {
@@ -20,10 +22,8 @@ locals {
     } : {}
   )
 
-  # Default subscription name matches the topic so Frame can use one
-  # gcppubsub://project/name URL for both publisher and subscriber.
-  # Apps consume via Frame event handlers (WithRegisterEvents → SubscribeWorker),
-  # not a separate "default internal" mem:// queue.
+  # Prefer push to Frame handler when default_push_endpoint is set; else pull
+  # for tooling. Subscription name matches topic for consistent naming.
   subscriptions = length(var.subscriptions) > 0 ? var.subscriptions : (
     contains(keys(local.topics), local.default_topic_key) ? {
       (local.default_topic_key) = {
@@ -31,8 +31,8 @@ locals {
         name                       = local.default_events_name
         ack_deadline_seconds       = 20
         message_retention_duration = "604800s"
-        push_endpoint              = null
-        enable_subscriber_iam      = true
+        push_endpoint              = var.default_push_endpoint
+        enable_subscriber_iam      = var.default_push_endpoint == null || var.default_push_endpoint == ""
       }
     } : {}
   )
@@ -66,6 +66,14 @@ resource "google_pubsub_subscription" "this" {
     for_each = each.value.push_endpoint != null && each.value.push_endpoint != "" ? [1] : []
     content {
       push_endpoint = each.value.push_endpoint
+
+      dynamic "oidc_token" {
+        for_each = var.push_oidc_service_account_email != "" ? [1] : []
+        content {
+          service_account_email = var.push_oidc_service_account_email
+          audience              = var.push_oidc_audience != "" ? var.push_oidc_audience : each.value.push_endpoint
+        }
+      }
     }
   }
 

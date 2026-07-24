@@ -37,14 +37,14 @@ Not a production migration of existing cluster workloads.
 ### Pub/Sub verification
 
 13. [ ] Topic exists in the **same GCP project** as Cloud Run, e.g. `{app}-events`
-14. [ ] Pull subscription exists, e.g. `{app}-events` (same name as topic for Frame)
+14. [ ] Topic + subscription `{app}-events` exist in the GCP project
 15. [ ] Cloud Run revision env includes:
     - `MESSAGING_BACKEND=pubsub`
-    - `EVENTS_QUEUE_URL=gcppubsub://{project}/{app}-events`
+    - `EVENTS_QUEUE_URL=mem://{app}-events` (app-scoped; not Frame default name)
     - `EVENTS_QUEUE_NAME={app}-events`
     - `PUBSUB_TOPIC_EVENTS` / `PUBSUB_SUBSCRIPTION_EVENTS` as applicable
-16. [ ] Runtime SA has `roles/pubsub.publisher` on the topic (and subscriber on the sub)
-17. [ ] Frame blank-imports `gocloud.dev/pubsub/gcppubsub`; handlers receive via `WithRegisterEvents`
+16. [ ] Runtime SA has `roles/pubsub.publisher` on the topic
+17. [ ] Frame apps use `WithRegisterEvents` handlers (not a bare default internal queue name)
 18. [ ] App can publish a test message (or admin tooling shows topic traffic)
 
 ## Boundaries

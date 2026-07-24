@@ -24,11 +24,10 @@ Reusable plumbing (not domain aggregation):
 
 ## Intentional Cloud Run deltas
 
-1. **Events**: Frame apps use `EVENTS_QUEUE_URL=gcppubsub://{project}/{app}-events` (topic + subscription share the name). Consume path is Frame `WithRegisterEvents` handlers — not `mem://frame.events.internal_._queue`. Migrate jobs keep `mem://frame.events.migrate`.
+1. **Events (Frame)**: Frame v2 does **not** support `gcppubsub://`. Dual publish+subscribe (setupEventsQueue) only works with `mem://` or `nats://`. Cloud Run apps use app-scoped `mem://{app}-events` + `WithRegisterEvents` handlers — **not** the Frame default `frame.events.internal_._queue`. Pub/Sub topics `{app}-events` are always provisioned for durable/cross-service producers. Push to `POST /_frame/queue/{ref}` is Frame’s Cloud Run receive path (`push://{ref}`); that requires separate publish URLs (`ce+https` / `cloudtasks`) and is opt-in. Migrate jobs keep `mem://frame.events.migrate`.
 2. **No Valkey**: set `CACHE_URI` when Memorystore exists.
 3. **Hydra admin**: public serve only for now.
 4. **Cross-service URIs**: each app hardcodes public hosts it depends on (`accounts` / `oauth2` / `api`).
-5. **gcppubsub driver**: service images must blank-import `gocloud.dev/pubsub/gcppubsub` (Frame only registers mem + NATS by default).
 
 ## Deploy order
 

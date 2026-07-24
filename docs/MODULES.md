@@ -124,7 +124,7 @@ Cloud Run v2 service with optional external runtime SA and Secret Manager env bi
 Default when `topics` is empty and `create_default_events_topic = true`:
 
 - Topic: `{app_name}-events`
-- Pull subscription: `{app_name}-events` (same name as topic — required for Frame’s single `gcppubsub://project/name` URL for both OpenTopic and OpenSubscription)
+- Subscription: `{app_name}-events` (pull by default; set `default_push_endpoint` for Frame `POST /_frame/queue/{ref}`)
 
 ### Inputs
 
