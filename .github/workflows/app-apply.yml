@@ -93,6 +93,6 @@ jobs:
       app: ${{ matrix.app }}
       env: ${{ matrix.env }}
       mode: apply
-      gcp_github_environment: ${{ matrix.gcp_github_environment }}
-      neon_github_environment: ${{ matrix.neon_github_environment }}
+      job_environment: ${{ matrix.job_environment }}
+      uses_neon: ${{ matrix.uses_neon }}
     secrets: inherit

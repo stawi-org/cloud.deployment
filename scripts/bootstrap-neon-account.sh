@@ -16,18 +16,18 @@
 #
 # Usage:
 #   export GITHUB_TOKEN=ghp_xxx
-#   export NEON_API_KEY=napi_xxx          # org API key from Neon console
+#   export API_KEY=napi_xxx          # org API key from Neon console
 #   ./bootstrap-neon-account.sh --account identity
 #
-#   ./bootstrap-neon-account.sh --account payments --api-key "$NEON_API_KEY" \
+#   ./bootstrap-neon-account.sh --account payments --api-key "$API_KEY" \
 #     --org-hint "Stawi Payments" --sync-github-env
 #
 # Flags:
 #   --account <KEY>       neon-accounts.yaml key (required): identity|payments|…
-#   --api-key <KEY>       Neon org API key (or env NEON_API_KEY / NEON_ORG_API_KEY)
+#   --api-key <KEY>       Neon org API key (or env API_KEY / NEON_ORG_API_KEY)
 #   --org-hint <NAME>     Optional human label for the Neon org
 #   --org-id <ID>         Optional Neon org id (metadata only)
-#   --sync-github-env     Create/update GH Environment secret NEON_API_KEY
+#   --sync-github-env     Create/update GH Environment secret API_KEY
 #   --repo-path <PATH>    cloud.deployment checkout
 #   --no-clone / --no-push / --no-pr / --force-repo-write / --metadata-only
 #
@@ -43,7 +43,8 @@ export GIT_CONFIG_VALUE_0=
 export PATH="${HOME}/.local/bin:${PATH}"
 
 ACCOUNT=""
-API_KEY="${NEON_API_KEY:-${NEON_ORG_API_KEY:-}}"
+# Accept NEON_API_KEY as alias for the org API key value (not a GitHub secret name)
+API_KEY="${API_KEY:-${NEON_API_KEY:-${NEON_ORG_API_KEY:-}}}"
 ORG_HINT=""
 ORG_ID=""
 SYNC_GH_ENV="false"
@@ -98,7 +99,7 @@ if [[ "$ACCOUNT" == *"/"* || "$ACCOUNT" == *".."* ]]; then
   die "--account must be a single path segment"
 fi
 if [[ "$METADATA_ONLY" != "true" && -z "$API_KEY" ]]; then
-  die "pass --api-key or set NEON_API_KEY / NEON_ORG_API_KEY (or use --metadata-only)"
+  die "pass --api-key or set API_KEY / NEON_ORG_API_KEY (or use --metadata-only)"
 fi
 
 BRANCH="${BRANCH:-onboard-neon-${ACCOUNT}}"
@@ -237,7 +238,7 @@ github_create_pr() {
   return 1
 }
 
-# GitHub Environment secret NEON_API_KEY (CI fallback path).
+# GitHub Environment secret API_KEY (CI fallback path).
 # Prefer `gh secret set --env` when available — fewer permission footguns than raw API.
 sync_github_environment_secret() {
   local env_name="$1" secret_value="$2"
@@ -264,7 +265,7 @@ sync_github_environment_secret() {
 
 Your PAT cannot manage environments. Either:
   • Add fine-grained permission Administration: Read and write (plus Environments), or
-  • Create '${env_name}' in the UI and set secret NEON_API_KEY manually, then re-run
+  • Create '${env_name}' in the UI and set secret API_KEY manually, then re-run
     without --sync-github-env.
 
 UI: https://github.com/${GITHUB_REPO}/settings/environments"
@@ -273,20 +274,20 @@ UI: https://github.com/${GITHUB_REPO}/settings/environments"
 
     if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
         printf '%s' "$secret_value" \
-        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set NEON_API_KEY \
+        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set API_KEY \
             --repo "$GITHUB_REPO" \
             --env "$env_name" 2>/tmp/neon-gh-secret.err; then
-      say "  set ${env_name} / NEON_API_KEY via gh"
+      say "  set ${env_name} / API_KEY via gh"
       return 0
     fi
     # older gh uses --body -
     if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
         printf '%s' "$secret_value" \
-        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set NEON_API_KEY \
+        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set API_KEY \
             --repo "$GITHUB_REPO" \
             --env "$env_name" \
             --body - 2>>/tmp/neon-gh-secret.err; then
-      say "  set ${env_name} / NEON_API_KEY via gh"
+      say "  set ${env_name} / API_KEY via gh"
       return 0
     fi
     warn "gh secret set failed:"
@@ -325,7 +326,7 @@ Common causes:
   3) You are not an admin of ${GITHUB_REPO}
 
 Workaround (no API): UI → Settings → Environments → New environment '${env_name}'
-  → Environment secrets → NEON_API_KEY = your Neon org API key
+  → Environment secrets → API_KEY = your Neon org API key
 Then re-run without --sync-github-env (SOPS/PR path only), or with --sync-github-env after env exists.
 
 Response: $(head -c 300 "$create_body" 2>/dev/null || true)"
@@ -392,13 +393,13 @@ PY
     -H "Accept: application/vnd.github+json" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
     -H "Content-Type: application/json" \
-    "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}/secrets/NEON_API_KEY" \
+    "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}/secrets/API_KEY" \
     -d "$(jq -n --arg k "$key_id" --arg v "$encrypted" '{encrypted_value:$v, key_id:$k}')")
   if [[ "$put_code" != "201" && "$put_code" != "204" ]]; then
     die "put environment secret HTTP ${put_code}: $(head -c 400 "$put_body" 2>/dev/null || true)"
   fi
   rm -f "$put_body"
-  say "  set ${env_name} / NEON_API_KEY via REST"
+  say "  set ${env_name} / API_KEY via REST"
 }
 
 ensure_git_clone() {
@@ -456,9 +457,14 @@ if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REPO_PATH/config/neon-accounts.yaml" >/
   die "account '${ACCOUNT}' not in config/neon-accounts.yaml — add the domain key to the registry first"
 fi
 
-GH_ENV=$(yq -r ".accounts[\"${ACCOUNT}\"].github_environment // \"neon-${ACCOUNT}\"" \
+GH_ENV=$(yq -r ".accounts[\"${ACCOUNT}\"].github_environment // \"\"" \
   "$REPO_PATH/config/neon-accounts.yaml")
-[[ -n "$GH_ENV" && "$GH_ENV" != "null" ]] || GH_ENV="neon-${ACCOUNT}"
+# Canonical name: neon--{account}
+[[ -n "$GH_ENV" && "$GH_ENV" != "null" ]] || GH_ENV="neon--${ACCOUNT}"
+if [[ "$GH_ENV" != "neon--${ACCOUNT}" ]]; then
+  warn "registry github_environment=${GH_ENV}; canonical is neon--${ACCOUNT} — using canonical"
+  GH_ENV="neon--${ACCOUNT}"
+fi
 
 # Optional live check against Neon API
 if [[ -n "$API_KEY" && "$METADATA_ONLY" != "true" ]]; then
@@ -563,7 +569,7 @@ cat >"$WORKTREE/credentials/README.md" <<'EOF'
 - `credentials/neon/<account>/auth.yaml` — from `scripts/bootstrap-neon-account.sh`
 - Contains org API key (SOPS). Used by operators / optional CI decrypt.
 - Non-secret registry: `config/neon-accounts.yaml`
-- CI preferred: GitHub Environment `NEON_API_KEY` (`--sync-github-env`) or Secret Manager (configured separately per deploy GCP project)
+- CI preferred: GitHub Environment `API_KEY` (`--sync-github-env`) or Secret Manager (configured separately per deploy GCP project)
 - Apps link Neon↔GCP only via `app.yaml` (`neon.account` + `gcp.account`)
 
 Decrypt (private age key required):
@@ -614,7 +620,7 @@ Independent of GCP. Stores org API key as SOPS-encrypted credential and updates 
 
 - Apps with \`neon.account: ${ACCOUNT}\` use this Neon org for database projects.
 - Pair with any \`gcp.account\` independently in \`app.yaml\`.
-- Prefer CI: Environment \`${GH_ENV}\` secret \`NEON_API_KEY\` (run bootstrap with \`--sync-github-env\`).
+- Prefer CI: Environment \`${GH_ENV}\` secret \`API_KEY\` (run bootstrap with \`--sync-github-env\`).
 EOF
 }
 
@@ -648,7 +654,7 @@ if [[ "$PUSH_OK" != "true" ]]; then
 Neon credential files prepared. Push needs a token:
 
   export GITHUB_TOKEN=ghp_xxx
-  ./bootstrap-neon-account.sh --account ${ACCOUNT} --api-key "\$NEON_API_KEY" --force-repo-write
+  ./bootstrap-neon-account.sh --account ${ACCOUNT} --api-key "\$API_KEY" --force-repo-write
 
 Branch: ${BRANCH}
 EOF

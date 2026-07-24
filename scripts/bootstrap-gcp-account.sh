@@ -572,54 +572,24 @@ git -C "$REPO_PATH" worktree add -b "$BRANCH" "$WORKTREE" "origin/${BASE_BRANCH}
 
 say "worktree: $WORKTREE"
 
-# --- Update gcp-accounts.yaml (public registry — plan intact) ---
-python3 - "$WORKTREE/config/gcp-accounts.yaml" "$ACCOUNT" "$ENV_NAME" "$PROJECT" "$REGION" \
-  "$WIF_PROVIDER_RESOURCE" "$SA_EMAIL" <<'PY'
-import sys
-from pathlib import Path
+# --- Update gcp-accounts.yaml (public registry; yq only) ---
+REG_FILE="$WORKTREE/config/gcp-accounts.yaml"
+PROTECTION_ENV="deploy--${ACCOUNT}--${ENV_NAME}"
+LABEL_ENV="dev"
+[[ "$ENV_NAME" == "stawi-prod" ]] && LABEL_ENV="prod"
 
-path, account, env, project, region, wif, sa = sys.argv[1:8]
-try:
-    import yaml
-except ImportError:
-    # minimal fallback without PyYAML: use yq externally — parent should have yq
-    sys.exit(0)
-
-text = Path(path).read_text()
-data = yaml.safe_load(text)
-acc = data.setdefault("accounts", {}).setdefault(account, {})
-envs = acc.setdefault("envs", {})
-slice_ = envs.setdefault(env, {})
-slice_["project_id"] = project
-slice_["region"] = region
-slice_["workload_identity_provider"] = wif
-slice_["deploy_service_account"] = sa
-slice_.setdefault("github_environment", f"gcp-{account}-{env.replace('stawi-', '')}" if False else f"gcp-{account}-{env}")
-# Prefer stable naming: gcp-identity-dev style already in file
-if "github_environment" not in slice_ or not slice_["github_environment"]:
-    slice_["github_environment"] = f"gcp-{account}-{env}"
-labels = slice_.setdefault("labels", {})
-labels.setdefault("managed-by", "cloud-deployment")
-labels.setdefault("domain", account)
-if env == "stawi-dev":
-    labels["environment"] = "dev"
-elif env == "stawi-prod":
-    labels["environment"] = "prod"
-
-# Keep github_environment from original if present and looks intentional
-# (we don't overwrite if already set to non-empty custom)
-Path(path).write_text(yaml.safe_dump(data, sort_keys=False, default_flow_style=False))
-print(f"updated {path} accounts.{account}.envs.{env}")
-PY
-
-# Prefer yq for reliable edit (works without PyYAML)
 yq -i "
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].project_id = \"${PROJECT}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].region = \"${REGION}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].workload_identity_provider = \"${WIF_PROVIDER_RESOURCE}\" |
-  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].deploy_service_account = \"${SA_EMAIL}\"
-" "$WORKTREE/config/gcp-accounts.yaml"
-say "updated config/gcp-accounts.yaml → ${ACCOUNT}/${ENV_NAME}"
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].deploy_service_account = \"${SA_EMAIL}\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].protection_environment = \"${PROTECTION_ENV}\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].sops_auth_path = \"${AUTH_REL}\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.\"managed-by\" = \"cloud-deployment\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.domain = \"${ACCOUNT}\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.environment = \"${LABEL_ENV}\"
+" "$REG_FILE"
+say "updated config/gcp-accounts.yaml → ${ACCOUNT}/${ENV_NAME} (project=${PROJECT})"
 
 # --- SOPS-encrypted auth (like deployment.infra) ---
 mkdir -p "$WORKTREE/credentials/gcp/${ACCOUNT}/${ENV_NAME}"
@@ -634,8 +604,10 @@ auth:
   region: ${REGION}
   workload_identity_provider: ${WIF_PROVIDER_RESOURCE}
   deploy_service_account: ${SA_EMAIL}
+  protection_environment: ${PROTECTION_ENV}
   github_repository: ${GITHUB_REPO}
   bootstrapped_at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  note: "GCP deploy metadata only — no Neon keys; runtime secrets in Secret Manager"
 EOF
 
 # filename-override: match .sops.yaml creation_rules (not the /tmp plaintext path)
