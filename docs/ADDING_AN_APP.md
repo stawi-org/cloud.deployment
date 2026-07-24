@@ -17,18 +17,18 @@ Use a short DNS-/Cloud Run–safe name (lowercase, hyphens). Do not deploy `_tem
 name: <name>
 owners: []
 envs:
-  - stawi-dev
+  - stawi-prod          # prod-first; add stawi-dev when a real dev project exists
 gcp:
-  account: labs       # config/gcp-accounts.yaml → GCP project / WIF
+  account: identity     # config/gcp-accounts.yaml → GCP project / WIF
 neon:
-  account: labs       # config/neon-accounts.yaml → Neon org + SM API key
+  account: identity     # config/neon-accounts.yaml → Neon org
 runtime: cloudrun
 ```
 
 | Field | Purpose |
 |-------|---------|
 | `name` | Inventory name (CI uses **directory** name as `app_name`) |
-| `envs` | Deploy envs; must exist under both GCP and Neon account registries |
+| `envs` | Deploy envs; must exist under both GCP and Neon account registries. **Default: `stawi-prod` only** until dev is funded/bootstrapped |
 | `gcp.account` | Which **GCP account** supplies project, region, Secret Manager, Pub/Sub, Cloud Run |
 | `neon.account` | Which **Neon org** hosts this app’s database project |
 

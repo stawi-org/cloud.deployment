@@ -2,7 +2,7 @@ name: identity-oauth2-hydra
 owners:
   - identity-team
 envs:
-  - stawi-dev
+  # Prod-first: stand up stawi-dev later when resources allow
   - stawi-prod
 gcp:
   account: identity

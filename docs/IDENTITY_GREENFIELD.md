@@ -53,12 +53,12 @@ echo -n "$NEON_ORG_API_KEY" | gcloud secrets create neon-org-api-key \
 
 ## Deploy order (build), single go-live
 
-1. Fill real `project_id` / WIF in `config/gcp-accounts.yaml` for `identity`.  
-2. Create GCP projects, enable APIs (Run, SM, Pub/Sub, IAM), WIF, deploy SA.  
-3. Store `neon-org-api-key` in SM.  
-4. Apply in order: Hydra → Keto → authentication → tenancy/profile/identity (or all in parallel if images tolerate empty deps, then re-apply).  
-5. Smoke OIDC (login, token, userinfo, Keto check).  
-6. Point DNS (`accounts`, `oauth2`, API paths) once.  
+1. Bootstrap GCP **prod**: `--account identity --env stawi-prod --project stawi-identity` (done when registry shows real WIF).  
+2. Bootstrap Neon **identity** org (independent script).  
+3. Apply apps against **`stawi-prod` only**.  
+4. Order: Hydra → Keto → authentication → tenancy/profile/identity (or parallel then re-apply).  
+5. Smoke OIDC; point DNS once.  
+6. **Later:** bootstrap `stawi-dev` when capacity allows; add `stawi-dev` back to each app’s `envs`.
 
 ## Ory (Hydra / Keto) notes
 
