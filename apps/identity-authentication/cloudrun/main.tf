@@ -36,21 +36,31 @@ locals {
   database_secret_id = "${var.app_name}-database-url"
   # Secret IDs created in SM (values seeded by scripts/seed-gcp-secrets.sh except DATABASE_URL)
   app_secret_ids = toset([
-    "identity-authentication-google-oauth-client-id",
-    "identity-authentication-google-oauth-client-secret",
     "identity-authentication-csrf-secret",
     "identity-authentication-cookie-hash-key",
     "identity-authentication-cookie-block-key",
     "hydra-webhook-psk",
   ])
+  google_secret_ids = toset(compact([
+    var.google_oauth_client_id != "" ? "identity-authentication-google-oauth-client-id" : null,
+    var.google_oauth_client_secret != "" ? "identity-authentication-google-oauth-client-secret" : null,
+  ]))
   secret_ids = setunion(
     toset([local.database_secret_id]),
     local.app_secret_ids,
+    local.google_secret_ids,
     var.extra_secret_ids,
     toset(keys(var.extra_secret_values)),
   )
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
+    local.generated_secret_values,
+    var.google_oauth_client_id != "" ? {
+      "identity-authentication-google-oauth-client-id" = var.google_oauth_client_id
+    } : {},
+    var.google_oauth_client_secret != "" ? {
+      "identity-authentication-google-oauth-client-secret" = var.google_oauth_client_secret
+    } : {},
     var.extra_secret_values,
   )
 }
@@ -93,29 +103,31 @@ module "service" {
       APP_NAME    = var.app_name
     },
   )
-  secret_env = {
-    DATABASE_URL = {
-      secret = module.secrets.secret_ids[local.database_secret_id]
-    }
-    GOOGLE_OAUTH_CLIENT_ID = {
-      secret = "identity-authentication-google-oauth-client-id"
-    }
-    GOOGLE_OAUTH_CLIENT_SECRET = {
-      secret = "identity-authentication-google-oauth-client-secret"
-    }
-    CSRF_SECRET = {
-      secret = "identity-authentication-csrf-secret"
-    }
-    SECURE_COOKIE_HASH_KEY = {
-      secret = "identity-authentication-cookie-hash-key"
-    }
-    SECURE_COOKIE_BLOCK_KEY = {
-      secret = "identity-authentication-cookie-block-key"
-    }
-    HYDRA_WEBHOOK_PSK = {
-      secret = "hydra-webhook-psk"
-    }
-  }
+  secret_env = merge(
+    {
+      DATABASE_URL = {
+        secret = module.secrets.secret_ids[local.database_secret_id]
+      }
+      CSRF_SECRET = {
+        secret = "identity-authentication-csrf-secret"
+      }
+      SECURE_COOKIE_HASH_KEY = {
+        secret = "identity-authentication-cookie-hash-key"
+      }
+      SECURE_COOKIE_BLOCK_KEY = {
+        secret = "identity-authentication-cookie-block-key"
+      }
+      HYDRA_WEBHOOK_PSK = {
+        secret = "hydra-webhook-psk"
+      }
+    },
+    var.google_oauth_client_id != "" ? {
+      GOOGLE_OAUTH_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
+    } : {},
+    var.google_oauth_client_secret != "" ? {
+      GOOGLE_OAUTH_CLIENT_SECRET = { secret = "identity-authentication-google-oauth-client-secret" }
+    } : {},
+  )
 
   depends_on = [
     module.secrets,

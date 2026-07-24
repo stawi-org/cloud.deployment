@@ -53,3 +53,17 @@ variable "extra_secret_ids" {
   default     = []
   description = "SM secret IDs to create without versions (fill versions outside git)"
 }
+
+variable "google_oauth_client_id" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Optional. If set, written to Secret Manager and mounted on Cloud Run."
+}
+
+variable "google_oauth_client_secret" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Optional. If set, written to Secret Manager and mounted on Cloud Run."
+}

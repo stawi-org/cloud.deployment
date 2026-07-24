@@ -17,89 +17,12 @@ Greenfield identity on **Cloud Run + Neon + Pub/Sub + Secret Manager**, env **`s
 
 ---
 
-## Critical CI detail (Neon key)
+## Secrets: GitHub vs Secret Manager
 
-Job `environment` is usually **`gcp-identity-prod`**.  
-Secrets on **`neon-identity`** are **not** injected into that job.
+See **[GITHUB_SECRETS.md](GITHUB_SECRETS.md)** for the authoritative list.
 
-Therefore **`neon-org-api-key` must exist in Secret Manager** on `stawi-identity` for CI OpenTofu to create Neon projects.
-
-```bash
-# Preferred after you can decrypt SOPS (private age key) OR from env:
-export NEON_ORG_API_KEY='napi_...'   # or from sops -d
-
-./scripts/seed-gcp-secrets.sh \
-  --project stawi-identity \
-  --env stawi-prod \
-  --app identity-authentication \
-  --set "neon-org-api-key=${NEON_ORG_API_KEY}"
-
-# Or from SOPS (needs private age key):
-./scripts/seed-gcp-secrets.sh \
-  --app identity-authentication \
-  --env stawi-prod \
-  --from-sops-neon identity
-```
-
----
-
-## Secrets → Secret Manager
-
-Catalog: [`config/secret-catalog/identity.yaml`](../config/secret-catalog/identity.yaml)  
-Seeder: [`scripts/seed-gcp-secrets.sh`](../scripts/seed-gcp-secrets.sh)  
-Example env file: [`scripts/generate-identity-secrets.env.example`](../scripts/generate-identity-secrets.env.example)
-
-### 1. Create a local env file (never commit)
-
-```bash
-cp scripts/generate-identity-secrets.env.example secrets.identity.local.env
-chmod 600 secrets.identity.local.env
-# edit: paste Google OAuth, generate randoms, Neon key, etc.
-```
-
-### 2. Generate random crypto material where empty
-
-```bash
-gcloud config set project stawi-identity   # or ADC for that project
-
-./scripts/seed-gcp-secrets.sh \
-  --app identity-authentication \
-  --env stawi-prod \
-  --from-env-file ./secrets.identity.local.env \
-  --generate-missing
-
-./scripts/seed-gcp-secrets.sh \
-  --app identity-oauth2-hydra \
-  --env stawi-prod \
-  --from-env-file ./secrets.identity.local.env \
-  --generate-missing
-```
-
-`--generate-missing` fills empty catalog keys with `openssl rand` (except database URLs).
-
-### 3. Verify
-
-```bash
-gcloud secrets list --project=stawi-identity
-gcloud secrets versions access latest --secret=neon-org-api-key --project=stawi-identity | wc -c
-```
-
-### Secret inventory
-
-| Secret ID | Used by | Notes |
-|-----------|---------|--------|
-| `neon-org-api-key` | CI only | Neon org API key |
-| `hydra-webhook-psk` | auth + hydra | Shared webhook bearer |
-| `identity-authentication-google-oauth-client-id` | auth | Google OAuth |
-| `identity-authentication-google-oauth-client-secret` | auth | Google OAuth |
-| `identity-authentication-csrf-secret` | auth | Session/CSRF |
-| `identity-authentication-cookie-hash-key` | auth | Cookie |
-| `identity-authentication-cookie-block-key` | auth | Cookie |
-| `identity-oauth2-hydra-secrets-system` | hydra | Ory system secret |
-| `identity-oauth2-hydra-secrets-cookie` | hydra | Ory cookie secret |
-| `{app}-database-url` | each app | **Created by OpenTofu** from Neon |
-
-Runtime SA gets `secretAccessor` via `modules/app-secrets` on apply.
+**You only set GitHub repository secrets** (R2 + `NEON_API_KEY`).  
+**Secret Manager is filled automatically on OpenTofu apply** (database URLs + generated crypto).
 
 ---
 

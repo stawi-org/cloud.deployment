@@ -47,6 +47,7 @@ locals {
   )
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
+    local.generated_secret_values,
     var.extra_secret_values,
   )
 }

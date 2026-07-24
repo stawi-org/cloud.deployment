@@ -30,7 +30,8 @@ on:
         required: true
       R2_SECRET_ACCESS_KEY:
         required: true
-      # Fallback only if Secret Manager neon key fetch is unavailable
+      # Repository secret (required for CI when job uses gcp-* environment).
+      # Do not rely on neon-* environment secrets — they are not visible here.
       NEON_API_KEY:
         required: false
 
