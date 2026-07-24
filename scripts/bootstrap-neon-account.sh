@@ -323,22 +323,33 @@ $(head -c 400 "$pk_body" 2>/dev/null || true)"
   pub=$(jq -r '.key // empty' <<<"$pk_json")
   [[ -n "$key_id" && -n "$pub" ]] || die "public-key response missing key_id/key"
 
-  local encrypted
-  encrypted=$(python3 - "$pub" "$secret_value" <<'PY'
+  # Encrypt for GitHub's libsodium sealbox. Never pip-install into system
+  # Python (PEP 668 / externally-managed-environment on Debian/Ubuntu).
+  local encrypted venv_dir py
+  venv_dir=$(mktemp -d)
+  py=""
+  if python3 -c 'from nacl import public' 2>/dev/null; then
+    py="python3"
+  else
+    say "  installing pynacl in temporary venv (system pip is blocked on this OS)"
+    python3 -m venv "$venv_dir" \
+      || die "python3 -m venv failed — install python3-venv (e.g. sudo apt install python3-venv python3-full)"
+    # shellcheck disable=SC1091
+    # Use venv pip only
+    "$venv_dir/bin/pip" install -q --disable-pip-version-check pynacl \
+      || die "pip install pynacl in venv failed"
+    py="$venv_dir/bin/python"
+  fi
+  encrypted=$("$py" - "$pub" "$secret_value" <<'PY'
 import base64, sys
+from nacl import encoding, public
 pub_b64, secret = sys.argv[1], sys.argv[2]
-try:
-    from nacl import encoding, public
-except ImportError:
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-q", "pynacl"])
-    from nacl import encoding, public
-
 pubkey = public.PublicKey(pub_b64.encode("utf-8"), encoding.Base64Encoder())
 sealed = public.SealedBox(pubkey).encrypt(secret.encode("utf-8"))
 print(base64.b64encode(sealed).decode("utf-8"))
 PY
-)
+  ) || die "failed to encrypt secret for GitHub (pynacl)"
+  rm -rf "$venv_dir"
 
   local put_body put_code
   put_body=$(mktemp)

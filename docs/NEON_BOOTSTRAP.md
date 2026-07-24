@@ -79,7 +79,8 @@ If you see **`curl: (22) … 404`** on environment create/public-key:
 1. Confirm `GITHUB_TOKEN` is for a user/admin that can open  
    https://github.com/stawi-org/cloud.deployment/settings/environments  
 2. Or create the environment manually, add secret `NEON_API_KEY`, then re-run **without** `--sync-github-env` (SOPS/PR only), or with it after the env exists.  
-3. Prefer installing `gh` and re-running — the script uses `gh secret set --env` first when available.
+3. Prefer installing `gh` and re-running — the script uses `gh secret set --env` first when available.  
+4. If you see **`externally-managed-environment` / `No module named 'nacl'`**: the REST fallback tried to `pip install pynacl` into system Python (blocked on modern Debian/Ubuntu). Pull the latest script (uses a temp venv), or install `python3-venv` / use `gh`, or set the secret in the UI and omit `--sync-github-env`.
 
 ## After merge
 
