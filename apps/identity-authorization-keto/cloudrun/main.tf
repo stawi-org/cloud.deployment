@@ -43,6 +43,8 @@ locals {
     GCP_PROJECT         = var.project_id
     APP_NAME            = var.app_name
     LOG_LEVEL           = "info"
+    SERVE_READ_HOST     = "0.0.0.0"
+    SERVE_WRITE_HOST    = "0.0.0.0"
     NAMESPACES_LOCATION = "file:///etc/keto-namespaces/namespaces.ts"
   })
   keto_secret_env = {

@@ -57,6 +57,8 @@ locals {
 
   # Cluster Helm hydra.config → env (public edge only)
   hydra_env = {
+    # Cloud Run requires listen on all interfaces (not localhost)
+    SERVE_PUBLIC_HOST                               = "0.0.0.0"
     SERVE_PUBLIC_PORT                               = "4444"
     SERVE_PUBLIC_BASE_URL                           = local.oauth2_origin
     SERVE_PUBLIC_CORS_ENABLED                       = "false"

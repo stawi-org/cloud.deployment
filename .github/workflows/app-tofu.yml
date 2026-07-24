@@ -155,15 +155,50 @@ jobs:
 
       - name: Tofu apply
         if: inputs.mode == 'apply'
+        env:
+          APP: ${{ inputs.app }}
+          ENV_NAME: ${{ inputs.env }}
+          PROJECT_ID: ${{ steps.creds.outputs.project_id }}
+          REGION: ${{ steps.creds.outputs.region }}
         run: |
           set -euo pipefail
           if [[ "${{ steps.auth.outcome }}" != "success" ]]; then
             echo "::error::GCP WIF required for apply"
             exit 1
           fi
+          TF_COMMON=(
+            -var-file="envs/${ENV_NAME}.tfvars"
+            -var="app_name=${APP}"
+            -var="platform=${ENV_NAME}"
+            -var="project_id=${PROJECT_ID}"
+            -var="region=${REGION}"
+          )
+
+          # Phase 1: DB + secrets + migrate job definition (no service yet)
+          echo "::group::Apply infra + migrate job"
           tofu apply -auto-approve \
-            -var-file="envs/${{ inputs.env }}.tfvars" \
-            -var="app_name=${{ inputs.app }}" \
-            -var="platform=${{ inputs.env }}" \
-            -var="project_id=${{ steps.creds.outputs.project_id }}" \
-            -var="region=${{ steps.creds.outputs.region }}"
+            -target=module.db \
+            -target=module.secrets \
+            -target=module.messaging \
+            -target=module.migrate \
+            -target=google_service_account.runtime \
+            "${TF_COMMON[@]}"
+          echo "::endgroup::"
+
+          # Phase 2: always run migrations (idempotent)
+          MIGRATE_JOB="${APP}-migrate"
+          if gcloud run jobs describe "${MIGRATE_JOB}" --project="${PROJECT_ID}" --region="${REGION}" >/dev/null 2>&1; then
+            echo "::group::Execute migrate job ${MIGRATE_JOB}"
+            gcloud run jobs execute "${MIGRATE_JOB}" \
+              --project="${PROJECT_ID}" \
+              --region="${REGION}" \
+              --wait
+            echo "::endgroup::"
+          else
+            echo "::warning::No migrate job ${MIGRATE_JOB} — skipping execute"
+          fi
+
+          # Phase 3: full apply (Cloud Run service etc.)
+          echo "::group::Apply full stack"
+          tofu apply -auto-approve "${TF_COMMON[@]}"
+          echo "::endgroup::"

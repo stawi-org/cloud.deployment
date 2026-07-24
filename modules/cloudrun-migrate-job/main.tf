@@ -72,13 +72,12 @@ resource "terraform_data" "execute" {
   count = var.execute ? 1 : 0
 
   triggers_replace = {
-    job_uid  = google_cloud_run_v2_job.this.uid
-    image    = var.image
-    args     = join("\n", coalesce(var.args, []))
-    command  = join("\n", coalesce(var.command, []))
-    extra    = var.execute_trigger
-    # secret versions may change connection strings without job template change
-    secrets  = join(",", [for k, v in var.secret_env : "${k}=${v.secret}:${coalesce(v.version, "latest")}"])
+    job_uid = google_cloud_run_v2_job.this.uid
+    image   = var.image
+    args    = join("\n", coalesce(var.args, []))
+    command = join("\n", coalesce(var.command, []))
+    extra   = var.execute_trigger
+    secrets = join(",", [for k, v in var.secret_env : "${k}=${v.secret}:${coalesce(v.version, "latest")}"])
   }
 
   depends_on = [google_cloud_run_v2_job.this]
