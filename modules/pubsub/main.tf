@@ -1,24 +1,34 @@
 # Google Cloud Pub/Sub is the only messaging plane for apps in cloud.deployment.
 # Cluster NATS/JetStream must not be wired into Cloud Run apps.
+#
+# Frame apps use gocloud gcppubsub with a single EVENTS_QUEUE_URL for both
+# OpenTopic (publish) and OpenSubscription (consume → event handlers). The
+# shortened form gcppubsub://{project}/{name} requires the topic name and the
+# subscription name to be identical.
 
 locals {
   default_topic_key = "events"
+  default_events_name = "${var.app_name}-events"
 
   # Effective topics: explicit map, or default single events topic
   topics = length(var.topics) > 0 ? var.topics : (
     var.create_default_events_topic ? {
       (local.default_topic_key) = {
-        name                       = "${var.app_name}-events"
+        name                       = local.default_events_name
         message_retention_duration = "604800s"
       }
     } : {}
   )
 
+  # Default subscription name matches the topic so Frame can use one
+  # gcppubsub://project/name URL for both publisher and subscriber.
+  # Apps consume via Frame event handlers (WithRegisterEvents → SubscribeWorker),
+  # not a separate "default internal" mem:// queue.
   subscriptions = length(var.subscriptions) > 0 ? var.subscriptions : (
     contains(keys(local.topics), local.default_topic_key) ? {
       (local.default_topic_key) = {
         topic_key                  = local.default_topic_key
-        name                       = "${var.app_name}-events-pull"
+        name                       = local.default_events_name
         ack_deadline_seconds       = 20
         message_retention_duration = "604800s"
         push_endpoint              = null
@@ -26,6 +36,9 @@ locals {
       }
     } : {}
   )
+
+  events_topic_name = try(google_pubsub_topic.this[local.default_topic_key].name, "")
+  events_sub_name   = try(google_pubsub_subscription.this[local.default_topic_key].name, "")
 }
 
 resource "google_pubsub_topic" "this" {

@@ -100,8 +100,7 @@ locals {
     NOTIFICATION_SERVICE_URI         = "${local.api_base}/notification"
     AUTHORIZATION_SERVICE_READ_URI   = local.api_base
     AUTHORIZATION_SERVICE_WRITE_URI  = local.api_base
-    EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
-    EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
+    # EVENTS_QUEUE_* from module.messaging.service_env (gcppubsub + handlers)
     OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
     OTEL_EXPORTER_OTLP_TRACES_TIMEOUT = "10000"
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT = "10000"

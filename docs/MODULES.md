@@ -124,7 +124,7 @@ Cloud Run v2 service with optional external runtime SA and Secret Manager env bi
 Default when `topics` is empty and `create_default_events_topic = true`:
 
 - Topic: `{app_name}-events`
-- Pull subscription: `{app_name}-events-pull`
+- Pull subscription: `{app_name}-events` (same name as topic — required for Frame’s single `gcppubsub://project/name` URL for both OpenTopic and OpenSubscription)
 
 ### Inputs
 
@@ -148,7 +148,8 @@ Subscription object: `topic_key`, optional `name`, `ack_deadline_seconds`, `mess
 |------|-------------|
 | `topic_names` / `topic_ids` | Map logical key → name/id |
 | `subscription_names` / `subscription_ids` | Map logical key → name/id |
-| `service_env` | Env map for Cloud Run: `MESSAGING_BACKEND=pubsub`, `PUBSUB_TOPIC_*`, `PUBSUB_SUBSCRIPTION_*` |
+| `service_env` | Env map for Cloud Run: `MESSAGING_BACKEND=pubsub`, `EVENTS_QUEUE_URL`, `EVENTS_QUEUE_NAME`, `PUBSUB_TOPIC_*`, `PUBSUB_SUBSCRIPTION_*` |
+| `events_queue_url` / `events_queue_name` | Frame `EVENTS_QUEUE_*` values |
 
 ### Policy
 

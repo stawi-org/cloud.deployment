@@ -85,8 +85,7 @@ locals {
     PROFILE_SERVICE_WORKLOAD_API_TARGET_PATH    = "/ns/profile/sa/service-profile"
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH    = "/ns/auth/sa/service-tenancy"
     NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
-    EVENTS_QUEUE_URL                            = "mem://frame.events.internal._queue"
-    EVENTS_QUEUE_NAME                           = "frame.events.internal_._queue"
+    # EVENTS_QUEUE_* from module.messaging.service_env (gcppubsub + handlers)
     OTEL_EXPORTER_OTLP_TIMEOUT                  = "10000"
     OTEL_EXPORTER_OTLP_TRACES_TIMEOUT           = "10000"
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT          = "10000"

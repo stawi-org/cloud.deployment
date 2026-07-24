@@ -92,8 +92,7 @@ locals {
     KETO_SERVICE_ADMIN_URI           = data.google_cloud_run_v2_service.keto_write.uri
     AUTHORIZATION_SERVICE_READ_URI   = data.google_cloud_run_v2_service.keto_read.uri
     AUTHORIZATION_SERVICE_WRITE_URI  = data.google_cloud_run_v2_service.keto_write.uri
-    EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
-    EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
+    # EVENTS_QUEUE_* from module.messaging.service_env (gcppubsub + handlers)
     OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
     OTEL_EXPORTER_OTLP_TRACES_TIMEOUT = "10000"
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT = "10000"

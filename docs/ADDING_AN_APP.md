@@ -64,8 +64,10 @@ Migrations use the Neon **direct** connection string; the service uses the **poo
 **Pub/Sub is automatic.** The template includes `module "messaging"` with defaults:
 
 - Topic: `{app_name}-events`
-- Pull subscription: `{app_name}-events-pull`
-- Runtime env: `MESSAGING_BACKEND=pubsub`, plus `PUBSUB_TOPIC_*` / `PUBSUB_SUBSCRIPTION_*`
+- Pull subscription: `{app_name}-events` (same name as topic for Frame `gcppubsub://` dual open)
+- Runtime env: `MESSAGING_BACKEND=pubsub`, `EVENTS_QUEUE_URL`, `EVENTS_QUEUE_NAME`, plus `PUBSUB_TOPIC_*` / `PUBSUB_SUBSCRIPTION_*`
+- Frame apps consume via `WithRegisterEvents` handlers (not `mem://frame.events.internal_._queue`)
+- Images must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` (Frame only registers mem + NATS)
 
 Do **not** wire cluster NATS/JetStream into apps in this repo. Override `topics` / `subscriptions` on the pubsub module only when you need extra topics.
 

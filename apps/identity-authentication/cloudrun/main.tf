@@ -117,8 +117,7 @@ locals {
     NATIVE_CREDENTIAL_EXCHANGE_ENABLED    = "true"
     AUTH_PROVIDER_GOOGLE_CALLBACK_URL     = "${local.accounts_origin}/s/social/callback"
     AUTH_PROVIDER_GOOGLE_SCOPES           = "openid email profile"
-    EVENTS_QUEUE_URL                      = "mem://frame.events.internal._queue"
-    EVENTS_QUEUE_NAME                     = "frame.events.internal_._queue"
+    # EVENTS_QUEUE_* from module.messaging.service_env (gcppubsub + handlers)
     OTEL_EXPORTER_OTLP_TIMEOUT            = "10000"
     OTEL_EXPORTER_OTLP_TRACES_TIMEOUT     = "10000"
     OTEL_EXPORTER_OTLP_METRICS_TIMEOUT    = "10000"
