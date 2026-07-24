@@ -34,12 +34,17 @@ resource "google_service_account" "runtime" {
 
 locals {
   database_secret_id = "${var.app_name}-database-url"
+  app_secret_ids = toset([
+    "identity-oauth2-hydra-secrets-system",
+    "identity-oauth2-hydra-secrets-cookie",
+    "hydra-webhook-psk",
+  ])
   secret_ids = setunion(
     toset([local.database_secret_id]),
+    local.app_secret_ids,
     var.extra_secret_ids,
     toset(keys(var.extra_secret_values)),
   )
-  # Values: always DATABASE_URL from Neon; optional extras from CI/vars (not git)
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     var.extra_secret_values,
@@ -87,6 +92,19 @@ module "service" {
   secret_env = {
     DATABASE_URL = {
       secret = module.secrets.secret_ids[local.database_secret_id]
+    }
+    # Hydra chart/env often expects DSN — same payload as DATABASE_URL
+    DSN = {
+      secret = module.secrets.secret_ids[local.database_secret_id]
+    }
+    SECRETS_SYSTEM = {
+      secret = "identity-oauth2-hydra-secrets-system"
+    }
+    SECRETS_COOKIE = {
+      secret = "identity-oauth2-hydra-secrets-cookie"
+    }
+    WEBHOOK_BEARER_PSK = {
+      secret = "hydra-webhook-psk"
     }
   }
 

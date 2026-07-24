@@ -15,3 +15,6 @@ SHARED_TASK_NOTES.md
 .env
 .env.*
 .neon
+secrets*.local.env
+*.local.env
+!scripts/generate-identity-secrets.env.example

@@ -1,0 +1,98 @@
+# Required GCP Secret Manager secrets for identity domain (stawi-prod → project stawi-identity).
+# Values are NEVER in git. Populate with scripts/seed-gcp-secrets.sh.
+#
+# DATABASE_URL secrets are created by OpenTofu from Neon (do not seed manually unless
+# overriding). All other secrets below must exist with at least one version before
+# the app can run correctly (tofu may create empty secret IDs if listed in extra_secret_ids).
+
+project_hint: stawi-identity
+gcp_account: identity
+env: stawi-prod
+
+# Deploy-time only (CI OpenTofu Neon provider) — not mounted on Cloud Run
+deploy_time:
+  - id: neon-org-api-key
+    description: Neon organization API key for OpenTofu kislerdm/neon provider
+    required: true
+    source_hints:
+      - "bootstrap-neon-account.sh --sync-github-env (GH env neon-identity)"
+      - "sops -d credentials/neon/identity/auth.yaml | yq .auth.api_key"
+      - "export NEON_ORG_API_KEY=... then seed script"
+
+# Shared across multiple identity apps
+shared:
+  - id: hydra-webhook-psk
+    description: Bearer PSK for Hydra ↔ authentication webhooks
+    required: true
+    used_by:
+      - identity-authentication
+      - identity-oauth2-hydra
+
+apps:
+  identity-authentication:
+    runtime_secrets:
+      - id: identity-authentication-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: identity-authentication-google-oauth-client-id
+        env: GOOGLE_OAUTH_CLIENT_ID
+        required: true
+      - id: identity-authentication-google-oauth-client-secret
+        env: GOOGLE_OAUTH_CLIENT_SECRET
+        required: true
+      - id: identity-authentication-csrf-secret
+        env: CSRF_SECRET
+        required: true
+      - id: identity-authentication-cookie-hash-key
+        env: SECURE_COOKIE_HASH_KEY
+        required: true
+      - id: identity-authentication-cookie-block-key
+        env: SECURE_COOKIE_BLOCK_KEY
+        required: true
+      - id: hydra-webhook-psk
+        env: HYDRA_WEBHOOK_PSK
+        required: true
+        shared: true
+
+  identity-oauth2-hydra:
+    runtime_secrets:
+      - id: identity-oauth2-hydra-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+        # Hydra also needs DSN — map same secret or set DSN from DATABASE_URL in app config later
+      - id: identity-oauth2-hydra-secrets-system
+        env: SECRETS_SYSTEM
+        required: true
+        description: Ory Hydra secrets.system (generate long random)
+      - id: identity-oauth2-hydra-secrets-cookie
+        env: SECRETS_COOKIE
+        required: true
+        description: Ory Hydra secrets.cookie
+      - id: hydra-webhook-psk
+        env: WEBHOOK_BEARER_PSK
+        required: true
+        shared: true
+
+  identity-authorization-keto:
+    runtime_secrets:
+      - id: identity-authorization-keto-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+
+  identity-tenancy:
+    runtime_secrets:
+      - id: identity-tenancy-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+
+  identity-profile:
+    runtime_secrets:
+      - id: identity-profile-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+
+  identity-identity:
+    runtime_secrets:
+      - id: identity-identity-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL

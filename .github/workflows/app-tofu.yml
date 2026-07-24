@@ -84,9 +84,13 @@ jobs:
           workload_identity_provider: ${{ steps.ctx.outputs.workload_identity_provider }}
           service_account: ${{ steps.ctx.outputs.deploy_service_account }}
 
+      # Neon org key: prefer Secret Manager (works when job environment is gcp-*).
+      # GH Environment secret neon-identity/NEON_API_KEY is NOT visible when the job
+      # uses environment: gcp-identity-prod — seed SM via scripts/seed-gcp-secrets.sh.
       - name: Load Neon org API key from Secret Manager
         id: neon_sm
         if: steps.auth.outcome == 'success' && steps.ctx.outputs.neon_sm_secret_id != ''
+        continue-on-error: true
         run: |
           set -euo pipefail
           PROJECT="${{ steps.ctx.outputs.neon_sm_project_id }}"
@@ -96,15 +100,19 @@ jobs:
           echo "TF_VAR_neon_api_key=${VAL}" >> "$GITHUB_ENV"
           echo "source=secret-manager" >> "$GITHUB_OUTPUT"
 
-      - name: Load Neon org API key from GitHub Environment (fallback)
+      - name: Load Neon org API key from secrets (fallback)
         if: env.TF_VAR_neon_api_key == ''
         env:
+          # Available only if job environment is neon-* OR secret is a *repository* secret
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         run: |
           set -euo pipefail
           if [[ -z "${NEON_API_KEY:-}" ]]; then
-            echo "::error::No Neon API key: WIF+Secret Manager failed and NEON_API_KEY empty"
-            echo "::error::Bootstrap: store neon-org-api-key in SM project ${{ steps.ctx.outputs.neon_sm_project_id }}"
+            echo "::error::No Neon org API key available for OpenTofu."
+            echo "::error::Seed Secret Manager (preferred when using gcp-* job environments):"
+            echo "::error::  ./scripts/seed-gcp-secrets.sh --env stawi-prod --app identity-authentication --from-sops-neon identity"
+            echo "::error::  # or --set neon-org-api-key=\$NEON_ORG_API_KEY --project stawi-identity"
+            echo "::error::Expected SM secret: ${{ steps.ctx.outputs.neon_sm_secret_id }} in project ${{ steps.ctx.outputs.neon_sm_project_id }}"
             exit 1
           fi
           echo "::add-mask::${NEON_API_KEY}"

@@ -34,12 +34,21 @@ resource "google_service_account" "runtime" {
 
 locals {
   database_secret_id = "${var.app_name}-database-url"
+  # Secret IDs created in SM (values seeded by scripts/seed-gcp-secrets.sh except DATABASE_URL)
+  app_secret_ids = toset([
+    "identity-authentication-google-oauth-client-id",
+    "identity-authentication-google-oauth-client-secret",
+    "identity-authentication-csrf-secret",
+    "identity-authentication-cookie-hash-key",
+    "identity-authentication-cookie-block-key",
+    "hydra-webhook-psk",
+  ])
   secret_ids = setunion(
     toset([local.database_secret_id]),
+    local.app_secret_ids,
     var.extra_secret_ids,
     toset(keys(var.extra_secret_values)),
   )
-  # Values: always DATABASE_URL from Neon; optional extras from CI/vars (not git)
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     var.extra_secret_values,
@@ -87,6 +96,24 @@ module "service" {
   secret_env = {
     DATABASE_URL = {
       secret = module.secrets.secret_ids[local.database_secret_id]
+    }
+    GOOGLE_OAUTH_CLIENT_ID = {
+      secret = "identity-authentication-google-oauth-client-id"
+    }
+    GOOGLE_OAUTH_CLIENT_SECRET = {
+      secret = "identity-authentication-google-oauth-client-secret"
+    }
+    CSRF_SECRET = {
+      secret = "identity-authentication-csrf-secret"
+    }
+    SECURE_COOKIE_HASH_KEY = {
+      secret = "identity-authentication-cookie-hash-key"
+    }
+    SECURE_COOKIE_BLOCK_KEY = {
+      secret = "identity-authentication-cookie-block-key"
+    }
+    HYDRA_WEBHOOK_PSK = {
+      secret = "hydra-webhook-psk"
     }
   }
 
