@@ -163,8 +163,8 @@ module "service_read" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = 4466
-  use_http2             = true # Frame authz client uses gRPC
-  # Image default config /home/ory/keto.yml is missing — use mounted file
+  # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
+  # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
   args                  = ["serve", "read", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
   env                   = local.keto_common_env

@@ -89,10 +89,9 @@ locals {
       signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
       key_id     = "hydra.openid.id-token"
     })
-    # Explicit :443 — some gRPC clients default to :80 when port is omitted.
-    KETO_SERVICE_ADMIN_URI           = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
-    AUTHORIZATION_SERVICE_READ_URI   = "${data.google_cloud_run_v2_service.keto_read.uri}:443"
-    AUTHORIZATION_SERVICE_WRITE_URI  = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
+    KETO_SERVICE_ADMIN_URI           = data.google_cloud_run_v2_service.keto_write.uri
+    AUTHORIZATION_SERVICE_READ_URI   = data.google_cloud_run_v2_service.keto_read.uri
+    AUTHORIZATION_SERVICE_WRITE_URI  = data.google_cloud_run_v2_service.keto_write.uri
     EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
     EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
     OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
@@ -152,9 +151,9 @@ module "migrate" {
     OTEL_METRICS_EXPORTER             = "none"
     OTEL_LOGS_EXPORTER                = "none"
     AUTHORIZATION_MODE                = "keto"
-    KETO_SERVICE_ADMIN_URI            = data.google_cloud_run_v2_service.keto_write.uri
-    AUTHORIZATION_SERVICE_READ_URI    = data.google_cloud_run_v2_service.keto_read.uri
-    AUTHORIZATION_SERVICE_WRITE_URI   = data.google_cloud_run_v2_service.keto_write.uri
+    KETO_SERVICE_ADMIN_URI            = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
+    AUTHORIZATION_SERVICE_READ_URI    = "${data.google_cloud_run_v2_service.keto_read.uri}:443"
+    AUTHORIZATION_SERVICE_WRITE_URI   = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
     PERMISSIONS_REGISTRATION_URL      = "${local.api_base}/tenancy/_internal/register/permissions"
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
