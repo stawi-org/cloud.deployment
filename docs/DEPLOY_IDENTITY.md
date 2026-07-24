@@ -69,15 +69,42 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 
 ---
 
+## Container images (Artifact Registry)
+
+GHCR pulls via org `cache.europe-docker.pkg.dev` often fail without cache credentials.
+Bootstrap images live in project AR:
+
+```text
+europe-west9-docker.pkg.dev/stawi-identity/apps/<name>:<tag>
+```
+
+Mirror before first apply or when bootstrap tag changes:
+
+```bash
+./scripts/mirror-ghcr-to-ar.sh \
+  --project stawi-identity --location europe-west9 --repo apps \
+  --src ghcr.io/antinvestor/service-authentication:v1.54.53 \
+  --name service-authentication --tag v1.54.53
+```
+
+Routine rolls still use decentralized **cloudrun-ship** (OpenTofu ignores image). Prefer shipping AR tags once the service repo is configured for dual push (GHCR + AR).
+
+### Warm instances (usability)
+
+| Service | `min_instance_count` | Why |
+|---------|----------------------|-----|
+| `identity-oauth2-hydra` | 1 | OIDC discovery used by every Frame cold start |
+| `identity-authorization-keto-read` | 1 | ReBAC checks from Frame services |
+| `identity-authentication` | 1 | Login/consent path |
+
 ## Still incomplete without extra work
 
 | Item | Action |
 |------|--------|
-| Hydra/Keto **image config** (issuer URLs, login/consent, DSN env names) | Align container entrypoint/env with Ory |
-| Frame services **service discovery** (public Cloud Run URLs for Hydra/Keto) | Set after first apply URIs are known |
 | Custom domains / DNS | Cloudflare / Cloud Run domain mapping |
-| Ship Frame images | Service-repo release → `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)); tfvars image is initial/bootstrap only |
-| Migrations | Cloud Run Job or startup migrate for Frame services |
+| Ship Frame images to AR | Service-repo release → AR + `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)) |
+| Tenancy service-bot → Keto bootstrap | Optional follow-up if migrate soft-fails |
+| Google OAuth client secrets | Optional `google_oauth_*` vars on authentication |
 
 ---
 

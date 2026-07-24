@@ -171,12 +171,13 @@ module "service_read" {
   container_port        = 4466
   # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
   # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
-  args           = ["serve", "read", "-c", "/etc/keto/keto.yml"]
-  memory         = "512Mi"
-  env            = local.keto_common_env
-  secret_env     = local.keto_secret_env
-  secret_volumes = local.keto_secret_volumes
-  gcs_volumes    = local.keto_gcs_volumes
+  args               = ["serve", "read", "-c", "/etc/keto/keto.yml"]
+  memory             = "512Mi"
+  min_instance_count = 1 # warm for Frame AUTHORIZATION_MODE=keto cold starts
+  env                = local.keto_common_env
+  secret_env         = local.keto_secret_env
+  secret_volumes     = local.keto_secret_volumes
+  gcs_volumes        = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,

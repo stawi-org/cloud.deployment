@@ -214,6 +214,7 @@ module "service" {
   container_port        = 8080
   memory                = "1Gi"
   cpu                   = "1"
+  min_instance_count    = 1 # login/consent path — keep warm
   startup_probe_path    = "/healthz"
   liveness_probe_path   = "/healthz"
   env = merge(

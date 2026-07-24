@@ -164,6 +164,8 @@ module "service" {
   container_port        = 4444
   args                  = ["serve", "public"]
   memory                = "512Mi"
+  # Keep one warm instance: platform + Frame apps discover OIDC at cold start.
+  min_instance_count    = 1
   env = merge(
     local.hydra_env,
     module.messaging.service_env,

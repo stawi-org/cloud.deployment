@@ -63,13 +63,32 @@ Caller supplies image, service, project, region, WIF, ship SA, optional migrate 
 
 Service allowlist (default): identity Frame apps + platform (`platform-devices`, `platform-settings`, `platform-geolocation`, `platform-files`). Pass `allowed_services` to override.
 
+## Bootstrap images (first deploy)
+
+Cloud Run cannot reliably pull private GHCR via the org cache. For first OpenTofu apply (or when the bootstrap tag is missing from AR), mirror into project Artifact Registry:
+
+```bash
+# Identity
+./scripts/mirror-ghcr-to-ar.sh --project stawi-identity --repo apps \
+  --src ghcr.io/antinvestor/service-authentication:v1.54.53 \
+  --name service-authentication --tag v1.54.53
+
+# Platform (same pattern)
+./scripts/mirror-ghcr-to-ar.sh --project stawi-platform --repo apps \
+  --src ghcr.io/antinvestor/service-files:v1.10.54 \
+  --name service-files --tag v1.10.54
+```
+
+Point `envs/stawi-prod.tfvars` `image` at `europe-west9-docker.pkg.dev/<project>/apps/<name>:<tag>`.
+
 ## Adding a new Frame service
 
-1. Apply app stack in this repo (service + migrate job + messaging exist).
-2. Grant ship SA `roles/iam.serviceAccountUser` on the new runtime SA (re-run bootstrap with updated `--runtime-sa`).
-3. Add repo to WIF allowlist (`--ship-repo`) if new.
-4. In the service repo `release.yaml`, add a `ship` job calling `cloudrun-ship.yml` after `docker`.
-5. Prefer semver tags; avoid shipping `:latest` to prod.
+1. Mirror bootstrap image into project AR (`scripts/mirror-ghcr-to-ar.sh`).
+2. Apply app stack in this repo (service + migrate job + messaging exist).
+3. Grant ship SA `roles/iam.serviceAccountUser` on the new runtime SA (re-run bootstrap with updated `--runtime-sa`).
+4. Add repo to WIF allowlist (`--ship-repo`) if new.
+5. In the service repo `release.yaml`, add a `ship` job calling `cloudrun-ship.yml` after `docker`.
+6. Prefer semver tags; avoid shipping `:latest` to prod. Prefer AR destination once dual-push is wired.
 
 ## Rollback
 
