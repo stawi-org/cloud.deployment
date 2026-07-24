@@ -1,0 +1,10 @@
+# config/neon-accounts.yaml
+# app.yaml neon.account must match a key here.
+# CI exports the secret named by api_key_secret into NEON_API_KEY for that job.
+accounts:
+  stawi-org:
+    api_key_secret: NEON_API_KEY_STAWI_ORG
+    description: Primary Stawi Neon organization
+  stawi-labs:
+    api_key_secret: NEON_API_KEY_STAWI_LABS
+    description: Labs / experimental Neon organization
