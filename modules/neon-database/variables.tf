@@ -35,21 +35,22 @@ variable "history_retention_seconds" {
   description = "PITR history window (1 day default — cost-conscious for greenfield)"
 }
 
-# Cost-safe compute defaults: scale to min CU and suspend when idle.
+# Cost-safe compute defaults. Off by default so free Neon orgs work without
+# plan upgrades; enable per-app/org when the plan allows endpoint settings.
+variable "configure_endpoint_settings" {
+  type        = bool
+  default     = false
+  description = "If true, set autoscaling CU bounds on the default endpoint"
+}
+
 variable "autoscaling_min_cu" {
   type        = number
   default     = 0.25
-  description = "Minimum Neon compute units (0.25 = cheapest always-available floor)"
+  description = "Minimum Neon compute units (when configure_endpoint_settings)"
 }
 
 variable "autoscaling_max_cu" {
   type        = number
   default     = 1
-  description = "Maximum Neon compute units — raise per-app if load requires it"
-}
-
-variable "suspend_timeout_seconds" {
-  type        = number
-  default     = 300
-  description = "Idle seconds before compute suspends (scale-to-zero-ish)"
+  description = "Maximum Neon compute units (when configure_endpoint_settings)"
 }

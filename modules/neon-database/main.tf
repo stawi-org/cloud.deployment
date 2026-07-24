@@ -10,10 +10,14 @@ resource "neon_project" "this" {
 
   history_retention_seconds = var.history_retention_seconds
 
-  default_endpoint_settings {
-    autoscaling_limit_min_cu = var.autoscaling_min_cu
-    autoscaling_limit_max_cu = var.autoscaling_max_cu
-    suspend_timeout_seconds  = var.suspend_timeout_seconds
+  # Free Neon orgs cannot set custom suspend intervals. Only set CU bounds when enabled.
+  dynamic "default_endpoint_settings" {
+    for_each = var.configure_endpoint_settings ? [1] : []
+    content {
+      autoscaling_limit_min_cu = var.autoscaling_min_cu
+      autoscaling_limit_max_cu = var.autoscaling_max_cu
+      # omit suspend_timeout_seconds — not permitted on free plans; Neon default applies
+    }
   }
 }
 
