@@ -13,14 +13,22 @@ permissions:
 
 jobs:
   scripts:
-    name: change-detection tests
+    name: change-detection + neon account policy tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install jq
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+      - name: Install jq and yq
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq jq
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
       - name: Run detect-changed-apps tests
         run: ./.github/scripts/tests/test-detect-changed-apps.sh
+      - name: Run neon account policy tests
+        run: ./.github/scripts/tests/test-validate-neon-accounts.sh
+      - name: Validate all apps neon.account policy
+        run: ./.github/scripts/validate-neon-accounts.sh .
 
   tofu-validate:
     name: tofu validate

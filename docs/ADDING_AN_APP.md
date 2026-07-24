@@ -19,7 +19,8 @@ owners: []          # optional team / CODEOWNERS-style list
 envs:
   - stawi-dev       # add stawi-prod when ready
 neon:
-  account: stawi-org   # must exist in config/neon-accounts.yaml
+  # Domain org: identity | notifications | payments | platform | labs
+  account: labs
 runtime: cloudrun
 ```
 
@@ -27,7 +28,7 @@ runtime: cloudrun
 |-------|---------|
 | `name` | Human / inventory name (CI uses the **directory** name as `app_name`) |
 | `envs` | Which platform envs this app deploys to; drives the plan/apply matrix |
-| `neon.account` | Selects which Neon org API key CI exports (`config/neon-accounts.yaml`) |
+| `neon.account` | Domain Neon **organization** key in `config/neon-accounts.yaml` (not a project name) |
 
 ## 3. Configure OpenTofu root (`apps/<name>/cloudrun`)
 
@@ -61,11 +62,13 @@ Do **not** wire cluster NATS/JetStream into apps in this repo. Override `topics`
 
 Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform.project_id`).
 
-## 4. Neon credentials
+## 4. Neon credentials (multi-account)
 
-1. Confirm `neon.account` maps to a secret in `config/neon-accounts.yaml`.
-2. Ensure that GitHub secret exists (e.g. `NEON_API_KEY_STAWI_ORG`).
-3. CI sets `TF_VAR_neon_api_key` for the job; never commit API keys.
+1. Pick a **domain** account (`identity`, `notifications`, `payments`, `platform`, `labs`) — see [BACKEND.md](BACKEND.md) and the [multi-account design](superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md).
+2. Confirm the key exists in `config/neon-accounts.yaml` and respects `allowed_deploy_envs` / `allowed_app_prefixes` (e.g. payments apps should be named `payment-*` / `checkout-*` / …).
+3. Ensure the GitHub **Environment** named `github_environment` (e.g. `neon-payments`) exists with secret **`NEON_API_KEY`** only.
+4. CI loads that single key into `TF_VAR_neon_api_key` for that job — never commit API keys; never put all domain keys on the job.
+5. Canonical operator copy of each key lives in Vault at `vault_path` (rotation source of truth).
 
 ## 5. Independent CI
 

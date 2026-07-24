@@ -5,9 +5,12 @@ Not a production migration of existing cluster workloads.
 
 ## Prerequisites
 
-1. [ ] Create GitHub secrets:
+1. [ ] Create GitHub **repo** secrets:
    - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
-   - `NEON_API_KEY_STAWI_ORG` (and `NEON_API_KEY_STAWI_LABS` if needed)
+2. [ ] Create GitHub **Environments** (each with secret `NEON_API_KEY` only):
+   - `neon-labs` (pilot often uses `neon.account: labs`)
+   - plus `neon-identity`, `neon-notifications`, `neon-payments`, `neon-platform` as needed
+   - Source keys from Vault paths in `config/neon-accounts.yaml` (see multi-account design)
 2. [ ] Set `platforms/stawi-dev` (and prod if used) `project_id` to real GCP projects  
    (placeholders: `stawi-cloudrun-dev` / `stawi-cloudrun-prod`)
 3. [ ] Configure Workload Identity Federation for Actions → deploy SA  

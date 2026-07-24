@@ -25,6 +25,7 @@ See [docs/superpowers/specs/2026-07-24-cloud-deployment-architecture-design.md](
 - **Public edge only** for talking to cluster platform services (first wave).
 - Shared modules mirror the Colony idea: change once, thin app deltas.
 - **Messaging is always Cloud Pub/Sub** (cluster NATS is not used from these apps).
+- **Neon multi-account:** domain orgs (`identity`, `notifications`, `payments`, …) with least-privilege GitHub Environment secrets — see [docs/BACKEND.md](docs/BACKEND.md) and [the multi-account design](docs/superpowers/specs/2026-07-24-neon-multi-account-secrets-design.md).
 
 ## Status
 

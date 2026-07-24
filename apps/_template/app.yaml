@@ -3,5 +3,8 @@ owners: []
 envs:
   - stawi-dev
 neon:
-  account: stawi-org   # must exist in config/neon-accounts.yaml
+  # Domain Neon org key — must exist in config/neon-accounts.yaml
+  # identity | notifications | payments | platform | labs
+  # CI loads NEON_API_KEY only from GitHub Environment neon-<account>
+  account: labs
 runtime: cloudrun

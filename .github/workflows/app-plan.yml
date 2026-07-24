@@ -46,7 +46,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
       - id: d
-        name: Detect changed apps
+        name: Detect changed apps + Neon environments
         env:
           INPUT_APP: ${{ github.event_name == 'workflow_dispatch' && inputs.app || '' }}
           INPUT_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.env || '' }}
@@ -69,15 +69,14 @@ jobs:
             fi
             MATRIX=$(BASE_REF="$BASE_REF" HEAD_REF="$HEAD_REF" .github/scripts/detect-changed-apps.sh)
           fi
-          # Compact for GHA output (single line)
-          MATRIX_C=$(echo "$MATRIX" | jq -c .)
-          echo "matrix=${MATRIX_C}" >> "$GITHUB_OUTPUT"
-          if [[ "$MATRIX_C" == "[]" ]]; then
+          ENRICHED=$(echo "$MATRIX" | .github/scripts/enrich-matrix-neon.sh .)
+          echo "matrix=${ENRICHED}" >> "$GITHUB_OUTPUT"
+          if [[ "$ENRICHED" == "[]" ]]; then
             echo "nonempty=false" >> "$GITHUB_OUTPUT"
           else
             echo "nonempty=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "Detected: ${MATRIX_C}"
+          echo "Detected: ${ENRICHED}"
 
   plan:
     needs: detect
@@ -91,4 +90,5 @@ jobs:
       app: ${{ matrix.app }}
       env: ${{ matrix.env }}
       mode: plan
+      neon_github_environment: ${{ matrix.neon_github_environment }}
     secrets: inherit
