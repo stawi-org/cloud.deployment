@@ -89,9 +89,10 @@ locals {
       signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
       key_id     = "hydra.openid.id-token"
     })
-    KETO_SERVICE_ADMIN_URI           = data.google_cloud_run_v2_service.keto_write.uri
-    AUTHORIZATION_SERVICE_READ_URI   = data.google_cloud_run_v2_service.keto_read.uri
-    AUTHORIZATION_SERVICE_WRITE_URI  = data.google_cloud_run_v2_service.keto_write.uri
+    # Explicit :443 — some gRPC clients default to :80 when port is omitted.
+    KETO_SERVICE_ADMIN_URI           = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
+    AUTHORIZATION_SERVICE_READ_URI   = "${data.google_cloud_run_v2_service.keto_read.uri}:443"
+    AUTHORIZATION_SERVICE_WRITE_URI  = "${data.google_cloud_run_v2_service.keto_write.uri}:443"
     EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
     EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
     OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"

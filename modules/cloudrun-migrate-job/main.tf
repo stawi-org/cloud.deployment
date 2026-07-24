@@ -14,6 +14,9 @@ resource "google_cloud_run_v2_job" "this" {
   location = var.region
   labels   = var.labels
 
+  # Allow replace when image/env change (Cloud Run jobs default protection blocks destroy).
+  deletion_protection = false
+
   template {
     labels = var.labels
     template {
