@@ -132,9 +132,9 @@ jobs:
             -backend-config="endpoints={s3=\"${ENDPOINT}\"}"
 
       # When neon.account (org API key) changes, state may still track projects in the
-      # previous org. Destroy with the new key fails; drop module.db from state so a
-      # clean project is created under the current org. Orphaned Neon projects must be
-      # deleted manually in the old org console if no longer needed.
+      # previous org (or a deleted project). Destroy with the wrong key fails; drop
+      # module.db from state so a clean project is created under the current org.
+      # Orphaned Neon projects must be deleted manually in the old org if needed.
       - name: Rebind Neon state if org credentials cannot refresh project
         if: inputs.mode == 'apply'
         env:
@@ -144,10 +144,6 @@ jobs:
           REGION: ${{ steps.creds.outputs.region }}
         run: |
           set -euo pipefail
-          if ! tofu state list 2>/dev/null | grep -q '^module.db.neon_project.this$'; then
-            echo "No module.db.neon_project.this in state — skip rebind"
-            exit 0
-          fi
           TF_COMMON=(
             -var-file="envs/${ENV_NAME}.tfvars"
             -var="app_name=${APP}"
@@ -156,6 +152,19 @@ jobs:
             -var="region=${REGION}"
           )
           set +e
+          tofu state list > /tmp/tofu-state-list.txt 2>/tmp/tofu-state-list.err
+          LIST_RC=$?
+          set -e
+          if [[ $LIST_RC -ne 0 ]]; then
+            echo "::warning::tofu state list failed; continuing without rebind"
+            cat /tmp/tofu-state-list.err || true
+            exit 0
+          fi
+          if ! grep -qE '^module\.db\.neon_project\.this$' /tmp/tofu-state-list.txt; then
+            echo "No module.db.neon_project.this in state — skip rebind"
+            exit 0
+          fi
+          set +e
           tofu refresh -target=module.db.neon_project.this "${TF_COMMON[@]}" >/tmp/neon-refresh.log 2>&1
           RC=$?
           set -e
@@ -163,13 +172,13 @@ jobs:
             echo "Neon project refresh OK with current credentials"
             exit 0
           fi
-          echo "::warning::Neon project refresh failed (likely org switch). State-rm module.db.* for rebind."
+          echo "::warning::Neon project refresh failed (likely org switch or deleted project). State-rm module.db.* for rebind."
           cat /tmp/neon-refresh.log || true
           while read -r addr; do
             [[ -z "$addr" ]] && continue
             echo "state rm $addr"
             tofu state rm "$addr" || true
-          done < <(tofu state list | grep '^module.db\.' || true)
+          done < <(grep -E '^module\.db\.' /tmp/tofu-state-list.txt || true)
 
       - name: Tofu plan
         if: inputs.mode == 'plan'
