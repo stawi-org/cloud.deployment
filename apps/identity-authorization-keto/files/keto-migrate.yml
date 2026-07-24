@@ -1,6 +1,11 @@
-# Minimal Keto config for migrate jobs only (no namespaces file required).
+# Minimal Keto config for migrate jobs only.
 # Runtime services use keto.yml + namespaces.ts from GCS.
+# Without an explicit namespaces value Keto defaults to ./keto_namespaces.
 version: v0.12.0
+
+namespaces:
+  - id: 0
+    name: default
 
 log:
   level: info

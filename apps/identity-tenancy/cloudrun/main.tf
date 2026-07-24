@@ -142,8 +142,9 @@ module "migrate" {
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
     OAUTH2_WELL_KNOWN_OIDC_PATH       = ".well-known/openid-configuration"
+    OAUTH2_AUDIENCE_BASE_URL          = local.api_base
     OAUTH2_CLIENT_ASSERTION_AUDIENCE  = local.token_url
-    OAUTH2_CLIENT_ASSERTION_AUD             = local.token_url
+    OAUTH2_CLIENT_ASSERTION_AUD       = local.token_url
     OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
     OAUTH2_JWT_VERIFY_ISSUER          = local.issuer
     OAUTH2_SERVICE_CLIENT_ID          = var.app_name
