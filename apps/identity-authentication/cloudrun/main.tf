@@ -52,9 +52,10 @@ locals {
     "identity-authentication-cookie-hash-key",
     "identity-authentication-cookie-block-key",
   ])
+  # Conditions must not mark for_each keys sensitive (random/SOPS values are sensitive).
   google_secret_ids = toset(compact([
-    var.google_oauth_client_id != "" ? "identity-authentication-google-oauth-client-id" : null,
-    var.google_oauth_client_secret != "" ? "identity-authentication-google-oauth-client-secret" : null,
+    try(nonsensitive(var.google_oauth_client_id), "") != "" ? "identity-authentication-google-oauth-client-id" : null,
+    try(nonsensitive(var.google_oauth_client_secret), "") != "" ? "identity-authentication-google-oauth-client-secret" : null,
   ]))
   secret_ids = setunion(
     toset([local.database_secret_id, local.database_direct_secret_id]),

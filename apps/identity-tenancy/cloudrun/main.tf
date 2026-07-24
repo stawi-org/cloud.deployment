@@ -17,6 +17,18 @@ data "google_cloud_run_v2_service" "hydra" {
   project  = var.project_id
 }
 
+data "google_cloud_run_v2_service" "keto_read" {
+  name     = "identity-authorization-keto-read"
+  location = var.region
+  project  = var.project_id
+}
+
+data "google_cloud_run_v2_service" "keto_write" {
+  name     = "identity-authorization-keto-write"
+  location = var.region
+  project  = var.project_id
+}
+
 module "edge" {
   source = "../../../modules/edge-contract"
   env    = var.platform
@@ -77,9 +89,9 @@ locals {
       signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
       key_id     = "hydra.openid.id-token"
     })
-    KETO_SERVICE_ADMIN_URI           = local.api_base
-    AUTHORIZATION_SERVICE_READ_URI   = local.api_base
-    AUTHORIZATION_SERVICE_WRITE_URI  = local.api_base
+    KETO_SERVICE_ADMIN_URI           = data.google_cloud_run_v2_service.keto_write.uri
+    AUTHORIZATION_SERVICE_READ_URI   = data.google_cloud_run_v2_service.keto_read.uri
+    AUTHORIZATION_SERVICE_WRITE_URI  = data.google_cloud_run_v2_service.keto_write.uri
     EVENTS_QUEUE_URL                 = "mem://frame.events.internal._queue"
     EVENTS_QUEUE_NAME                = "frame.events.internal_._queue"
     OTEL_EXPORTER_OTLP_TIMEOUT       = "10000"
@@ -138,7 +150,10 @@ module "migrate" {
     OTEL_TRACES_EXPORTER              = "none"
     OTEL_METRICS_EXPORTER             = "none"
     OTEL_LOGS_EXPORTER                = "none"
-    AUTHORIZATION_MODE                = "none"
+    AUTHORIZATION_MODE                = "keto"
+    KETO_SERVICE_ADMIN_URI            = data.google_cloud_run_v2_service.keto_write.uri
+    AUTHORIZATION_SERVICE_READ_URI    = data.google_cloud_run_v2_service.keto_read.uri
+    AUTHORIZATION_SERVICE_WRITE_URI   = data.google_cloud_run_v2_service.keto_write.uri
     PERMISSIONS_REGISTRATION_URL      = "${local.api_base}/tenancy/_internal/register/permissions"
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
