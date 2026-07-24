@@ -1,0 +1,13 @@
+name: platform-settings
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: platform
+neon:
+  # Use identity Neon org until a dedicated platform Neon org is bootstrapped.
+  account: identity
+runtime: cloudrun
+domain: platform
+version: 1

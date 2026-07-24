@@ -98,6 +98,8 @@ accounts:
         region: europe-west9
         workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-platform.iam.gserviceaccount.com
+        ship_workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-ship
+        ship_service_account: cloudrun-ship@stawi-platform.iam.gserviceaccount.com
         labels:
           environment: prod
           domain: platform

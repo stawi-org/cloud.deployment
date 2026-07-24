@@ -61,7 +61,7 @@ workload_identity_provider:   projects/721554040672/locations/global/workloadIde
 
 Caller supplies image, service, project, region, WIF, ship SA, optional migrate job.
 
-Service allowlist (default): `identity-profile`, `identity-authentication`, `identity-tenancy`, `identity-identity`.
+Service allowlist (default): identity Frame apps + platform (`platform-devices`, `platform-settings`, `platform-geolocation`, `platform-files`). Pass `allowed_services` to override.
 
 ## Adding a new Frame service
 
