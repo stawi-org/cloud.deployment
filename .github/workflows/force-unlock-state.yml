@@ -1,0 +1,43 @@
+name: force-unlock-state
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        required: true
+        type: string
+      env:
+        required: true
+        type: string
+      lock_id:
+        required: true
+        type: string
+jobs:
+  unlock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.10.0"
+      - name: R2 creds
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}" >> "$GITHUB_ENV"
+          echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
+          echo "AWS_REGION=auto" >> "$GITHUB_ENV"
+      - name: force-unlock
+        working-directory: apps/${{ inputs.app }}/cloudrun
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          KEY="cloud-deployment/apps/${{ inputs.app }}/${{ inputs.env }}/terraform.tfstate"
+          tofu init \
+            -backend-config="../../../config/r2-backend.hcl" \
+            -backend-config="key=${KEY}" \
+            -backend-config="endpoints={s3=\"${ENDPOINT}\"}"
+          tofu force-unlock -force "${{ inputs.lock_id }}"
