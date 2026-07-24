@@ -1,6 +1,4 @@
-# Repeatable Cloud Run + Neon + Pub/Sub app root.
-# Account selection (which GCP project / Neon org) is OUTSIDE this file:
-#   app.yaml → config/gcp-accounts.yaml + config/neon-accounts.yaml → CI vars.
+# service-authentication — parity with namespaces/identity/authentication/service-authentication.yaml
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -9,6 +7,11 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
+}
+
+module "domain" {
+  source = "../../../modules/identity-domain"
+  env    = var.platform
 }
 
 module "edge" {
@@ -36,7 +39,6 @@ locals {
     "identity-authentication-csrf-secret",
     "identity-authentication-cookie-hash-key",
     "identity-authentication-cookie-block-key",
-    "hydra-webhook-psk",
   ])
   google_secret_ids = toset(compact([
     var.google_oauth_client_id != "" ? "identity-authentication-google-oauth-client-id" : null,
@@ -65,21 +67,42 @@ locals {
     } : {},
     var.extra_secret_values,
   )
+
+  # Colony oauth2 → Frame env (resource /authentication)
+  oauth2_env = merge(module.domain.oauth2_common, {
+    OAUTH2_SERVICE_CLIENT_ID = var.app_name
+    OAUTH2_RESOURCE_AUDIENCE = module.domain.oauth2_resource_audience["authentication"]
+    OAUTH2_REQUESTED_AUDIENCES = join(",", [
+      "${module.domain.api_base}/profile",
+      "${module.domain.api_base}/tenancy",
+      "${module.domain.api_base}/devices",
+      "${module.domain.api_base}/files",
+    ])
+    # private_key_jwt: sign via self webhook (public accounts origin)
+    OAUTH2_PRIVATE_JWT_KEY = jsonencode({
+      source     = "url"
+      signer_url = "${module.domain.accounts_origin}/webhook/sign/private-key-jwt"
+      key_id     = "hydra.openid.id-token"
+    })
+  })
 }
 
 module "secrets" {
-  source = "../../../modules/app-secrets"
+  source           = "../../../modules/app-secrets"
+  project_id       = var.project_id
+  labels           = var.labels
+  secret_ids       = local.secret_ids
+  version_ids      = local.version_ids
+  secret_values    = local.secret_values
+  accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
+}
 
-  project_id = var.project_id
-  labels     = var.labels
-
-  secret_ids    = local.secret_ids
-  version_ids   = local.version_ids
-  secret_values = local.secret_values
-
-  accessor_members = [
-    "serviceAccount:${google_service_account.runtime.email}",
-  ]
+# Shared webhook PSK created by Hydra app — grant access for enrich/sign webhooks.
+resource "google_secret_manager_secret_iam_member" "hydra_webhook_psk" {
+  project   = var.project_id
+  secret_id = "hydra-webhook-psk"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
 module "messaging" {
@@ -91,8 +114,7 @@ module "messaging" {
 }
 
 module "migrate" {
-  source = "../../../modules/cloudrun-migrate-job"
-
+  source                = "../../../modules/cloudrun-migrate-job"
   name                  = "${var.app_name}-migrate"
   project_id            = var.project_id
   region                = var.region
@@ -100,19 +122,12 @@ module "migrate" {
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
   args                  = ["migrate"]
-  env = {
-    LOG_LEVEL             = "INFO"
-    EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
-    OTEL_TRACES_EXPORTER  = "none"
-    OTEL_METRICS_EXPORTER = "none"
-    OTEL_LOGS_EXPORTER    = "none"
-  }
+  env = merge(module.domain.migrate_env, {
+    PERMISSIONS_REGISTRATION_URL = "${module.domain.service_uris.TENANCY_SERVICE_URI}/_internal/register/permissions"
+  })
   secret_env = {
-    DATABASE_URL = {
-      secret = module.secrets.secret_ids[local.database_direct_secret_id]
-    }
+    DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
   }
-
   depends_on = [module.secrets]
 }
 
@@ -124,37 +139,51 @@ module "service" {
   image                 = var.image
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
+  container_port        = 8080
+  memory                = "1Gi"
+  cpu                   = "1"
+  startup_probe_path    = "/healthz"
+  liveness_probe_path   = "/healthz"
   env = merge(
     module.edge.service_env,
+    module.domain.frame_http,
+    module.domain.oauth2_common,
+    local.oauth2_env,
+    module.domain.service_uris,
+    module.domain.events_mem,
+    module.domain.otel_timeouts,
     module.messaging.service_env,
     {
-      GCP_PROJECT = var.project_id
-      APP_NAME    = var.app_name
+      GCP_PROJECT                         = var.project_id
+      APP_NAME                            = var.app_name
+      LOG_LEVEL                           = "INFO"
+      EXPOSE_ERRORS                       = "false"
+      DEFAULT_TENANT_ID                   = module.domain.default_tenant_id
+      DEFAULT_PARTITION_ID                = module.domain.default_partition_id
+      FEDCM_PUBLIC_ORIGIN                 = module.domain.accounts_origin
+      FEDCM_HYDRA_PUBLIC_URL              = module.domain.oauth2_origin
+      OAUTH2_HYDRA_PUBLIC_INTERNAL_URL    = module.domain.oauth2_origin
+      NATIVE_CREDENTIAL_EXCHANGE_ENABLED  = "true"
+      AUTH_PROVIDER_GOOGLE_CALLBACK_URL   = "${module.domain.accounts_origin}/s/social/callback"
+      AUTH_PROVIDER_GOOGLE_SCOPES         = "openid email profile"
+      AUTHORIZATION_MODE                  = "keto"
     },
   )
   secret_env = merge(
     {
-      DATABASE_URL = {
-        secret = module.secrets.secret_ids[local.database_secret_id]
-      }
-      CSRF_SECRET = {
-        secret = "identity-authentication-csrf-secret"
-      }
-      SECURE_COOKIE_HASH_KEY = {
-        secret = "identity-authentication-cookie-hash-key"
-      }
-      SECURE_COOKIE_BLOCK_KEY = {
-        secret = "identity-authentication-cookie-block-key"
-      }
-      HYDRA_WEBHOOK_PSK = {
-        secret = "hydra-webhook-psk"
-      }
+      DATABASE_URL             = { secret = module.secrets.secret_ids[local.database_secret_id] }
+      REPLICA_DATABASE_URL     = { secret = module.secrets.secret_ids[local.database_secret_id] }
+      CSRF_SECRET              = { secret = "identity-authentication-csrf-secret" }
+      SECURE_COOKIE_HASH_KEY   = { secret = "identity-authentication-cookie-hash-key" }
+      SECURE_COOKIE_BLOCK_KEY  = { secret = "identity-authentication-cookie-block-key" }
+      HYDRA_WEBHOOK_API_PSK    = { secret = "hydra-webhook-psk" }
+      OAUTH2_SIGNER_API_KEY    = { secret = "hydra-webhook-psk" }
     },
     var.google_oauth_client_id != "" ? {
-      GOOGLE_OAUTH_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
+      AUTH_PROVIDER_GOOGLE_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
     } : {},
     var.google_oauth_client_secret != "" ? {
-      GOOGLE_OAUTH_CLIENT_SECRET = { secret = "identity-authentication-google-oauth-client-secret" }
+      AUTH_PROVIDER_GOOGLE_SECRET = { secret = "identity-authentication-google-oauth-client-secret" }
     } : {},
   )
 
@@ -162,5 +191,6 @@ module "service" {
     module.secrets,
     module.messaging,
     module.migrate,
+    google_secret_manager_secret_iam_member.hydra_webhook_psk,
   ]
 }

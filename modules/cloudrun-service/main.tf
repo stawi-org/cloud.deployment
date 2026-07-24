@@ -20,7 +20,6 @@ resource "google_cloud_run_v2_service" "this" {
   ingress  = var.ingress
   labels   = var.labels
 
-  # Allow replace/destroy during greenfield iteration. Flip to true after cutover.
   deletion_protection = var.deletion_protection
 
   template {
@@ -30,6 +29,25 @@ resource "google_cloud_run_v2_service" "this" {
       max_instance_count = var.max_instance_count
     }
     max_instance_request_concurrency = var.concurrency
+
+    dynamic "volumes" {
+      for_each = var.secret_volumes
+      content {
+        name = volumes.key
+        secret {
+          secret       = volumes.value.secret
+          default_mode = 292 # 0444
+          dynamic "items" {
+            for_each = volumes.value.file_name != null ? [volumes.value.file_name] : []
+            content {
+              path    = items.value
+              version = volumes.value.version
+            }
+          }
+        }
+      }
+    }
+
     containers {
       image   = var.image
       command = var.command
@@ -45,6 +63,43 @@ resource "google_cloud_run_v2_service" "this" {
         cpu_idle          = var.cpu_idle
         startup_cpu_boost = var.startup_cpu_boost
       }
+
+      dynamic "volume_mounts" {
+        for_each = var.secret_volumes
+        content {
+          name       = volume_mounts.key
+          mount_path = volume_mounts.value.mount_path
+        }
+      }
+
+      dynamic "startup_probe" {
+        for_each = var.startup_probe_path != "" ? [1] : []
+        content {
+          initial_delay_seconds = 10
+          timeout_seconds       = 3
+          period_seconds        = 5
+          failure_threshold     = 30
+          http_get {
+            path = var.startup_probe_path
+            port = var.container_port
+          }
+        }
+      }
+
+      dynamic "liveness_probe" {
+        for_each = var.liveness_probe_path != "" ? [1] : []
+        content {
+          initial_delay_seconds = 30
+          timeout_seconds       = 5
+          period_seconds        = 10
+          failure_threshold     = 3
+          http_get {
+            path = var.liveness_probe_path
+            port = var.container_port
+          }
+        }
+      }
+
       dynamic "env" {
         for_each = var.env
         content {
@@ -68,8 +123,9 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-# Public invoker for edge apps (allUsers)
 resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
+  count = var.public_invoker ? 1 : 0
+
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.this.name

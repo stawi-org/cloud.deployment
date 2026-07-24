@@ -13,12 +13,13 @@ locals {
     "https://thesa-dev.stawi.org",
     "http://localhost:5173",
   ]
-  # Service env map injected into Cloud Run
+  # Minimal edge defaults; identity apps prefer modules/identity-domain for full parity.
   service_env = {
-    OAUTH2_SERVICE_URI          = "https://oauth2.stawi.org"
-    OAUTH2_AUDIENCE_BASE_URL    = "https://api.stawi.org"
-    OAUTH2_CLIENT_ASSERTION_AUD = local.oauth_token_url
-    OTEL_EXPORTER_OTLP_ENDPOINT = "https://otlp.nr-data.net" # override per platform if needed
-    EDGE_ENV                    = var.env
+    OAUTH2_SERVICE_URI               = "https://oauth2.stawi.org"
+    OAUTH2_AUDIENCE_BASE_URL         = "https://api.stawi.org"
+    OAUTH2_CLIENT_ASSERTION_AUDIENCE = local.oauth_token_url
+    OAUTH2_CLIENT_ASSERTION_AUD      = local.oauth_token_url # legacy alias
+    OTEL_EXPORTER_OTLP_ENDPOINT      = "https://otlp.nr-data.net"
+    EDGE_ENV                         = var.env
   }
 }

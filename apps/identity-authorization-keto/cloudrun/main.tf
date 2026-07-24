@@ -1,5 +1,5 @@
-# Ory Keto on Cloud Run + Neon + Pub/Sub.
-# Migrations: Cloud Run Job runs `keto migrate up -y` before serve.
+# Ory Keto — parity with namespaces/identity/authorization/service-keto.yaml
+# Cluster runs read:4466 + write:4467. Cloud Run = one port per service → two services.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -10,8 +10,8 @@ provider "google" {
   region  = var.region
 }
 
-module "edge" {
-  source = "../../../modules/edge-contract"
+module "domain" {
+  source = "../../../modules/identity-domain"
   env    = var.platform
 }
 
@@ -31,31 +31,28 @@ resource "google_service_account" "runtime" {
 locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
+  namespaces_secret_id      = "${var.app_name}-namespaces-ts"
   secret_ids = setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id]),
+    toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id]),
     var.extra_secret_ids,
   )
-  version_ids = toset([local.database_secret_id, local.database_direct_secret_id])
+  version_ids = toset([local.database_secret_id, local.database_direct_secret_id, local.namespaces_secret_id])
   secret_values = merge(
     { (local.database_secret_id) = module.db.pooled_connection_uri },
     { (local.database_direct_secret_id) = module.db.connection_uri },
+    { (local.namespaces_secret_id) = file("${path.module}/../files/namespaces.ts") },
     var.extra_secret_values,
   )
 }
 
 module "secrets" {
-  source = "../../../modules/app-secrets"
-
-  project_id = var.project_id
-  labels     = var.labels
-
-  secret_ids    = local.secret_ids
-  version_ids   = local.version_ids
-  secret_values = local.secret_values
-
-  accessor_members = [
-    "serviceAccount:${google_service_account.runtime.email}",
-  ]
+  source           = "../../../modules/app-secrets"
+  project_id       = var.project_id
+  labels           = var.labels
+  secret_ids       = local.secret_ids
+  version_ids      = local.version_ids
+  secret_values    = local.secret_values
+  accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
 }
 
 module "messaging" {
@@ -67,63 +64,81 @@ module "messaging" {
 }
 
 module "migrate" {
-  source = "../../../modules/cloudrun-migrate-job"
-
+  source                = "../../../modules/cloudrun-migrate-job"
   name                  = "${var.app_name}-migrate"
   project_id            = var.project_id
   region                = var.region
   image                 = var.image
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
-  # keto entrypoint is already "keto"
-  args = ["migrate", "up", "-y"]
-  env = {
-    LOG_LEVEL = "info"
-  }
+  args                  = ["migrate", "up", "-y"]
+  env                   = { LOG_LEVEL = "info" }
   secret_env = {
-    DSN = {
-      secret = module.secrets.secret_ids[local.database_direct_secret_id]
-    }
-    DATABASE_URL = {
-      secret = module.secrets.secret_ids[local.database_direct_secret_id]
-    }
+    DSN          = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
   }
-
   depends_on = [module.secrets]
 }
 
-module "service" {
+locals {
+  keto_common_env = merge(module.messaging.service_env, {
+    GCP_PROJECT                      = var.project_id
+    APP_NAME                         = var.app_name
+    LOG_LEVEL                        = "info"
+    NAMESPACES_LOCATION              = "file:///etc/keto-namespaces/namespaces.ts"
+    # Ory env form for namespaces.location
+    NAMESPACES_LOCATION_             = "file:///etc/keto-namespaces/namespaces.ts"
+  })
+  keto_secret_env = {
+    DSN                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
+  }
+  keto_volumes = {
+    namespaces = {
+      secret     = local.namespaces_secret_id
+      mount_path = "/etc/keto-namespaces"
+      file_name  = "namespaces.ts"
+    }
+  }
+}
+
+# Read API (4466) — used by AUTHORIZATION_SERVICE_READ_URI
+module "service_read" {
   source                = "../../../modules/cloudrun-service"
-  name                  = var.app_name
+  name                  = "${var.app_name}-read"
   project_id            = var.project_id
   region                = var.region
   image                 = var.image
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
-  # Keto read API default port
-  container_port = 4466
-  args           = ["serve", "read"]
-  env = merge(
-    module.edge.service_env,
-    module.messaging.service_env,
-    {
-      GCP_PROJECT = var.project_id
-      APP_NAME    = var.app_name
-      LOG_LEVEL   = "info"
-    },
-  )
-  secret_env = {
-    DATABASE_URL = {
-      secret = module.secrets.secret_ids[local.database_secret_id]
-    }
-    DSN = {
-      secret = module.secrets.secret_ids[local.database_secret_id]
-    }
-  }
+  container_port        = 4466
+  args                  = ["serve", "read"]
+  memory                = "512Mi"
+  env = merge(local.keto_common_env, {
+    SERVE_READ_PORT = "4466"
+  })
+  secret_env     = local.keto_secret_env
+  secret_volumes = local.keto_volumes
+  depends_on     = [module.secrets, module.migrate]
+}
 
-  depends_on = [
-    module.secrets,
-    module.messaging,
-    module.migrate,
-  ]
+# Write / admin API (4467)
+module "service_write" {
+  source                = "../../../modules/cloudrun-service"
+  name                  = "${var.app_name}-write"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.image
+  labels                = var.labels
+  service_account_email = google_service_account.runtime.email
+  container_port        = 4467
+  args                  = ["serve", "write"]
+  memory                = "512Mi"
+  env = merge(local.keto_common_env, {
+    SERVE_WRITE_PORT = "4467"
+  })
+  secret_env     = local.keto_secret_env
+  secret_volumes = local.keto_volumes
+  depends_on     = [module.secrets, module.migrate]
 }

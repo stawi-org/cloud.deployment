@@ -35,7 +35,7 @@ variable "args" {
 variable "service_account_email" {
   type        = string
   default     = null
-  description = "If set, use this SA instead of creating one in the module. Prefer root-managed SA so secret IAM can be granted before the service."
+  description = "If set, use this SA instead of creating one in the module."
 }
 
 variable "env" {
@@ -53,6 +53,19 @@ variable "secret_env" {
   description = "Env vars sourced from Secret Manager"
 }
 
+# Mount Secret Manager secrets as files (e.g. Keto namespaces.ts).
+variable "secret_volumes" {
+  type = map(object({
+    secret     = string
+    mount_path = string
+    # filename inside the mount (Cloud Run secret volume item path)
+    file_name  = optional(string, null)
+    version    = optional(string, "latest")
+  }))
+  default     = {}
+  description = "Map of volume name → Secret Manager volume mount"
+}
+
 variable "cpu" {
   type    = string
   default = "1"
@@ -64,15 +77,13 @@ variable "memory" {
 }
 
 variable "max_instance_count" {
-  type        = number
-  default     = 5
-  description = "Hard cap on instances — keep low for cost; raise per-app under load"
+  type    = number
+  default = 5
 }
 
 variable "min_instance_count" {
-  type        = number
-  default     = 0
-  description = "0 = scale to zero (no idle cost)"
+  type    = number
+  default = 0
 }
 
 variable "concurrency" {
@@ -81,15 +92,13 @@ variable "concurrency" {
 }
 
 variable "cpu_idle" {
-  type        = bool
-  default     = true
-  description = "When true, CPU is allocated only during request processing (cheaper for min_instances=0)"
+  type    = bool
+  default = true
 }
 
 variable "startup_cpu_boost" {
-  type        = bool
-  default     = true
-  description = "Brief CPU boost on cold start — faster wake, minimal extra cost"
+  type    = bool
+  default = true
 }
 
 variable "ingress" {
@@ -103,7 +112,24 @@ variable "labels" {
 }
 
 variable "deletion_protection" {
+  type    = bool
+  default = false
+}
+
+variable "public_invoker" {
   type        = bool
-  default     = false
-  description = "Cloud Run deletion protection; keep false until greenfield is stable"
+  default     = true
+  description = "Grant allUsers run.invoker (edge). Set false for admin-only services."
+}
+
+variable "startup_probe_path" {
+  type        = string
+  default     = ""
+  description = "If set, HTTP startup probe on this path (e.g. /healthz)"
+}
+
+variable "liveness_probe_path" {
+  type        = string
+  default     = ""
+  description = "If set, HTTP liveness probe on this path"
 }

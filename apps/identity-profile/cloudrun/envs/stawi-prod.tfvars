@@ -1,1 +1,1 @@
-image = "ghcr.io/antinvestor/service-profile:latest"
+image = "ghcr.io/antinvestor/service-profile:v1.53.4"
