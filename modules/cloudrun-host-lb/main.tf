@@ -25,7 +25,9 @@ resource "google_certificate_manager_dns_authorization" "host" {
 
 resource "google_certificate_manager_certificate" "this" {
   project  = var.project_id
-  name     = "${var.name}-cert"
+  # -v2: recreate after ACME DNS cutover so Certificate Manager re-runs
+  # domain authorization (stuck FAILED attempts do not always recheck promptly).
+  name     = "${var.name}-cert-v2"
   labels   = var.labels
   location = "global"
 
@@ -34,6 +36,10 @@ resource "google_certificate_manager_certificate" "this" {
     dns_authorizations = [
       for h in local.hostnames : google_certificate_manager_dns_authorization.host[h].id
     ]
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
