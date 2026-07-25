@@ -48,23 +48,27 @@ resource "neon_database" "app" {
 # `set -o pipefail` — always use bash (see cloudrun-migrate-job).
 # ---------------------------------------------------------------------------
 
+# Single provisioner for the full extension set (idempotent CREATE IF NOT EXISTS).
+# Re-runs when the sorted list changes so missing extensions are repaired without
+# manual taint. Parallel per-extension for_each previously left some apps without
+# btree_gin / btree_gist when early applies partially succeeded.
 resource "terraform_data" "extensions" {
-  for_each = toset(var.extensions)
+  count = length(var.extensions) > 0 ? 1 : 0
 
   input = {
     project_id = neon_project.this.id
     database   = neon_database.app.name
-    extension  = each.key
     role       = neon_role.app.name
+    # Stable, sorted list so reordering alone does not re-run.
+    extensions = join(",", sort(var.extensions))
   }
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     environment = {
       DATABASE_URL = neon_project.this.connection_uri
-      EXT_NAME     = each.key
+      EXT_LIST     = join(",", sort(var.extensions))
     }
-    # Quote extension names that need it (e.g. uuid-ossp).
     command = <<-EOT
       set -euo pipefail
       if ! command -v psql >/dev/null 2>&1; then
@@ -76,10 +80,14 @@ resource "terraform_data" "extensions" {
           exit 1
         fi
       fi
-      # Neon allows CREATE EXTENSION for supported extensions as DB owner.
-      psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-        -c "CREATE EXTENSION IF NOT EXISTS \"$${EXT_NAME}\" CASCADE;"
-      echo "extension ok: $${EXT_NAME}"
+      IFS=',' read -r -a exts <<< "$${EXT_LIST}"
+      for ext in "$${exts[@]}"; do
+        [[ -n "$$ext" ]] || continue
+        # Neon allows CREATE EXTENSION for supported extensions as DB owner.
+        psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 \
+          -c "CREATE EXTENSION IF NOT EXISTS \"$$ext\" CASCADE;"
+        echo "extension ok: $$ext"
+      done
     EOT
   }
 

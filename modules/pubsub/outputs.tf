@@ -73,7 +73,7 @@ output "service_env" {
       FRAME_QUEUE_PUSH_OIDC_ALLOWED_EMAILS = var.push_oidc_service_account_email
       } : (
       # Pull-only / non-Frame: leave push auth unset (Frame defaults to none).
-      local.events_topic_name != "" && !local.default_is_push ? {
+      local.events_topic_name != "" && !local.any_push ? {
         FRAME_QUEUE_PUSH_AUTH = "none"
       } : {}
     ),

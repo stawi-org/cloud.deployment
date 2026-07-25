@@ -43,23 +43,34 @@ locals {
     } : {}
   )
 
+  # True when any resolved subscription is push (default or multi-topic custom).
+  any_push = anytrue([
+    for s in local.subscriptions :
+    try(s.push_endpoint, null) != null && try(s.push_endpoint, "") != ""
+  ])
+  # Events subscription specifically uses push (Frame dual-URL subscribe).
+  events_is_push = (
+    contains(keys(local.subscriptions), local.default_topic_key)
+    && try(local.subscriptions[local.default_topic_key].push_endpoint, null) != null
+    && try(local.subscriptions[local.default_topic_key].push_endpoint, "") != ""
+  ) || (length(var.subscriptions) == 0 && local.default_is_push)
+
   events_topic_name = try(google_pubsub_topic.this[local.default_topic_key].name, "")
   events_sub_name   = try(google_pubsub_subscription.this[local.default_topic_key].name, "")
 
-  # Frame publish/subscribe URLs (dual when push endpoint is set).
+  # Frame publish/subscribe URLs (dual when events sub is push).
   frame_publish_url = local.events_topic_name != "" ? (
     "gcppubsub://${var.project_id}/${local.events_topic_name}"
   ) : ""
   frame_subscribe_url = local.events_topic_name != "" ? (
-    local.default_is_push
+    local.events_is_push
     ? "push://${local.events_ref}?protocol=gcppubsub"
     : "gcppubsub://${var.project_id}/${local.events_sub_name}"
   ) : ""
 
-  # Push OIDC: always configure the full FRAME_QUEUE_PUSH_OIDC_* suite for Frame
-  # when a push endpoint is used. Audience defaults to the push URL (must match
-  # the Pub/Sub subscription oidc_token.audience).
-  push_oidc_enabled = local.default_is_push && var.push_oidc_service_account_email != ""
+  # Push OIDC: full FRAME_QUEUE_PUSH_OIDC_* suite when any push sub is used.
+  # Audience must match Pub/Sub subscription oidc_token.audience (shared for multi-topic).
+  push_oidc_enabled = local.any_push && var.push_oidc_service_account_email != ""
   # coalesce() rejects null and "" — hydra/keto pass a null push endpoint.
   push_oidc_audience = (
     var.push_oidc_audience != ""
@@ -81,8 +92,8 @@ locals {
 # Frame push without OIDC would accept unauthenticated delivery — refuse that.
 check "frame_push_requires_oidc" {
   assert {
-    condition     = !local.default_is_push || var.push_oidc_service_account_email != ""
-    error_message = "default_push_endpoint is set but push_oidc_service_account_email is empty; Frame apps must configure FRAME_QUEUE_PUSH_OIDC_* (pass the runtime SA used for Pub/Sub push OIDC)."
+    condition     = !local.any_push || var.push_oidc_service_account_email != ""
+    error_message = "one or more push subscriptions are configured but push_oidc_service_account_email is empty; Frame apps must configure FRAME_QUEUE_PUSH_OIDC_* (pass the runtime SA used for Pub/Sub push OIDC)."
   }
 }
 

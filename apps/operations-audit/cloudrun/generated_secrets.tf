@@ -1,28 +1,27 @@
-# Shared + app secrets owned by operations-audit (like identity-oauth2-hydra owns hydra-webhook-psk).
+# Shared + app secrets owned by operations-audit.
 # Other operations apps only take IAM accessor on hydra-webhook-psk.
 #
-# hydra-webhook-psk should ideally match stawi-identity so private_key_jwt webhooks
-# accept the signer call. After first apply, re-seed from identity if needed:
-#   gcloud secrets versions access latest --secret=hydra-webhook-psk --project=stawi-identity \
-#     | gcloud secrets versions add hydra-webhook-psk --project=stawi-operations --data-file=-
+# hydra-webhook-psk MUST match stawi-identity so private_key_jwt webhooks
+# to accounts.stawi.org succeed. CI deploy SA has secretAccessor on the
+# identity secret (one-time IAM grant).
 #
-# audit-signing-key: service expects hex-encoded key material (hex.DecodeString),
-# not PEM — PEM dashes fail with: encoding/hex: invalid byte U+002D '-'.
+# audit-signing-key: service expects hex-encoded key material (hex.DecodeString).
 
-resource "random_password" "hydra_webhook_psk" {
-  length  = 48
-  special = false
+data "google_secret_manager_secret_version" "identity_hydra_psk" {
+  project = var.identity_project_id
+  secret  = "hydra-webhook-psk"
 }
 
 resource "random_bytes" "audit_signing" {
-  # App expects 64 raw bytes after hex.DecodeString (ed25519-style seed+pub or dual key).
+  # App expects 64 raw bytes after hex.DecodeString.
   length = 64
 }
 
 locals {
+  # Keys must stay non-sensitive for app-secrets for_each (see modules/app-secrets).
+  generated_secret_ids = toset(["hydra-webhook-psk", "audit-signing-key"])
   generated_secret_values = {
-    "hydra-webhook-psk" = random_password.hydra_webhook_psk.result
+    "hydra-webhook-psk" = data.google_secret_manager_secret_version.identity_hydra_psk.secret_data
     "audit-signing-key" = random_bytes.audit_signing.hex
   }
-  generated_secret_ids = toset(keys(local.generated_secret_values))
 }

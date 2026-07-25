@@ -52,13 +52,15 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
    ```
 3. Repo secrets: `SOPS_AGE_KEY`, `R2_*`, and (if edge hosts later) `CLOUDFLARE_API_TOKEN`.
 4. **Shared secrets** in project `stawi-operations` (OpenTofu-managed on first apply):
-   - `hydra-webhook-psk` — owned by **operations-audit** (generated). Prefer re-seeding with the
-     identity project value so private_key_jwt webhooks to `accounts.stawi.org` succeed:
+   - `hydra-webhook-psk` — owned by **operations-audit**. Value is **copied from
+     stawi-identity** via data source (must match so private_key_jwt webhooks to
+     `accounts.stawi.org` succeed). One-time IAM:
      ```bash
-     gcloud secrets versions access latest --secret=hydra-webhook-psk --project=stawi-identity \
-       | gcloud secrets versions add hydra-webhook-psk --project=stawi-operations --data-file=-
+     gcloud secrets add-iam-policy-binding hydra-webhook-psk --project=stawi-identity \
+       --member="serviceAccount:tofu-deploy@stawi-operations.iam.gserviceaccount.com" \
+       --role="roles/secretmanager.secretAccessor"
      ```
-   - `audit-signing-key` — owned by **operations-audit**
+   - `audit-signing-key` — owned by **operations-audit** (hex, 64 bytes after decode)
    - `service-files-encryption` — owned by **operations-redirect**
 
    Apply **operations-audit** (and **operations-redirect** if needed) before other ops apps so
@@ -98,7 +100,15 @@ done
 
 ## Notes / gaps vs K8s
 
-- **Messaging:** Cloud Run uses **Pub/Sub** (Frame dual URL), not in-cluster NATS. Trustage/redirect JetStream subjects are not ported 1:1; expect follow-up for queue parity.
-- **Valkey / Redis:** K8s `VALKEY_CACHE_URL` is not provisioned here; add Memorystore or omit until needed.
-- **Public hosts:** optional hostnames in tfvars; full HTTPS edge can use a future `edge-lb-operations` or Cloudflare path routes on `api.stawi.org` (same as K8s gateway paths).
+- **Messaging:** Cloud Run uses **Pub/Sub** (Frame dual URL), not in-cluster NATS.
+  - Most apps: single `{app}-events` topic + push subscription (Frame events).
+  - **operations-trustage:** multi-topic Pub/Sub — `events`, `exec`, `wf-events` with push
+    workers (`exec-worker`, `event-router`). Scheduler wake queues remain in-process
+    (`mem://`); trustage runs with `min_instance_count = 1`.
+- **Valkey / Redis:** K8s `VALKEY_CACHE_URL` is not provisioned; trustage sets
+  `CACHE_REQUIRE_VALKEY=false`. Add Memorystore when cache is required.
+- **Public hosts:** optional hostnames in tfvars; full HTTPS edge can use a future
+  `edge-lb-operations` or Cloudflare path routes on `api.stawi.org` (same as K8s gateway paths).
 - **thesa** has no Neon DB; analytics secrets are optional at runtime.
+- **Logging:** deploy SA needs `roles/logging.viewer` (bootstrap grants it). If debug
+  workflows cannot read logs, re-run bootstrap or grant manually as project admin.

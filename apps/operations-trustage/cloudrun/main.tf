@@ -62,6 +62,16 @@ locals {
   service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
   events_ref           = "${var.app_name}-events"
   events_push_endpoint = "${local.service_run_url}/_frame/queue/${local.events_ref}"
+  # Shared OIDC audience for all Pub/Sub push subscriptions (Frame accepts one).
+  push_oidc_audience = local.service_run_url
+
+  # Workflow Pub/Sub topics (NATS JetStream parity on Cloud Run).
+  exec_topic_name      = "${var.app_name}-exec"
+  wf_events_topic_name = "${var.app_name}-wf-events"
+  exec_worker_ref      = "exec-worker"
+  event_router_ref     = "event-router"
+  exec_worker_push     = "${local.service_run_url}/_frame/queue/${local.exec_worker_ref}"
+  event_router_push    = "${local.service_run_url}/_frame/queue/${local.event_router_ref}"
 
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
@@ -131,24 +141,22 @@ locals {
     OUTBOX_BATCH_SIZE            = "20"
     DISPATCH_BATCH_SIZE          = "50"
     ADAPTER_HTTP_TIMEOUT_SECONDS = "30"
-    # Workflow queues: mem:// until NATS/JetStream or multi-topic Pub/Sub lands.
-    # App defaults to nats://localhost (fatal on Cloud Run).
-    # mem:// requires publisher+subscriber share the same topic name, and rejects
-    # NATS consumer query params — zero MAX_ACK_PENDING so they are not appended.
-    QUEUE_EXEC_DISPATCH_NAME    = "exec-dispatch"
-    QUEUE_EXEC_DISPATCH_URL     = "mem://exec-dispatch"
-    QUEUE_EXEC_WORKER_NAME      = "exec-worker"
-    QUEUE_EXEC_WORKER_URL       = "mem://exec-dispatch"
-    QUEUE_EVENT_INGEST_NAME     = "event-ingest"
-    QUEUE_EVENT_INGEST_URL      = "mem://event-ingest"
-    QUEUE_EVENT_ROUTER_NAME     = "event-router"
-    QUEUE_EVENT_ROUTER_URL      = "mem://event-ingest"
-    EXEC_WORKER_MAX_ACK_PENDING = "0"
+    CACHE_REQUIRE_VALKEY         = "false"
+    # Workflow queues → Pub/Sub (multi-instance). Frame dual-URL:
+    #   publish  gcppubsub://{project}/{topic}
+    #   receive  push://{ref}?protocol=gcppubsub  → Pub/Sub push to /_frame/queue/{ref}
+    QUEUE_EXEC_DISPATCH_NAME     = "exec-dispatch"
+    QUEUE_EXEC_DISPATCH_URL      = "gcppubsub://${var.project_id}/${local.exec_topic_name}"
+    QUEUE_EXEC_WORKER_NAME       = local.exec_worker_ref
+    QUEUE_EXEC_WORKER_URL        = "push://${local.exec_worker_ref}?protocol=gcppubsub"
+    QUEUE_EVENT_INGEST_NAME      = "event-ingest"
+    QUEUE_EVENT_INGEST_URL       = "gcppubsub://${var.project_id}/${local.wf_events_topic_name}"
+    QUEUE_EVENT_ROUTER_NAME      = local.event_router_ref
+    QUEUE_EVENT_ROUTER_URL       = "push://${local.event_router_ref}?protocol=gcppubsub"
+    # Do not inject NATS consumer_max_ack_pending onto push:// URLs.
+    EXEC_WORKER_MAX_ACK_PENDING  = "0"
     EVENT_ROUTER_MAX_ACK_PENDING = "0"
-    # Frame events topic via in-process mem for bootstrap.
-    EVENTS_QUEUE_URL           = "mem://operations-trustage-events"
-    EVENTS_QUEUE_PUBLISH_URL   = "mem://operations-trustage-events"
-    EVENTS_QUEUE_SUBSCRIBE_URL = "mem://operations-trustage-events"
+    # Scheduler wake queues stay mem:// (in-process); keep min_instance_count ≥ 1.
   })
 }
 
@@ -178,11 +186,48 @@ module "messaging" {
   labels                          = var.labels
   allowed_persistence_regions     = [var.region]
   enforce_in_transit              = false
-  default_push_endpoint           = local.events_push_endpoint
+  create_default_events_topic     = false
+  default_push_endpoint           = null
   push_oidc_service_account_email = google_service_account.runtime.email
-  push_oidc_audience              = local.events_push_endpoint
-  pubsub_service_agent_email      = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
-  create_dead_letter_topic        = true
+  # Shared audience so all push OIDC tokens match FRAME_QUEUE_PUSH_OIDC_AUDIENCE.
+  push_oidc_audience         = local.push_oidc_audience
+  pubsub_service_agent_email = "service-${data.google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  create_dead_letter_topic   = true
+
+  topics = {
+    events = {
+      name = local.events_ref
+    }
+    exec = {
+      name = local.exec_topic_name
+    }
+    wf_events = {
+      name = local.wf_events_topic_name
+    }
+  }
+
+  subscriptions = {
+    events = {
+      topic_key             = "events"
+      name                  = "${local.events_ref}-push"
+      push_endpoint         = local.events_push_endpoint
+      enable_subscriber_iam = false
+    }
+    exec_worker = {
+      topic_key             = "exec"
+      name                  = "${var.app_name}-exec-worker-push"
+      push_endpoint         = local.exec_worker_push
+      enable_subscriber_iam = false
+      ack_deadline_seconds  = 60
+    }
+    event_router = {
+      topic_key             = "wf_events"
+      name                  = "${var.app_name}-event-router-push"
+      push_endpoint         = local.event_router_push
+      enable_subscriber_iam = false
+      ack_deadline_seconds  = 30
+    }
+  }
 }
 
 module "migrate" {
@@ -221,9 +266,12 @@ module "service" {
   container_port        = var.container_port
   use_http2             = true
   memory                = var.memory
-  public_invoker        = true
+  # Keep ≥1 so mem:// scheduler wake queues and in-process timers stay live.
+  min_instance_count = 1
+  public_invoker     = true
   env = merge(
     module.edge.service_env,
+    # Multi-topic Pub/Sub: events dual-URL + FRAME_QUEUE_PUSH_OIDC_* from module.
     module.messaging.service_env,
     local.app_env,
   )

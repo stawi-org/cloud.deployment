@@ -90,8 +90,16 @@ jobs:
             URL=$(gcloud secrets versions access latest --secret="$SECRET_ID" --project="$PROJ")
             echo "probing $(echo "$URL" | sed -E 's#://([^:]+):[^@]+@#://\1:***@#')"
             psql "$URL" -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension ORDER BY 1;" 2>&1 || true
-            psql "$URL" -v ON_ERROR_STOP=1 -c \
-              "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\" CASCADE;" 2>&1 || true
+            # Repair base suite (idempotent). timescaledb only for audit/trustage.
+            BASE_EXTS='uuid-ossp pg_stat_statements pg_trgm btree_gin btree_gist'
+            for ext in $BASE_EXTS; do
+              psql "$URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS \"$ext\" CASCADE;" 2>&1 || true
+            done
+            case "$SVC" in
+              operations-audit|operations-trustage)
+                psql "$URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;' 2>&1 || true
+                ;;
+            esac
             psql "$URL" -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension ORDER BY 1;" 2>&1 || true
           else
             echo "secret $SECRET_ID not found"
