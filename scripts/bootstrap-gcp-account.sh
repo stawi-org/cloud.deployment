@@ -88,8 +88,10 @@ usage() {
 Flags:
   --project <ID>         GCP project id (required)
   --account <KEY>        gcp-accounts.yaml account key (required)
-                         e.g. identity | payments | notifications | platform | labs
+                         e.g. identity | platform | operations | payments
+                         New keys are auto-created in the registry PR if missing.
   --env <NAME>           stawi-dev | stawi-prod (default: stawi-dev)
+                         Env slices are auto-created if missing.
   --region <REGION>      Default europe-west1
   --repo-path <PATH>     cloud.deployment checkout (default: auto-clone ~/cloud.deployment)
   --no-clone             Fail if no checkout found
@@ -135,11 +137,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PROJECT" ]] || die "--project is required"
-[[ -n "$ACCOUNT" ]] || die "--account is required (e.g. identity)"
+[[ -n "$ACCOUNT" ]] || die "--account is required (e.g. identity | operations)"
 case "$ENV_NAME" in
   stawi-dev|stawi-prod) ;;
   *) die "--env must be stawi-dev or stawi-prod (got: $ENV_NAME)" ;;
 esac
+# Stable registry keys only: lower-case letter, then alnum/hyphen (no path tricks).
+if [[ ! "$ACCOUNT" =~ ^[a-z][a-z0-9-]*$ ]]; then
+  die "--account must match ^[a-z][a-z0-9-]*$ (got: ${ACCOUNT})"
+fi
 if [[ "$ACCOUNT" == *"/"* || "$ACCOUNT" == *".."* ]]; then
   die "--account must be a single path segment"
 fi
@@ -407,11 +413,15 @@ resolve_repo_path
 verify_gcloud_access
 preflight_sops "$REPO_PATH"
 
-if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REPO_PATH/config/gcp-accounts.yaml" >/dev/null 2>&1; then
-  die "account '${ACCOUNT}' not in config/gcp-accounts.yaml — add the key to the plan/registry first"
-fi
-if ! yq -e ".accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"]" "$REPO_PATH/config/gcp-accounts.yaml" >/dev/null 2>&1; then
-  die "account '${ACCOUNT}' has no env slice '${ENV_NAME}' in gcp-accounts.yaml"
+# Registry is optional going in — missing account/env are created in the PR.
+# IAM-only mode only needs a valid GCP project; registry writes are skipped.
+REG_FILE_LOCAL="$REPO_PATH/config/gcp-accounts.yaml"
+if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REG_FILE_LOCAL" >/dev/null 2>&1; then
+  say "account '${ACCOUNT}' not yet in gcp-accounts.yaml — will create it in the bootstrap PR"
+elif ! yq -e ".accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"]" "$REG_FILE_LOCAL" >/dev/null 2>&1; then
+  say "env '${ENV_NAME}' missing under accounts.${ACCOUNT} — will create it in the bootstrap PR"
+else
+  say "registry already has accounts.${ACCOUNT}.envs.${ENV_NAME} (will refresh from live WIF/SA)"
 fi
 
 # =========================================================================
@@ -579,21 +589,44 @@ git -C "$REPO_PATH" worktree add -b "$BRANCH" "$WORKTREE" "origin/${BASE_BRANCH}
 say "worktree: $WORKTREE"
 
 # --- Update gcp-accounts.yaml (public registry; yq only) ---
+# Auto-create account + env if missing so expansion is a single bootstrap call.
 REG_FILE="$WORKTREE/config/gcp-accounts.yaml"
 LABEL_ENV="dev"
 [[ "$ENV_NAME" == "stawi-prod" ]] && LABEL_ENV="prod"
+CREATED_ACCOUNT="false"
+CREATED_ENV="false"
+if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REG_FILE" >/dev/null 2>&1; then
+  CREATED_ACCOUNT="true"
+fi
+if ! yq -e ".accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"]" "$REG_FILE" >/dev/null 2>&1; then
+  CREATED_ENV="true"
+fi
 
 yq -i "
+  .accounts[\"${ACCOUNT}\"] = (.accounts[\"${ACCOUNT}\"] // {}) |
+  .accounts[\"${ACCOUNT}\"].description = (.accounts[\"${ACCOUNT}\"].description // \"GCP account ${ACCOUNT} (auto-registered by bootstrap-gcp-account.sh)\") |
+  .accounts[\"${ACCOUNT}\"].owners = (.accounts[\"${ACCOUNT}\"].owners // [\"platform\"]) |
+  .accounts[\"${ACCOUNT}\"].sensitivity = (.accounts[\"${ACCOUNT}\"].sensitivity // \"medium\") |
+  .accounts[\"${ACCOUNT}\"].envs = (.accounts[\"${ACCOUNT}\"].envs // {}) |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"] = (.accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"] // {}) |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].project_id = \"${PROJECT}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].region = \"${REGION}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].workload_identity_provider = \"${WIF_PROVIDER_RESOURCE}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].deploy_service_account = \"${SA_EMAIL}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].sops_auth_path = \"${AUTH_REL}\" |
+  .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels = (.accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels // {}) |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.\"managed-by\" = \"cloud-deployment\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.domain = \"${ACCOUNT}\" |
   .accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].labels.environment = \"${LABEL_ENV}\" |
   del(.accounts[\"${ACCOUNT}\"].envs[\"${ENV_NAME}\"].protection_environment)
 " "$REG_FILE"
+
+if [[ "$CREATED_ACCOUNT" == "true" ]]; then
+  say "created accounts.${ACCOUNT} in config/gcp-accounts.yaml"
+fi
+if [[ "$CREATED_ENV" == "true" ]]; then
+  say "created accounts.${ACCOUNT}.envs.${ENV_NAME} in config/gcp-accounts.yaml"
+fi
 say "updated config/gcp-accounts.yaml → ${ACCOUNT}/${ENV_NAME} (project=${PROJECT})"
 
 # --- SOPS-encrypted auth (like deployment.infra) ---

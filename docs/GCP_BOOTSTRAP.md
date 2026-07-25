@@ -10,6 +10,8 @@ GCP bootstrap is **independent of Neon**. It never writes Neon keys.
 4. Updates `config/gcp-accounts.yaml` (public mirror).  
 5. Writes SOPS-encrypted `credentials/gcp/<account>/<env>/auth.yaml`.  
 
+If `--account` / `--env` are **not** already in the registry, bootstrap **creates** them in the PR (defaults: `owners: [platform]`, `sensitivity: medium`). You do not need to edit `gcp-accounts.yaml` by hand first.
+
 CI uses **WIF** from the SOPS file (or registry mirror) — no long-lived GCP keys in GitHub.
 
 ## Prerequisites
@@ -22,12 +24,20 @@ CI uses **WIF** from the SOPS file (or registry mirror) — no long-lived GCP ke
 ## Usage
 
 ```bash
+# Existing account
 ./scripts/bootstrap-gcp-account.sh \
   --account identity \
   --env stawi-prod \
   --project stawi-identity \
   --region europe-west9 \
   --repo-path "$PWD"
+
+# New domain (auto-registers accounts.operations + envs.stawi-prod)
+./scripts/bootstrap-gcp-account.sh \
+  --account operations \
+  --env stawi-prod \
+  --project stawi-operations \
+  --region europe-west9
 ```
 
 ## After bootstrap
