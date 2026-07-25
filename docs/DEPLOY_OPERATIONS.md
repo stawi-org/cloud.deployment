@@ -98,6 +98,24 @@ for app in operations-audit operations-formstore operations-queuestore \
 done
 ```
 
+## Runtime verification (stawi-prod)
+
+All six Cloud Run services report **Ready + ContainerHealthy**. Live `/readyz` probes
+(public `*.run.app`):
+
+| Service | Ready | `/readyz` | Neon extensions |
+|---------|-------|-----------|-----------------|
+| operations-audit | yes | app-specific (CR healthy) | base + timescaledb |
+| operations-formstore | yes | healthy | base (+ timescaledb if debug-repaired) |
+| operations-queuestore | yes | healthy | base |
+| operations-redirect | yes | app-specific (CR healthy) | base |
+| operations-trustage | yes | healthy | base + timescaledb |
+| operations-thesa | yes | app-specific (no DB) | n/a |
+
+Trustage multi-topic env (applied): `QUEUE_EXEC_*` → `operations-trustage-exec`,
+`QUEUE_EVENT_*` → `operations-trustage-wf-events`, Frame events dual-URL + OIDC push,
+`CACHE_REQUIRE_VALKEY=false`, `MinInstancesProvisioned`.
+
 ## Notes / gaps vs K8s
 
 - **Messaging:** Cloud Run uses **Pub/Sub** (Frame dual URL), not in-cluster NATS.
@@ -107,8 +125,17 @@ done
     (`mem://`); trustage runs with `min_instance_count = 1`.
 - **Valkey / Redis:** K8s `VALKEY_CACHE_URL` is not provisioned; trustage sets
   `CACHE_REQUIRE_VALKEY=false`. Add Memorystore when cache is required.
-- **Public hosts:** optional hostnames in tfvars; full HTTPS edge can use a future
-  `edge-lb-operations` or Cloudflare path routes on `api.stawi.org` (same as K8s gateway paths).
+- **Public hosts / edge:** no `edge-lb-operations` yet; path routes on `api.stawi.org`
+  (Cloudflare / future LB) still to wire for production public paths.
+- **Migrate jobs:** created with `execute = false`; run manually or flip when schema
+  changes need applying.
 - **thesa** has no Neon DB; analytics secrets are optional at runtime.
-- **Logging:** deploy SA needs `roles/logging.viewer` (bootstrap grants it). If debug
-  workflows cannot read logs, re-run bootstrap or grant manually as project admin.
+- **Logging / project IAM:** `tofu-deploy@stawi-operations` needs `roles/logging.viewer`
+  (listed in bootstrap). If debug workflows cannot read logs, a **project owner** must
+  re-run `./scripts/bootstrap-gcp-account.sh … --iam-only` or grant:
+  ```bash
+  gcloud projects add-iam-policy-binding stawi-operations \
+    --member='serviceAccount:tofu-deploy@stawi-operations.iam.gserviceaccount.com' \
+    --role='roles/logging.viewer'
+  ```
+  Human identities currently have no direct access to `stawi-operations` (CI WIF only).
