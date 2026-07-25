@@ -1,5 +1,15 @@
 output "service_uri" {
-  value = module.service.uri
+  description = "Hydra public OIDC base URL"
+  value       = module.service.uri
+}
+
+output "admin_uri" {
+  description = "Hydra admin base URL (IAM-protected; not on edge LB)"
+  value       = module.service_admin.uri
+}
+
+output "admin_service_name" {
+  value = module.service_admin.name
 }
 
 output "project_id" {
@@ -21,4 +31,8 @@ output "runtime_service_account_email" {
 
 output "pubsub_topic_names" {
   value = module.messaging.topic_names
+}
+
+output "admin_exposure" {
+  value = var.admin_exposure
 }

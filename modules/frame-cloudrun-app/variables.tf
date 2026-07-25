@@ -45,6 +45,12 @@ variable "identity_region" {
   description = "Region of identity Cloud Run services; null = var.region"
 }
 
+variable "use_hydra_admin_service" {
+  type        = bool
+  default     = true
+  description = "Read identity-oauth2-hydra-admin for OAUTH2_SERVICE_ADMIN_URI (IAM-protected). Set false before admin service exists."
+}
+
 variable "enable_keto" {
   type        = bool
   default     = true

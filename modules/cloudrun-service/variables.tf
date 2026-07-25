@@ -120,8 +120,17 @@ variable "startup_cpu_boost" {
 }
 
 variable "ingress" {
-  type    = string
-  default = "INGRESS_TRAFFIC_ALL"
+  type        = string
+  default     = null
+  description = "Override ingress. Prefer var.exposure unless you need a raw Cloud Run value."
+  validation {
+    condition = var.ingress == null || contains([
+      "INGRESS_TRAFFIC_ALL",
+      "INGRESS_TRAFFIC_INTERNAL_ONLY",
+      "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER",
+    ], var.ingress)
+    error_message = "ingress must be a valid Cloud Run v2 ingress enum or null."
+  }
 }
 
 variable "labels" {
@@ -134,10 +143,36 @@ variable "deletion_protection" {
   default = false
 }
 
+# ---------------------------------------------------------------------------
+# Exposure framework (prefer this over raw ingress + public_invoker)
+#
+# public         — internet + allUsers (or edge LB). Product APIs, Hydra public.
+# authenticated  — internet path exists but IAM required (no allUsers). Control
+#                  plane callable cross-project without Shared VPC (Keto, Hydra admin).
+# private        — INGRESS_TRAFFIC_INTERNAL_ONLY. Same VPC / internal only.
+#                  Use when Shared VPC or same-project private callers are ready.
+# ---------------------------------------------------------------------------
+
+variable "exposure" {
+  type        = string
+  default     = "public"
+  description = "public | authenticated | private — see modules/cloudrun-service README"
+  validation {
+    condition     = contains(["public", "authenticated", "private"], var.exposure)
+    error_message = "exposure must be public, authenticated, or private."
+  }
+}
+
 variable "public_invoker" {
   type        = bool
-  default     = true
-  description = "Grant allUsers run.invoker (edge). Set false for admin-only services."
+  default     = null
+  description = "Deprecated override: grant allUsers run.invoker. Null → derived from exposure (public only)."
+}
+
+variable "invoker_members" {
+  type        = set(string)
+  default     = []
+  description = "IAM members granted roles/run.invoker (e.g. serviceAccount:app@project.iam.gserviceaccount.com). Required for authenticated/private unless empty bootstrap."
 }
 
 variable "startup_probe_path" {

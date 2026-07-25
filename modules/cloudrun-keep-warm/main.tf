@@ -28,9 +28,17 @@ resource "google_cloud_scheduler_job" "this" {
   http_target {
     http_method = var.http_method
     uri         = var.uri
-    # Public invoker: no OIDC. For private services, add oidc_token { service_account_email = ... }.
     headers = {
       "User-Agent" = "cloud-deployment/keep-warm"
+    }
+
+    # Authenticated / private Cloud Run targets require OIDC (and run.invoker on that SA).
+    dynamic "oidc_token" {
+      for_each = var.oidc_service_account_email != "" ? [1] : []
+      content {
+        service_account_email = var.oidc_service_account_email
+        audience              = var.oidc_audience != "" ? var.oidc_audience : var.uri
+      }
     }
   }
 

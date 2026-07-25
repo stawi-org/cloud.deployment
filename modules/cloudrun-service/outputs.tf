@@ -9,3 +9,15 @@ output "service_account_email" {
 output "name" {
   value = google_cloud_run_v2_service.this.name
 }
+
+output "exposure" {
+  value = var.exposure
+}
+
+output "ingress" {
+  value = local.resolved_ingress
+}
+
+output "public_invoker" {
+  value = local.resolved_public_invoker
+}

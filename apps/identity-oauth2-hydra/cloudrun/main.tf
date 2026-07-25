@@ -65,25 +65,44 @@ locals {
     var.extra_secret_values,
   )
 
-  # Cluster Helm hydra.config → env (public edge only)
+  # Deterministic admin Cloud Run URL (K8s: hydra-admin ClusterIP only).
+  admin_service_name = "${var.app_name}-admin"
+  admin_run_url      = "https://${local.admin_service_name}-${data.google_project.this.number}.${var.region}.run.app"
+
+  # Identity runtimes that may call Hydra admin (client mgmt, etc.).
+  admin_invoker_members = setunion(
+    toset([
+      for id in toset([
+        "identity-authentication",
+        "identity-identity",
+        "identity-profile",
+        "identity-tenancy",
+        substr(replace(var.app_name, "_", "-"), 0, 28),
+      ]) : "serviceAccount:${id}@${var.project_id}.iam.gserviceaccount.com"
+    ]),
+    var.additional_admin_invoker_members,
+  )
+
+  # Cluster Helm hydra.config → env (public edge process)
   hydra_env = {
     # Cloud Run requires listen on all interfaces (not localhost)
-    SERVE_PUBLIC_HOST                                = "0.0.0.0"
-    SERVE_PUBLIC_PORT                                = "4444"
-    SERVE_PUBLIC_BASE_URL                            = local.oauth2_origin
-    SERVE_PUBLIC_CORS_ENABLED                        = "false"
-    SERVE_PUBLIC_COOKIES_DOMAIN                      = local.cookie_domain
-    SERVE_PUBLIC_COOKIES_SAME_SITE_MODE              = "Lax"
-    SERVE_PUBLIC_COOKIES_SECURE                      = "true"
-    SERVE_PUBLIC_REQUEST_LOG_DISABLE_FOR_HEALTH      = "true"
-    URLS_LOGIN                                       = "${local.accounts_origin}/s/login"
-    URLS_CONSENT                                     = "${local.accounts_origin}/s/consent"
-    URLS_LOGOUT                                      = "${local.accounts_origin}/s/logout"
-    URLS_ERROR                                       = "${local.accounts_origin}/error"
-    URLS_POST_LOGOUT_REDIRECT                        = "${local.accounts_origin}/logout-successful"
-    URLS_SELF_PUBLIC                                 = local.oauth2_origin
-    URLS_SELF_ISSUER                                 = local.issuer
-    URLS_SELF_ADMIN                                  = local.oauth2_origin
+    SERVE_PUBLIC_HOST                           = "0.0.0.0"
+    SERVE_PUBLIC_PORT                           = "4444"
+    SERVE_PUBLIC_BASE_URL                       = local.oauth2_origin
+    SERVE_PUBLIC_CORS_ENABLED                   = "false"
+    SERVE_PUBLIC_COOKIES_DOMAIN                 = local.cookie_domain
+    SERVE_PUBLIC_COOKIES_SAME_SITE_MODE         = "Lax"
+    SERVE_PUBLIC_COOKIES_SECURE                 = "true"
+    SERVE_PUBLIC_REQUEST_LOG_DISABLE_FOR_HEALTH = "true"
+    URLS_LOGIN                                  = "${local.accounts_origin}/s/login"
+    URLS_CONSENT                                = "${local.accounts_origin}/s/consent"
+    URLS_LOGOUT                                 = "${local.accounts_origin}/s/logout"
+    URLS_ERROR                                  = "${local.accounts_origin}/error"
+    URLS_POST_LOGOUT_REDIRECT                   = "${local.accounts_origin}/logout-successful"
+    URLS_SELF_PUBLIC                            = local.oauth2_origin
+    URLS_SELF_ISSUER                            = local.issuer
+    # Admin is a separate private Cloud Run service (not the public origin).
+    URLS_SELF_ADMIN                                  = local.admin_run_url
     WEBFINGER_OIDC_DISCOVERY_TOKEN_URL               = "${local.oauth2_origin}/oauth2/token"
     WEBFINGER_OIDC_DISCOVERY_AUTH_URL                = "${local.oauth2_origin}/oauth2/auth"
     WEBFINGER_OIDC_DISCOVERY_CLIENT_REGISTRATION_URL = "${local.oauth2_origin}/clients"
@@ -111,6 +130,13 @@ locals {
     LOG_LEVEL                                        = "warn"
     LOG_FORMAT                                       = "text"
   }
+
+  hydra_admin_env = merge(local.hydra_env, {
+    SERVE_ADMIN_HOST                           = "0.0.0.0"
+    SERVE_ADMIN_PORT                           = "4445"
+    SERVE_ADMIN_BASE_URL                       = local.admin_run_url
+    SERVE_ADMIN_REQUEST_LOG_DISABLE_FOR_HEALTH = "true"
+  })
 }
 
 module "secrets" {
@@ -154,6 +180,7 @@ module "migrate" {
   depends_on = [module.secrets]
 }
 
+# Public OIDC surface (oauth2.stawi.org). K8s: hydra-public + HTTPRoute.
 module "service" {
   source                = "../../../modules/cloudrun-service"
   name                  = var.app_name
@@ -165,7 +192,7 @@ module "service" {
   container_port        = 4444
   args                  = ["serve", "public"]
   memory                = "512Mi"
-  # min instances = 0; cheap keep-warm via Cloud Scheduler (module.keep_warm).
+  exposure              = "public"
   env = merge(
     local.hydra_env,
     module.messaging.service_env,
@@ -186,8 +213,41 @@ module "service" {
   depends_on = [module.secrets, module.messaging, module.migrate]
 }
 
-# Cheap keep-warm: ping every 5m instead of paying idle min_instance_count=1.
-# Frame apps fail OIDC discovery hard if Hydra is fully cold + Neon sleeping.
+# Admin API (K8s: hydra-admin ClusterIP only — never on Gateway).
+module "service_admin" {
+  source                = "../../../modules/cloudrun-service"
+  name                  = local.admin_service_name
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.image
+  labels                = var.labels
+  service_account_email = google_service_account.runtime.email
+  container_port        = 4445
+  args                  = ["serve", "admin"]
+  memory                = "512Mi"
+  exposure              = var.admin_exposure
+  invoker_members       = local.admin_invoker_members
+  env = merge(
+    local.hydra_admin_env,
+    module.messaging.service_env,
+    {
+      GCP_PROJECT = var.project_id
+      APP_NAME    = var.app_name
+    },
+  )
+  secret_env = {
+    DSN                           = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    DATABASE_URL                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    SECRETS_SYSTEM                = { secret = "identity-oauth2-hydra-secrets-system" }
+    SECRETS_COOKIE                = { secret = "identity-oauth2-hydra-secrets-cookie" }
+    WEBHOOK_BEARER_PSK            = { secret = "hydra-webhook-psk" }
+    OAUTH2_TOKEN_HOOK_AUTH_CONFIG = { secret = local.token_hook_secret_id }
+  }
+
+  depends_on = [module.secrets, module.messaging, module.migrate]
+}
+
+# Cheap keep-warm: public process only (OIDC discovery / token).
 module "keep_warm" {
   source           = "../../../modules/cloudrun-keep-warm"
   project_id       = var.project_id

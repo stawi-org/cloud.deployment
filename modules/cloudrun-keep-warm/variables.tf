@@ -51,3 +51,15 @@ variable "enable_api" {
   default     = true
   description = "Enable cloudscheduler.googleapis.com on the project"
 }
+
+variable "oidc_service_account_email" {
+  type        = string
+  default     = ""
+  description = "If set, Scheduler sends OIDC token as this SA (required when target Cloud Run is not allUsers-invokable)."
+}
+
+variable "oidc_audience" {
+  type        = string
+  default     = ""
+  description = "OIDC audience (defaults to job uri when empty). Must match what Cloud Run expects (usually the service URL)."
+}

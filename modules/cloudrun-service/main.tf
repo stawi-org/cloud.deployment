@@ -11,13 +11,44 @@ locals {
     var.service_account_email,
     try(google_service_account.runtime[0].email, null),
   )
+
+  # Exposure → ingress. Explicit var.ingress wins when set.
+  resolved_ingress = coalesce(var.ingress, (
+    var.exposure == "private"
+    ? "INGRESS_TRAFFIC_INTERNAL_ONLY"
+    : "INGRESS_TRAFFIC_ALL"
+  ))
+
+  # allUsers only for public product surfaces (unless explicitly overridden).
+  resolved_public_invoker = coalesce(
+    var.public_invoker,
+    var.exposure == "public",
+  )
+}
+
+check "private_or_authenticated_should_list_invokers" {
+  assert {
+    condition = (
+      var.exposure == "public"
+      || length(var.invoker_members) > 0
+      || var.public_invoker == true
+    )
+    error_message = "exposure=${var.exposure} requires invoker_members (runtime SAs, scheduler SA, etc.) so the service is not unreachable. Set exposure=public only for intentional internet-open APIs."
+  }
+}
+
+check "public_invoker_forbidden_when_private" {
+  assert {
+    condition     = !(var.exposure == "private" && local.resolved_public_invoker)
+    error_message = "exposure=private cannot grant allUsers (public_invoker). Use invoker_members only."
+  }
 }
 
 resource "google_cloud_run_v2_service" "this" {
   name     = var.name
   project  = var.project_id
   location = var.region
-  ingress  = var.ingress
+  ingress  = local.resolved_ingress
   labels   = var.labels
 
   deletion_protection = var.deletion_protection
@@ -156,12 +187,24 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
+# Anonymous internet invoker — public product surfaces only.
 resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
-  count = var.public_invoker ? 1 : 0
+  count = local.resolved_public_invoker ? 1 : 0
 
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.this.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# Explicit invokers (runtime SAs, keep-warm scheduler SA, cross-project callers).
+resource "google_cloud_run_v2_service_iam_member" "invoker" {
+  for_each = var.invoker_members
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.this.name
+  role     = "roles/run.invoker"
+  member   = each.value
 }

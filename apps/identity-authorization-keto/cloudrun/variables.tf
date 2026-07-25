@@ -59,3 +59,24 @@ variable "extra_secret_ids" {
   default     = []
   description = "SM secret IDs to create without versions (fill versions outside git)"
 }
+
+variable "exposure" {
+  type        = string
+  default     = "authenticated"
+  description = <<-EOT
+    Control-plane privacy (see modules/cloudrun-service):
+      authenticated — no allUsers; IAM invoker required (default; works cross-project)
+      private       — INGRESS_TRAFFIC_INTERNAL_ONLY (requires VPC private path for callers)
+    Never public for Keto.
+  EOT
+  validation {
+    condition     = contains(["authenticated", "private"], var.exposure)
+    error_message = "Keto exposure must be authenticated or private (never public)."
+  }
+}
+
+variable "additional_invoker_members" {
+  type        = set(string)
+  default     = []
+  description = "Extra run.invoker members (e.g. serviceAccount:operations-trustage@stawi-operations.iam.gserviceaccount.com)"
+}

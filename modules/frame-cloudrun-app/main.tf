@@ -75,7 +75,9 @@ locals {
   )
 
   oauth2_origin = data.google_cloud_run_v2_service.hydra.uri
-  token_url     = "${local.oauth2_origin}/oauth2/token"
+  # Prefer dedicated admin service (IAM-only); fall back to public if admin missing.
+  oauth2_admin_origin = try(data.google_cloud_run_v2_service.hydra_admin[0].uri, local.oauth2_origin)
+  token_url           = "${local.oauth2_origin}/oauth2/token"
 
   keto_read_uri  = var.enable_keto ? data.google_cloud_run_v2_service.keto_read[0].uri : local.api_base
   keto_write_uri = var.enable_keto ? data.google_cloud_run_v2_service.keto_write[0].uri : local.api_base
@@ -87,7 +89,7 @@ locals {
       LOG_LEVEL                         = "INFO"
       AUTHORIZATION_MODE                = "keto"
       OAUTH2_SERVICE_URI                = local.oauth2_origin
-      OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin
+      OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_admin_origin
       OAUTH2_WELL_KNOWN_OIDC_PATH       = ".well-known/openid-configuration"
       OAUTH2_AUDIENCE_BASE_URL          = local.api_base
       OAUTH2_CLIENT_ASSERTION_AUDIENCE  = local.token_url
@@ -158,6 +160,14 @@ locals {
 
 data "google_cloud_run_v2_service" "hydra" {
   name     = "identity-oauth2-hydra"
+  location = local.identity_region
+  project  = local.identity_project
+}
+
+# Optional until first hydra-admin apply succeeds (count avoids hard fail on greenfield).
+data "google_cloud_run_v2_service" "hydra_admin" {
+  count    = var.use_hydra_admin_service ? 1 : 0
+  name     = "identity-oauth2-hydra-admin"
   location = local.identity_region
   project  = local.identity_project
 }

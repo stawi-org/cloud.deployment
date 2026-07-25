@@ -72,3 +72,19 @@ variable "advertise_public_hostname" {
   default     = false
   description = "When true, Hydra URLs/issuer endpoints use https://public_hostname instead of run.app"
 }
+
+variable "admin_exposure" {
+  type        = string
+  default     = "authenticated"
+  description = "Hydra admin service exposure: authenticated (default) or private. Never public."
+  validation {
+    condition     = contains(["authenticated", "private"], var.admin_exposure)
+    error_message = "admin_exposure must be authenticated or private."
+  }
+}
+
+variable "additional_admin_invoker_members" {
+  type        = set(string)
+  default     = []
+  description = "Extra run.invoker members for Hydra admin (cross-project SAs if needed)"
+}

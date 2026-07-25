@@ -109,6 +109,30 @@ locals {
       read_only  = true
     }
   }
+
+  # ---------------------------------------------------------------------------
+  # Privacy: Keto is control plane (no public HTTPRoute in K8s). Cloud Run uses
+  # exposure=authenticated (IAM required, no allUsers). Use exposure=private when
+  # Shared VPC private path exists for all callers.
+  #
+  # Invokers: identity Frame runtimes + this SA (keep-warm OIDC) + optional
+  # cross-project callers (ops/platform) via var.additional_invoker_members.
+  # ---------------------------------------------------------------------------
+  identity_runtime_account_ids = toset([
+    "identity-authentication",
+    "identity-identity",
+    "identity-profile",
+    "identity-tenancy",
+    "identity-oauth2-hydra",
+    substr(replace(var.app_name, "_", "-"), 0, 28), # keto runtime (self / keep-warm)
+  ])
+  keto_invoker_members = setunion(
+    toset([
+      for id in local.identity_runtime_account_ids :
+      "serviceAccount:${id}@${var.project_id}.iam.gserviceaccount.com"
+    ]),
+    var.additional_invoker_members,
+  )
 }
 
 module "secrets" {
@@ -171,13 +195,14 @@ module "service_read" {
   container_port        = 4466
   # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
   # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
-  args           = ["serve", "read", "-c", "/etc/keto/keto.yml"]
-  memory         = "512Mi"
-  # min instances = 0; cheap keep-warm via Cloud Scheduler (module.keep_warm_read).
-  env            = local.keto_common_env
-  secret_env     = local.keto_secret_env
-  secret_volumes = local.keto_secret_volumes
-  gcs_volumes    = local.keto_gcs_volumes
+  args            = ["serve", "read", "-c", "/etc/keto/keto.yml"]
+  memory          = "512Mi"
+  exposure        = var.exposure
+  invoker_members = local.keto_invoker_members
+  env             = local.keto_common_env
+  secret_env      = local.keto_secret_env
+  secret_volumes  = local.keto_secret_volumes
+  gcs_volumes     = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,
@@ -186,16 +211,29 @@ module "service_read" {
   ]
 }
 
-# Cheap keep-warm for keto-read (Frame AUTHORIZATION_MODE=keto).
+# Keep-warm with OIDC (service is not allUsers-invokable).
 module "keep_warm_read" {
-  source           = "../../../modules/cloudrun-keep-warm"
-  project_id       = var.project_id
-  name             = "keep-warm-${var.app_name}-read"
-  uri              = "${module.service_read.uri}/health/ready"
-  schedule         = "*/5 * * * *"
-  attempt_deadline = "180s"
-  scheduler_region = "europe-west1"
-  depends_on       = [module.service_read]
+  source                     = "../../../modules/cloudrun-keep-warm"
+  project_id                 = var.project_id
+  name                       = "keep-warm-${var.app_name}-read"
+  uri                        = "${module.service_read.uri}/health/ready"
+  schedule                   = "*/5 * * * *"
+  attempt_deadline           = "180s"
+  scheduler_region           = "europe-west1"
+  oidc_service_account_email = google_service_account.runtime.email
+  oidc_audience              = module.service_read.uri
+  depends_on                 = [module.service_read]
+}
+
+# Scheduler service agent must mint tokens as the OIDC SA.
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+resource "google_service_account_iam_member" "scheduler_token_creator" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 }
 
 module "service_write" {
@@ -209,10 +247,13 @@ module "service_write" {
   container_port        = 4467
   args                  = ["serve", "write", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
-  env                   = local.keto_common_env
-  secret_env            = local.keto_secret_env
-  secret_volumes        = local.keto_secret_volumes
-  gcs_volumes           = local.keto_gcs_volumes
+  # Write is higher risk — same exposure mode, same invoker allow-list (tighten later).
+  exposure        = var.exposure
+  invoker_members = local.keto_invoker_members
+  env             = local.keto_common_env
+  secret_env      = local.keto_secret_env
+  secret_volumes  = local.keto_secret_volumes
+  gcs_volumes     = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,
