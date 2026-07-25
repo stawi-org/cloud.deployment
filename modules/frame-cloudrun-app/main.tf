@@ -47,25 +47,17 @@ locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
 
-  # for_each keys must never be sensitive (keys() of a sensitive map is sensitive).
+  # for_each keys must never be sensitive.
+  # Do NOT use keys()/length() of sensitive maps (extra_secret_values) — OpenTofu
+  # 1.10 marks the whole ternary and panics on for_each ("value is marked").
+  # Callers pass non-sensitive extra_secret_ids; default version ids to that set
+  # (or explicit extra_version_ids). Values are looked up by id at apply time.
   extra_version_ids = (
     length(var.extra_version_ids) > 0
     ? var.extra_version_ids
-    : (
-      length(var.extra_secret_values) > 0
-      ? nonsensitive(toset(keys(var.extra_secret_values)))
-      : toset([])
-    )
+    : var.extra_secret_ids
   )
 
-  secret_ids = setunion(
-    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
-    var.extra_secret_ids,
-  )
-  version_ids = setunion(
-    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
-    local.extra_version_ids,
-  )
   secret_values = merge(
     var.has_database ? {
       (local.database_secret_id)        = module.db[0].pooled_connection_uri
