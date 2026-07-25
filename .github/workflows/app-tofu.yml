@@ -266,6 +266,13 @@ jobs:
             -var="project_id=${PROJECT_ID}"
             -var="region=${REGION}"
           )
+          # Import into frame.* addresses while moved.tf is pending corrupts locks /
+          # confuses OpenTofu moves. Full apply after moves is enough.
+          if [[ -f moved.tf ]]; then
+            echo "moved.tf present — skip Pub/Sub import (state relocation apply will own messaging)"
+            exit 0
+          fi
+
           set +e
           tofu state list > /tmp/tofu-state-list.txt 2>/dev/null
           set -e
