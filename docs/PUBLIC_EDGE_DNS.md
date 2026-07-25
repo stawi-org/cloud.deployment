@@ -5,7 +5,7 @@ There is **no** Cloud Run path router / edge proxy.
 
 **Registry:** [`config/public-edge.yaml`](../config/public-edge.yaml)  
 **DNS today:** Cloudflare (orange-cloud on stawi.org).  
-**Module:** [`modules/cloudrun-domain-mapping`](../modules/cloudrun-domain-mapping)
+**Create mappings:** [`scripts/create-domain-mappings.sh`](../scripts/create-domain-mappings.sh) (**user gcloud**, not CI)
 
 ## Host map (prod)
 
@@ -25,89 +25,95 @@ There is **no** Cloud Run path router / edge proxy.
 
 ### Legacy `api.stawi.org/...` paths
 
-K8s Gateway used path prefixes on `api.stawi.org`. If those URLs must keep working, implement **Cloudflare** routing (Worker, origin rules, or load balancer) to the hostnames above — **not** a Cloud Run edge service in this repo.
-
-Example (conceptual):
+If those URLs must keep working, implement **Cloudflare** routing to the hosts above — not a Cloud Run edge service.
 
 ```text
-api.stawi.org/devices/*  →  devices.stawi.org/*   (optional prefix strip in CF)
+api.stawi.org/devices/*  →  devices.stawi.org/*
 api.stawi.org/profile/*  →  profile.stawi.org/*
 ```
 
-## Prerequisites
+## Why CI does not create mappings
 
-### 1. Google domain verification
+Domain mappings must be created by a **Google user** that owns the Search Console
+property for `stawi.org`. The CI identity `tofu-deploy@…` is a service account and
+will fail with “domain not verified”.
 
-Cloud Run domain mapping needs the domain verified for your user/project:
+OpenTofu keeps `enable_domain_mapping = false`. Use the **local user script** instead.
+
+## Step-by-step
+
+### 1. Confirm verification for *this* gcloud user
 
 ```bash
-gcloud domains verify stawi.org
-gcloud domains list-user-verified
+gcloud config get-value account    # e.g. bwire@stawi.org
+gcloud domains list-user-verified # must include stawi.org
 ```
 
-Until verified, leave `enable_domain_mapping = false` in each app’s `envs/stawi-prod.tfvars`.
+Apex DNS **already** has:
 
-### 2. Enable mapping per app
+```text
+google-site-verification=zSyjIq6uWNhB12YRZoPhiAYfOrGYafeEuldX6Sn7Ttg
+```
 
-Each public app has:
+If `list-user-verified` is **empty**, ownership is not attached to this login yet:
+
+1. Open [Search Console](https://search.google.com/search-console) as **the same account** as gcloud.
+2. Add property → **Domain** → `stawi.org` (not URL-prefix).
+3. Click **Verify** (TXT is already published — should succeed immediately).
+4. Or: Settings → Users and permissions → add this account as **Owner** if another user already verified.
+5. Re-check: `gcloud domains list-user-verified`
+
+Also: `gcloud domains verify stawi.org` only opens Search Console; you must finish Verify there.
+
+### 2. Create all domain mappings
+
+```bash
+./scripts/create-domain-mappings.sh
+./scripts/create-domain-mappings.sh --describe
+```
+
+### 3. Cloudflare DNS
+
+For each hostname, add the `resourceRecords` Google prints (usually CNAME → `ghs.googlehosted.com`).
+
+| Tip | Detail |
+|-----|--------|
+| Certificate issuance | Use **DNS-only (grey cloud)** until status Active |
+| After Active | Optional orange-cloud + SSL Full (strict) |
+
+### 4. Hydra public URLs
+
+After `oauth2.stawi.org` is Active and DNS points at Cloud Run:
 
 ```hcl
-public_hostname       = "profile.stawi.org"  # example
-enable_domain_mapping = false                # flip true after verify
+# apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars
+advertise_public_hostname = true
 ```
 
-Hydra also has `advertise_public_hostname` — set **true only after** DNS for `oauth2.stawi.org` points at the Cloud Run mapping (so Hydra advertises public URLs).
+Re-apply hydra so OIDC discovery advertises the public host.
 
-Helper:
+### 5. Clients / k8s retirement
 
-```bash
-./scripts/setup-public-edge-domains.sh status
-./scripts/setup-public-edge-domains.sh verify-hint
-./scripts/setup-public-edge-domains.sh enable-tfvars   # flips flags when ready
-```
+Point apps and browsers at the new hosts (or CF path aliases). Then remove K8s Gateway routes for cut-over hosts in `deployment.manifests`.
 
-### 3. Apply and read DNS records
-
-```bash
-gh workflow run app-apply.yml -f app=identity-profile -f env=stawi-prod
-# …
-
-gcloud beta run domain-mappings describe --domain=profile.stawi.org \
-  --region=europe-west9 --project=stawi-identity
-```
-
-Create the printed records in **Cloudflare** (prefer **DNS-only / grey cloud** until certificate is Active). Typical target: `ghs.googlehosted.com` CNAME.
-
-Then optionally orange-cloud with SSL **Full (strict)**.
-
-## Cutover order
-
-1. Verify domain.  
-2. Enable + apply domain mappings (all public apps).  
-3. Add Cloudflare CNAMEs for each hostname.  
-4. Wait until mapping certificate **Active**.  
-5. Set `advertise_public_hostname = true` on Hydra; re-apply.  
-6. Point remaining clients / env at the new hosts (or CF path aliases).  
-7. Retire K8s Gateway routes for these hosts in `deployment.manifests` when traffic is confirmed.
-
-## OpenTofu knobs (per app)
+## OpenTofu knobs (inventory only)
 
 | Variable | Purpose |
 |----------|---------|
-| `public_hostname` | FQDN for this service |
-| `enable_domain_mapping` | Create `google_cloud_run_domain_mapping` |
-| `advertise_public_hostname` | Hydra only — use public host in OIDC URLs |
+| `public_hostname` | FQDN for this service (set in each app tfvars) |
+| `enable_domain_mapping` | **Keep false** for CI; use create-domain-mappings.sh |
+| `advertise_public_hostname` | Hydra only — public OIDC URLs after DNS cutover |
 
 ## Frame health
 
-Frame default health path: **`GET /healthz`**.  
-Ory Hydra/Keto: `/health/ready` (not Frame).
+Frame default: **`GET /healthz`**. Ory: `/health/ready`.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| Mapping create: domain not verified | `gcloud domains verify stawi.org` |
+| “You currently have no verified domains” | Finish Search Console Domain verify as **this** gcloud user |
+| TXT present but still not verified | Wrong SC property type (use Domain) or different Google account |
+| CI apply fails on domain mapping | Expected if enabled — use user script; leave flag false |
 | CertificatePending | Grey-cloud CNAME to Google target until Active |
-| 404 on custom host | Mapping missing or DNS still on old origin |
-| Hydra discovery still shows `*.run.app` | Set `advertise_public_hostname = true` after oauth2 DNS cutover |
+| Hydra still shows `*.run.app` | `advertise_public_hostname = true` after oauth2 cutover |
