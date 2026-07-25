@@ -51,12 +51,21 @@ jobs:
           SVC="${{ inputs.service }}"
           PROJ="${{ inputs.project }}"
           REG="${{ inputs.region }}"
-          echo "=== describe $SVC ==="
-          gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" --format=yaml | head -120 || true
-          echo "=== recent revisions ==="
-          gcloud run revisions list --service="$SVC" --project="$PROJ" --region="$REG" --limit=5 || true
-          echo "=== logs (last 200 lines) ==="
+          echo "=== status conditions ==="
+          gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
+            --format='yaml(status.conditions,status.traffic,status.url)' || true
+          echo "=== container image + ports + env names ==="
+          gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
+            --format='yaml(spec.template.spec.containers)' || true
+          echo "=== latest revision status ==="
+          REV=$(gcloud run revisions list --service="$SVC" --project="$PROJ" --region="$REG" --format='value(name)' --limit=1)
+          echo "revision=$REV"
+          gcloud run revisions describe "$REV" --project="$PROJ" --region="$REG" \
+            --format='yaml(status.conditions,status.logUrl,spec.containers)' || true
+          echo "=== try run services logs read ==="
+          gcloud run services logs read "$SVC" --project="$PROJ" --region="$REG" --limit=100 2>&1 || true
+          echo "=== logging read ==="
           gcloud logging read \
-            "resource.type=cloud_run_revision AND resource.labels.service_name=\"$SVC\"" \
-            --project="$PROJ" --limit=200 --format='value(textPayload,jsonPayload.message,jsonPayload.err,jsonPayload.error,jsonPayload.msg)' \
-            --freshness=2h || true
+            "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$SVC\"" \
+            --project="$PROJ" --limit=100 --freshness=6h \
+            --format='table(timestamp,severity,textPayload)' 2>&1 || true
