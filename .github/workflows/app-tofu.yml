@@ -261,16 +261,19 @@ jobs:
             -var="project_id=${PROJECT_ID}"
             -var="region=${REGION}"
           )
-          # Import into frame.* addresses while moved.tf is pending corrupts locks /
-          # confuses OpenTofu moves. Full apply after moves is enough.
-          if [[ -f moved.tf ]]; then
-            echo "moved.tf present — skip Pub/Sub import (state relocation apply will own messaging)"
-            exit 0
-          fi
-
           set +e
           tofu state list > /tmp/tofu-state-list.txt 2>/dev/null
           set -e
+
+          # One-time: relocate legacy module.* addresses into module.frame.* via state mv
+          # (OpenTofu moved blocks crash with sensitive-marked for_each in 1.10).
+          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null \
+            && grep -qE '^(module\.service|module\.db|module\.secrets)' /tmp/tofu-state-list.txt 2>/dev/null; then
+            echo "::group::Migrate state into module.frame"
+            bash ../../../scripts/migrate-to-frame-module-state.sh
+            tofu state list > /tmp/tofu-state-list.txt 2>/dev/null || true
+            echo "::endgroup::"
+          fi
 
           import_if_missing() {
             local addr="$1" id="$2"
@@ -366,9 +369,10 @@ jobs:
             USE_FRAME=true
           fi
 
-          # moved.tf + -target is unsupported in OpenTofu — must full-apply once.
-          if [[ -f moved.tf ]]; then
-            echo "::group::Apply full stack (moved.tf state relocation — no targeting)"
+          # After first-time state mv into module.frame, prefer a single untargeted apply
+          # so nested resources and IAM all land together.
+          if [[ "$USE_FRAME" == "true" ]]; then
+            echo "::group::Apply full frame stack"
             tofu apply -auto-approve "${TF_COMMON[@]}"
             echo "::endgroup::"
             exit 0
