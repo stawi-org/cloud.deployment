@@ -31,6 +31,7 @@ mv_if() {
 # Core resources
 mv_if 'data.google_project.this' 'module.frame.data.google_project.this'
 mv_if 'data.google_cloud_run_v2_service.hydra' 'module.frame.data.google_cloud_run_v2_service.hydra'
+mv_if 'data.google_cloud_run_v2_service.hydra_admin' 'module.frame.data.google_cloud_run_v2_service.hydra_admin[0]'
 mv_if 'data.google_cloud_run_v2_service.keto_read' 'module.frame.data.google_cloud_run_v2_service.keto_read[0]'
 mv_if 'data.google_cloud_run_v2_service.keto_write' 'module.frame.data.google_cloud_run_v2_service.keto_write[0]'
 mv_if 'google_service_account.runtime' 'module.frame.google_service_account.runtime'

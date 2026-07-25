@@ -267,12 +267,25 @@ jobs:
 
           # One-time: relocate legacy module.* addresses into module.frame.* via state mv
           # (OpenTofu moved blocks crash with sensitive-marked for_each in 1.10).
-          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null \
-            && grep -qE '^(module\.service|module\.db|module\.secrets)' /tmp/tofu-state-list.txt 2>/dev/null; then
+          USE_FRAME=false
+          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null; then
+            USE_FRAME=true
+          fi
+          if [[ "$USE_FRAME" == "true" ]] \
+            && grep -qE '^(module\.service|module\.db|module\.secrets|module\.messaging)' /tmp/tofu-state-list.txt 2>/dev/null; then
             echo "::group::Migrate state into module.frame"
             bash ../../../scripts/migrate-to-frame-module-state.sh
             tofu state list > /tmp/tofu-state-list.txt 2>/dev/null || true
             echo "::endgroup::"
+          fi
+
+          # Frame stacks: skip Pub/Sub import. Import walks the whole graph and panics
+          # OpenTofu 1.10 on sensitive for_each (exit 11), leaving a stale R2 lock.
+          # State mv above relocates module.messaging → module.frame.module.messaging[0];
+          # full apply owns any remaining create/update.
+          if [[ "$USE_FRAME" == "true" ]]; then
+            echo "module.frame present — skip Pub/Sub import (full apply owns messaging)"
+            exit 0
           fi
 
           import_if_missing() {
@@ -294,13 +307,8 @@ jobs:
             fi
           }
 
-          # Default Frame/Ory events topic + optional push sub + DLQ.
-          # Prefer frame-cloudrun-app addresses when main.tf uses module "frame".
-          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null; then
-            MSG_PREFIX='module.frame.module.messaging[0]'
-          else
-            MSG_PREFIX='module.messaging'
-          fi
+          # Default Frame/Ory events topic + optional push sub + DLQ (non-frame only).
+          MSG_PREFIX='module.messaging'
           TOPIC="${APP}-events"
           DLQ="${APP}-events-dlq"
           if gcloud pubsub topics describe "$TOPIC" --project="$PROJECT_ID" >/dev/null 2>&1; then
