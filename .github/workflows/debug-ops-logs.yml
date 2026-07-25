@@ -45,6 +45,18 @@ jobs:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOY_SA }}
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Ensure logging.viewer on deploy SA
+        run: |
+          set -euo pipefail
+          gcloud projects add-iam-policy-binding "${{ inputs.project }}" \
+            --member="serviceAccount:${DEPLOY_SA}" \
+            --role="roles/logging.viewer" \
+            --condition=None --quiet || true
+          gcloud projects add-iam-policy-binding "${{ inputs.project }}" \
+            --member="serviceAccount:${DEPLOY_SA}" \
+            --role="roles/logging.viewAccessor" \
+            --condition=None --quiet || true
+
       - name: Dump service + recent logs
         run: |
           set -euo pipefail
