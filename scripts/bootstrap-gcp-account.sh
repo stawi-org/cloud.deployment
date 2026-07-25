@@ -504,6 +504,7 @@ for role in \
   roles/run.admin \
   roles/secretmanager.admin \
   roles/pubsub.admin \
+  roles/cloudscheduler.admin \
   roles/iam.serviceAccountAdmin \
   roles/iam.serviceAccountUser \
   roles/storage.objectViewer \
