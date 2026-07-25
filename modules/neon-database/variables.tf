@@ -55,3 +55,24 @@ variable "autoscaling_max_cu" {
   default     = 1
   description = "Maximum Neon compute units (when configure_endpoint_settings)"
 }
+
+variable "extensions" {
+  type        = list(string)
+  description = <<-EOT
+    PostgreSQL extensions to enable with CREATE EXTENSION IF NOT EXISTS.
+    Applied after the Neon database/role exist (requires psql on the apply host).
+
+    Common Neon-supported extensions:
+      - uuid-ossp, pgcrypto, pg_trgm, btree_gin, btree_gist, pg_stat_statements
+      - timescaledb (Apache-2 features only; no compression)
+      - postgis (and postgis_topology when needed)
+    Avoid pg_search on new Neon projects (deprecated for new installs as of 2026-03).
+  EOT
+  default = [
+    "uuid-ossp",
+    "pg_stat_statements",
+    "pg_trgm",
+    "btree_gin",
+    "btree_gist",
+  ]
+}

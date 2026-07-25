@@ -142,6 +142,18 @@ jobs:
           echo "::add-mask::${CLOUDFLARE_API_TOKEN}"
           echo "::notice::CLOUDFLARE_API_TOKEN loaded for edge DNS management"
 
+      # Neon extension enablement (modules/neon-database null_resource) needs psql.
+      - name: Install postgresql-client (Neon CREATE EXTENSION)
+        if: inputs.mode == 'apply'
+        run: |
+          set -euo pipefail
+          if command -v psql >/dev/null 2>&1; then
+            echo "psql already present: $(psql --version)"
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client
+
       - name: Tofu init (R2 state → cloud-tofu-state)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}

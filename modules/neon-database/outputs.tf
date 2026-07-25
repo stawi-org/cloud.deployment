@@ -25,3 +25,8 @@ output "pooled_connection_uri" {
   value       = neon_project.this.connection_uri_pooler
   sensitive   = true
 }
+
+output "extensions" {
+  description = "Extensions requested (applied via null_resource when non-empty)"
+  value       = var.extensions
+}

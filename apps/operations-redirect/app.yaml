@@ -1,0 +1,12 @@
+name: operations-redirect
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: operations
+neon:
+  account: operations
+runtime: cloudrun
+domain: operations
+version: 1
