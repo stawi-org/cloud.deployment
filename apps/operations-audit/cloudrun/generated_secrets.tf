@@ -15,7 +15,8 @@ resource "random_password" "hydra_webhook_psk" {
 }
 
 resource "random_bytes" "audit_signing" {
-  length = 32
+  # App expects 64 raw bytes after hex.DecodeString (ed25519-style seed+pub or dual key).
+  length = 64
 }
 
 locals {
