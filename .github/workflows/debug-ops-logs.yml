@@ -1,0 +1,62 @@
+# One-shot: dump Cloud Run revision logs for operations apps (WIF).
+name: debug-ops-logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Cloud Run service name
+        required: true
+        default: operations-audit
+      project:
+        description: GCP project
+        required: true
+        default: stawi-operations
+      region:
+        description: Region
+        required: true
+        default: europe-west9
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install sops + yq
+        run: |
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          sudo wget -qO /usr/local/bin/sops https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64
+          sudo chmod +x /usr/local/bin/sops
+      - name: Decrypt WIF + auth
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          set -euo pipefail
+          sops -d credentials/gcp/operations/stawi-prod/auth.yaml > /tmp/ops-auth.yaml
+          echo "WIF_PROVIDER=$(yq -r '.auth.workload_identity_provider' /tmp/ops-auth.yaml)" >> "$GITHUB_ENV"
+          echo "DEPLOY_SA=$(yq -r '.auth.deploy_service_account' /tmp/ops-auth.yaml)" >> "$GITHUB_ENV"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Dump service + recent logs
+        run: |
+          set -euo pipefail
+          SVC="${{ inputs.service }}"
+          PROJ="${{ inputs.project }}"
+          REG="${{ inputs.region }}"
+          echo "=== describe $SVC ==="
+          gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" --format=yaml | head -120 || true
+          echo "=== recent revisions ==="
+          gcloud run revisions list --service="$SVC" --project="$PROJ" --region="$REG" --limit=5 || true
+          echo "=== logs (last 200 lines) ==="
+          gcloud logging read \
+            "resource.type=cloud_run_revision AND resource.labels.service_name=\"$SVC\"" \
+            --project="$PROJ" --limit=200 --format='value(textPayload,jsonPayload.message,jsonPayload.err,jsonPayload.error,jsonPayload.msg)' \
+            --freshness=2h || true
