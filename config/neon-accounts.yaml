@@ -48,21 +48,3 @@ accounts:
     allowed_deploy_envs: [stawi-dev]
     allowed_app_prefixes: []
     sensitivity: low
-  stawi-org:
-    description: "LEGACY alias — prefer domain keys"
-    owners: [platform]
-    neon_org_hint: Stawi Platform Edge (legacy)
-    allowed_deploy_envs: [stawi-dev, stawi-prod]
-    allowed_app_prefixes: []
-    sensitivity: medium
-    deprecated: true
-    deprecated_message: Use a domain account key (identity, notifications, payments, platform, labs)
-  stawi-labs:
-    description: "LEGACY alias for labs"
-    owners: [platform]
-    neon_org_hint: Stawi Labs (legacy)
-    allowed_deploy_envs: [stawi-dev]
-    allowed_app_prefixes: []
-    sensitivity: low
-    deprecated: true
-    deprecated_message: Use neon.account labs

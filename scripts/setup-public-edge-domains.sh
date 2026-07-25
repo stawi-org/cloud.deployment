@@ -50,7 +50,7 @@ case "$cmd" in
       apps/identity-authentication/cloudrun/envs/stawi-prod.tfvars
     do
       echo "--- $f ---"
-      grep -E 'public_hostname|enable_domain|advertise_public' "$ROOT/$f" 2>/dev/null || true
+      grep -E 'public_hostname|advertise_public' "$ROOT/$f" 2>/dev/null || true
     done
     ;;
   apply-hint)

@@ -261,12 +261,3 @@ resource "google_cloud_run_v2_service_iam_member" "pubsub_push_invoker" {
 }
 
 # Public hostname → this Cloud Run service (see config/public-edge.yaml).
-module "domain" {
-  source       = "../../../modules/cloudrun-domain-mapping"
-  project_id   = var.project_id
-  region       = var.region
-  domain       = var.public_hostname
-  service_name = module.service.name
-  enabled      = var.enable_domain_mapping && var.public_hostname != ""
-  depends_on   = [module.service]
-}

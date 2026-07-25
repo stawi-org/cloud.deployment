@@ -66,8 +66,3 @@ variable "public_hostname" {
   description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
 }
 
-variable "enable_domain_mapping" {
-  type        = bool
-  default     = false
-  description = "Create Cloud Run domain mapping (requires gcloud domains verify stawi.org)"
-}

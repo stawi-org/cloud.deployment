@@ -55,9 +55,9 @@ export GITHUB_TOKEN=ghp_xxx   # for push/PR
 | `--account` | Key in `config/neon-accounts.yaml` (required; auto-created if new) |
 | `--api-key` | Org API key (or env `API_KEY` / `NEON_ORG_API_KEY`) |
 | `--org-hint` | Human label |
+| `--org-id` | Neon org id (metadata) |
 | `--metadata-only` | Registry metadata without writing API key |
 | `--force-repo-write` | Overwrite existing SOPS file |
-| `--sync-github-env` | **Deprecated no-op** — CI no longer uses `neon--*` environments |
 
 ## After bootstrap
 

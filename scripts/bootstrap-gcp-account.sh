@@ -94,7 +94,8 @@ Flags:
                          Env slices are auto-created if missing.
   --region <REGION>      Default europe-west1
   --repo-path <PATH>     cloud.deployment checkout (default: auto-clone ~/cloud.deployment)
-  --no-clone             Fail if no checkout found
+                         Existing checkouts are always fetched + reset to origin/<base-branch>
+  --no-clone             Fail if no checkout found (still syncs to latest base branch)
   --base-branch <NAME>   Default main
   --branch <NAME>        Push branch (default: onboard-gcp-<account>-<env>)
   --no-push              Commit only; skip push

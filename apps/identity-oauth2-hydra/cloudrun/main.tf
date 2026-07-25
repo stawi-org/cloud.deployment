@@ -199,12 +199,3 @@ module "keep_warm" {
   depends_on       = [module.service]
 }
 
-module "domain" {
-  source       = "../../../modules/cloudrun-domain-mapping"
-  project_id   = var.project_id
-  region       = var.region
-  domain       = var.public_hostname
-  service_name = module.service.name
-  enabled      = var.enable_domain_mapping
-  depends_on   = [module.service]
-}

@@ -66,11 +66,6 @@ variable "public_hostname" {
   description = "Canonical public host for the accounts UI"
 }
 
-variable "enable_domain_mapping" {
-  type        = bool
-  default     = false
-  description = "Create Cloud Run domain mapping for public_hostname (needs domain verification)"
-}
 
 variable "google_oauth_client_id" {
   type        = string

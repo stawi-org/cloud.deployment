@@ -66,11 +66,6 @@ variable "public_hostname" {
   description = "Canonical public host (K8s parity). Used when advertise_public_hostname=true."
 }
 
-variable "enable_domain_mapping" {
-  type        = bool
-  default     = false
-  description = "Create Cloud Run domain mapping for public_hostname (needs domain verification)"
-}
 
 variable "advertise_public_hostname" {
   type        = bool

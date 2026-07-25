@@ -260,15 +260,6 @@ module "keep_warm" {
   depends_on       = [module.service]
 }
 
-module "domain" {
-  source       = "../../../modules/cloudrun-domain-mapping"
-  project_id   = var.project_id
-  region       = var.region
-  domain       = var.public_hostname
-  service_name = module.service.name
-  enabled      = var.enable_domain_mapping
-  depends_on   = [module.service]
-}
 
 # Pub/Sub push OIDC: allow the runtime SA to be used as push identity,
 # and allow that identity to invoke the Cloud Run service.

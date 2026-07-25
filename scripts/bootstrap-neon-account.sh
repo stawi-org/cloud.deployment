@@ -28,7 +28,6 @@
 #   --api-key <KEY>       Neon org API key (or env API_KEY / NEON_ORG_API_KEY)
 #   --org-hint <NAME>     Optional human label for the Neon org
 #   --org-id <ID>         Optional Neon org id (metadata only)
-#   --sync-github-env     DEPRECATED no-op (CI uses SOPS, not neon--* GH envs)
 #   --repo-path <PATH>    cloud.deployment checkout (always synced to origin/main)
 #   --no-clone / --no-push / --no-pr / --force-repo-write / --metadata-only
 #
@@ -48,7 +47,6 @@ ACCOUNT=""
 API_KEY="${API_KEY:-${NEON_API_KEY:-${NEON_ORG_API_KEY:-}}}"
 ORG_HINT=""
 ORG_ID=""
-SYNC_GH_ENV="false"
 REPO_PATH=""
 BASE_BRANCH="main"
 BRANCH=""
@@ -78,7 +76,6 @@ while [[ $# -gt 0 ]]; do
     --api-key)          API_KEY="$2"; shift 2 ;;
     --org-hint)         ORG_HINT="$2"; shift 2 ;;
     --org-id)           ORG_ID="$2"; shift 2 ;;
-    --sync-github-env)  SYNC_GH_ENV="true"; shift ;;
     --repo-path)        REPO_PATH="$2"; shift 2 ;;
     --base-branch)      BASE_BRANCH="$2"; shift 2 ;;
     --branch)           BRANCH="$2"; shift 2 ;;
@@ -242,169 +239,6 @@ github_create_pr() {
   return 1
 }
 
-# GitHub Environment secret API_KEY (CI fallback path).
-# Prefer `gh secret set --env` when available — fewer permission footguns than raw API.
-sync_github_environment_secret() {
-  local env_name="$1" secret_value="$2"
-  local token
-  token="$(github_token)" || die "GITHUB_TOKEN required for --sync-github-env"
-
-  # --- Preferred path: GitHub CLI (no Python/pynacl) ---
-  if command -v gh >/dev/null 2>&1; then
-    say "setting GitHub Environment secret via gh (env=${env_name})"
-    # Ensure environment exists first (gh secret set may require it).
-    # Create via API with clear errors; ignore if already exists.
-    local pre_code pre_body
-    pre_body=$(mktemp)
-    pre_code=$(curl -sS -o "$pre_body" -w '%{http_code}' -X PUT \
-      -H "Authorization: Bearer ${token}" \
-      -H "Accept: application/vnd.github+json" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      -H "Content-Type: application/json" \
-      "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}" \
-      -d '{}' || echo "000")
-    if [[ "$pre_code" == "403" ]]; then
-      rm -f "$pre_body"
-      die "cannot create GitHub Environment '${env_name}' (HTTP 403).
-
-Your PAT cannot manage environments. Either:
-  • Add fine-grained permission Administration: Read and write (plus Environments), or
-  • Create '${env_name}' in the UI and set secret API_KEY manually, then re-run
-    without --sync-github-env.
-
-UI: https://github.com/${GITHUB_REPO}/settings/environments"
-    fi
-    rm -f "$pre_body"
-
-    if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
-        printf '%s' "$secret_value" \
-        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set API_KEY \
-            --repo "$GITHUB_REPO" \
-            --env "$env_name" 2>/tmp/neon-gh-secret.err; then
-      say "  set ${env_name} / API_KEY via gh"
-      return 0
-    fi
-    # older gh uses --body -
-    if GH_TOKEN="$token" GH_PROMPT_DISABLED=1 \
-        printf '%s' "$secret_value" \
-        | GH_TOKEN="$token" GH_PROMPT_DISABLED=1 gh secret set API_KEY \
-            --repo "$GITHUB_REPO" \
-            --env "$env_name" \
-            --body - 2>>/tmp/neon-gh-secret.err; then
-      say "  set ${env_name} / API_KEY via gh"
-      return 0
-    fi
-    warn "gh secret set failed:"
-    head -c 500 /tmp/neon-gh-secret.err >&2 || true
-    printf '\n' >&2
-    warn "falling back to REST API + pynacl venv…"
-  else
-    warn "gh not installed — using REST + pynacl (install gh to avoid Python deps: https://cli.github.com)"
-  fi
-
-  # --- REST: create environment, then encrypt + put secret ---
-  say "ensuring GitHub Environment ${env_name} (REST)"
-  local create_body create_code
-  create_body=$(mktemp)
-  create_code=$(curl -sS -o "$create_body" -w '%{http_code}' -X PUT \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    -H "Content-Type: application/json" \
-    "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}" \
-    -d '{}')
-  case "$create_code" in
-    200|201)
-      say "  environment ok (HTTP ${create_code})"
-      ;;
-    404)
-      rm -f "$create_body"
-      die "GitHub returned 404 creating environment '${env_name}' on ${GITHUB_REPO}.
-
-Common causes:
-  1) Token cannot see the repo (wrong GITHUB_TOKEN / SSO not authorized for stawi-org)
-  2) Token lacks permission to manage Environments
-     - classic PAT: repo scope (and admin on the repo)
-     - fine-grained: Repository permissions → Environments: Read and Write
-       plus Metadata: Read; often also Administration: Read
-  3) You are not an admin of ${GITHUB_REPO}
-
-Workaround (no API): UI → Settings → Environments → New environment '${env_name}'
-  → Environment secrets → API_KEY = your Neon org API key
-Then re-run without --sync-github-env (SOPS/PR path only), or with --sync-github-env after env exists.
-
-Response: $(head -c 300 "$create_body" 2>/dev/null || true)"
-      ;;
-    403)
-      die "GitHub 403 creating environment '${env_name}' — token lacks Environments write / admin on ${GITHUB_REPO}.
-$(head -c 400 "$create_body" 2>/dev/null || true)"
-      ;;
-    *)
-      die "create environment HTTP ${create_code}: $(head -c 400 "$create_body" 2>/dev/null || true)"
-      ;;
-  esac
-  rm -f "$create_body"
-
-  local pk_body pk_code pk_json key_id pub
-  pk_body=$(mktemp)
-  pk_code=$(curl -sS -o "$pk_body" -w '%{http_code}' \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}/secrets/public-key")
-  if [[ "$pk_code" != "200" ]]; then
-    die "get env public-key HTTP ${pk_code} for ${env_name} (env may not exist or token cannot read secrets).
-$(head -c 400 "$pk_body" 2>/dev/null || true)"
-  fi
-  pk_json=$(cat "$pk_body")
-  rm -f "$pk_body"
-  key_id=$(jq -r '.key_id // empty' <<<"$pk_json")
-  pub=$(jq -r '.key // empty' <<<"$pk_json")
-  [[ -n "$key_id" && -n "$pub" ]] || die "public-key response missing key_id/key"
-
-  # Encrypt for GitHub's libsodium sealbox. Never pip-install into system
-  # Python (PEP 668 / externally-managed-environment on Debian/Ubuntu).
-  local encrypted venv_dir py
-  venv_dir=$(mktemp -d)
-  py=""
-  if python3 -c 'from nacl import public' 2>/dev/null; then
-    py="python3"
-  else
-    say "  installing pynacl in temporary venv (system pip is blocked on this OS)"
-    python3 -m venv "$venv_dir" \
-      || die "python3 -m venv failed — install python3-venv (e.g. sudo apt install python3-venv python3-full)"
-    # shellcheck disable=SC1091
-    # Use venv pip only
-    "$venv_dir/bin/pip" install -q --disable-pip-version-check pynacl \
-      || die "pip install pynacl in venv failed"
-    py="$venv_dir/bin/python"
-  fi
-  encrypted=$("$py" - "$pub" "$secret_value" <<'PY'
-import base64, sys
-from nacl import encoding, public
-pub_b64, secret = sys.argv[1], sys.argv[2]
-pubkey = public.PublicKey(pub_b64.encode("utf-8"), encoding.Base64Encoder())
-sealed = public.SealedBox(pubkey).encrypt(secret.encode("utf-8"))
-print(base64.b64encode(sealed).decode("utf-8"))
-PY
-  ) || die "failed to encrypt secret for GitHub (pynacl)"
-  rm -rf "$venv_dir"
-
-  local put_body put_code
-  put_body=$(mktemp)
-  put_code=$(curl -sS -o "$put_body" -w '%{http_code}' -X PUT \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    -H "Content-Type: application/json" \
-    "https://api.github.com/repos/${GITHUB_REPO}/environments/${env_name}/secrets/API_KEY" \
-    -d "$(jq -n --arg k "$key_id" --arg v "$encrypted" '{encrypted_value:$v, key_id:$k}')")
-  if [[ "$put_code" != "201" && "$put_code" != "204" ]]; then
-    die "put environment secret HTTP ${put_code}: $(head -c 400 "$put_body" 2>/dev/null || true)"
-  fi
-  rm -f "$put_body"
-  say "  set ${env_name} / API_KEY via REST"
-}
 
 # Bring an existing checkout onto origin/${BASE_BRANCH} (latest main by default).
 sync_checkout_to_base() {
@@ -510,7 +344,7 @@ resolve_repo_path() {
 # -------- prereqs --------
 ensure_sops
 ensure_yq
-for cmd in jq curl python3 git sops yq; do
+for cmd in jq curl git sops yq; do
   command -v "$cmd" >/dev/null 2>&1 || die "missing: $cmd"
 done
 
@@ -538,12 +372,6 @@ if [[ -n "$API_KEY" && "$METADATA_ONLY" != "true" ]]; then
   fi
 fi
 
-# GitHub Environment secrets are no longer used by CI (SOPS + SOPS_AGE_KEY).
-if [[ "$SYNC_GH_ENV" == "true" ]]; then
-  warn "--sync-github-env is deprecated and ignored."
-  warn "CI loads Neon API keys from credentials/neon/<account>/auth.yaml via SOPS_AGE_KEY."
-  warn "Ensure repository secret SOPS_AGE_KEY is set (private age key matching .sops.yaml)."
-fi
 
 AUTH_REL="credentials/neon/${ACCOUNT}/auth.yaml"
 
@@ -591,10 +419,7 @@ yq -i "
   .accounts[\"${ACCOUNT}\"].allowed_deploy_envs = (.accounts[\"${ACCOUNT}\"].allowed_deploy_envs // [\"stawi-dev\", \"stawi-prod\"]) |
   .accounts[\"${ACCOUNT}\"].allowed_app_prefixes = (.accounts[\"${ACCOUNT}\"].allowed_app_prefixes // [\"${ACCOUNT}-\"]) |
   .accounts[\"${ACCOUNT}\"].sensitivity = (.accounts[\"${ACCOUNT}\"].sensitivity // \"medium\") |
-  .accounts[\"${ACCOUNT}\"].sops_auth_path = \"${AUTH_REL}\" |
-  del(.accounts[\"${ACCOUNT}\"].github_environment) |
-  del(.accounts[\"${ACCOUNT}\"].deprecated) |
-  del(.accounts[\"${ACCOUNT}\"].deprecated_message)
+  .accounts[\"${ACCOUNT}\"].sops_auth_path = \"${AUTH_REL}\"
 " "$REG_FILE"
 
 if [[ -n "$ORG_HINT" ]]; then
