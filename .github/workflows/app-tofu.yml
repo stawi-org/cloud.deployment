@@ -271,8 +271,9 @@ jobs:
           if grep -qE 'module\s+"frame"' main.tf 2>/dev/null; then
             USE_FRAME=true
           fi
+          # Legacy addresses are resource lines like module.secrets.google_… (never bare module.secrets).
           if [[ "$USE_FRAME" == "true" ]] \
-            && grep -qE '^(module\.service|module\.db|module\.secrets|module\.messaging)' /tmp/tofu-state-list.txt 2>/dev/null; then
+            && grep -qE '^(module\.(service|db|secrets|messaging|migrate|keep_warm)(\.|\[)|google_service_account\.runtime$)' /tmp/tofu-state-list.txt 2>/dev/null; then
             echo "::group::Migrate state into module.frame"
             bash ../../../scripts/migrate-to-frame-module-state.sh
             tofu state list > /tmp/tofu-state-list.txt 2>/dev/null || true

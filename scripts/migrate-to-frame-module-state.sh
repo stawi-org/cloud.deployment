@@ -15,31 +15,41 @@ if [[ ${#STATE[@]} -eq 0 ]]; then
   exit 0
 fi
 
+# state list prints resource addresses only (never bare "module.foo").
+# Match exact resource OR any resource under a module prefix.
 in_state() {
   local needle="$1"
-  printf '%s\n' "${STATE[@]}" | grep -qxF "$needle"
+  printf '%s\n' "${STATE[@]}" | grep -qxF "$needle" && return 0
+  # Module / nested module: any child under needle.
+  printf '%s\n' "${STATE[@]}" | grep -qE "^$(printf '%s' "$needle" | sed 's/[.[\*?^$(){}+|]/g' | sed 's/]/\\[/g')\." && return 0
+  return 1
+}
+
+refresh_state() {
+  mapfile -t STATE < <(tofu state list 2>/dev/null || true)
 }
 
 mv_if() {
   local from="$1" to="$2"
   if in_state "$from" && ! in_state "$to"; then
     echo "state mv $from → $to"
-    tofu state mv "$from" "$to" || true
+    if tofu state mv "$from" "$to"; then
+      refresh_state
+    else
+      echo "warning: state mv failed: $from → $to (continuing)"
+    fi
+  elif in_state "$from" && in_state "$to"; then
+    echo "skip $from (target $to already present)"
   fi
 }
 
-# Core resources
+# Core resources (exact addresses)
 mv_if 'data.google_project.this' 'module.frame.data.google_project.this'
 mv_if 'data.google_cloud_run_v2_service.hydra' 'module.frame.data.google_cloud_run_v2_service.hydra'
 mv_if 'data.google_cloud_run_v2_service.hydra_admin' 'module.frame.data.google_cloud_run_v2_service.hydra_admin[0]'
 mv_if 'data.google_cloud_run_v2_service.keto_read' 'module.frame.data.google_cloud_run_v2_service.keto_read[0]'
 mv_if 'data.google_cloud_run_v2_service.keto_write' 'module.frame.data.google_cloud_run_v2_service.keto_write[0]'
 mv_if 'google_service_account.runtime' 'module.frame.google_service_account.runtime'
-mv_if 'module.edge' 'module.frame.module.edge'
-mv_if 'module.secrets' 'module.frame.module.secrets'
-mv_if 'module.service' 'module.frame.module.service'
-mv_if 'module.messaging' 'module.frame.module.messaging[0]'
-mv_if 'module.keep_warm' 'module.frame.module.keep_warm[0]'
 mv_if 'google_secret_manager_secret_iam_member.hydra_webhook_psk' \
   'module.frame.google_secret_manager_secret_iam_member.oauth_signer[0]'
 mv_if 'google_service_account_iam_member.pubsub_push_token_creator' \
@@ -47,7 +57,14 @@ mv_if 'google_service_account_iam_member.pubsub_push_token_creator' \
 mv_if 'google_cloud_run_v2_service_iam_member.pubsub_push_invoker' \
   'module.frame.google_cloud_run_v2_service_iam_member.pubsub_push_invoker[0]'
 
-# DB / migrate (with or without count)
+# Whole modules (OpenTofu moves the entire module tree by prefix)
+mv_if 'module.edge' 'module.frame.module.edge'
+mv_if 'module.secrets' 'module.frame.module.secrets'
+mv_if 'module.service' 'module.frame.module.service'
+mv_if 'module.messaging' 'module.frame.module.messaging[0]'
+mv_if 'module.keep_warm' 'module.frame.module.keep_warm[0]'
+
+# DB / migrate (with or without count index)
 if in_state 'module.db[0]'; then
   mv_if 'module.db[0]' 'module.frame.module.db[0]'
 elif in_state 'module.db'; then
@@ -60,3 +77,5 @@ elif in_state 'module.migrate'; then
 fi
 
 echo "state migration pass complete"
+echo "--- sample state (frame vs legacy) ---"
+printf '%s\n' "${STATE[@]}" | grep -E '^(module\.frame|module\.(service|secrets|messaging|db|migrate|keep_warm))' | head -40 || true
