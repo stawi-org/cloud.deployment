@@ -26,6 +26,14 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 
 ## Prerequisites
 
+0. **Cross-project IAM (once):** ops deploy SA must read identity Cloud Run (Hydra/Keto URIs):
+   ```bash
+   gcloud projects add-iam-policy-binding stawi-identity \
+     --member="serviceAccount:tofu-deploy@stawi-operations.iam.gserviceaccount.com" \
+     --role="roles/run.viewer"
+   ```
+   (Platform uses the same pattern for `tofu-deploy@stawi-platform`.)
+
 1. GCP account bootstrapped:
    ```bash
    ./scripts/bootstrap-gcp-account.sh \
@@ -55,7 +63,8 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 
    Apply **operations-audit** (and **operations-redirect** if needed) before other ops apps so
    shared secret IAM bindings succeed.
-5. **Images:** prefer Artifact Registry after mirror:
+5. **Images:** bootstrap tags are mirrored to identity Artifact Registry (ops Cloud Run
+   service agent has `roles/artifactregistry.reader` on that repo). Prefer project-local AR long term:
    ```bash
    ./scripts/mirror-ghcr-to-ar.sh \
      --project stawi-operations \
@@ -66,6 +75,7 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
      --tag v1.54.52
    # …repeat for each image, then update envs/stawi-prod.tfvars image=
    ```
+   Current stawi-prod tfvars use `europe-west9-docker.pkg.dev/stawi-identity/apps/…`.
 
 ## Extensions (OpenTofu)
 

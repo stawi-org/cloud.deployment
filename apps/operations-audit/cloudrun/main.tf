@@ -195,6 +195,7 @@ module "service" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = var.container_port
+  use_http2             = true
   memory                = var.memory
   public_invoker        = true
   env = merge(
