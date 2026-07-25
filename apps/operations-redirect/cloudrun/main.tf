@@ -179,7 +179,6 @@ module "migrate" {
   project_id            = var.project_id
   region                = var.region
   image                 = var.image
-  ignore_image_changes  = false
   service_account_email = google_service_account.runtime.email
   labels                = var.labels
   execute               = false

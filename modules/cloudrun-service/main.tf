@@ -22,15 +22,12 @@ resource "google_cloud_run_v2_service" "this" {
 
   deletion_protection = var.deletion_protection
 
-  # Image is rolled by decentralized GH release ship (cloudrun-ship workflow)
-  # when ignore_image_changes is true (default). Set false for first-deploy
-  # bootstrap so OpenTofu can push the AR bootstrap tag.
+  # client/client_version are mutated by gcloud/API clients.
+  # Image is managed by OpenTofu from tfvars (bootstrap + explicit bumps).
+  # Decentralized ship can still gcloud-update the image; re-apply will
+  # converge to the tfvars tag unless ship also bumps envs/*.tfvars.
   lifecycle {
-    ignore_changes = var.ignore_image_changes ? [
-      client,
-      client_version,
-      template[0].containers[0].image,
-    ] : [
+    ignore_changes = [
       client,
       client_version,
     ]

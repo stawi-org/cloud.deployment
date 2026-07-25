@@ -14,11 +14,6 @@ variable "image" {
   type = string
 }
 
-variable "ignore_image_changes" {
-  type        = bool
-  default     = true
-  description = "If true (default), ship workflow owns the image tag. Set false so OpenTofu applies image from tfvars (bootstrap)."
-}
 
 variable "container_port" {
   type        = number
