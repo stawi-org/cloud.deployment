@@ -59,3 +59,15 @@ variable "extra_secret_ids" {
   default     = []
   description = "SM secret IDs to create without versions (fill versions outside git)"
 }
+
+variable "public_hostname" {
+  type        = string
+  default     = ""
+  description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
+}
+
+variable "enable_domain_mapping" {
+  type        = bool
+  default     = false
+  description = "Create Cloud Run domain mapping (requires gcloud domains verify stawi.org)"
+}

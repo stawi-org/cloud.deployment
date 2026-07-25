@@ -6,8 +6,8 @@
 #   2. After apply, add DNS records from outputs (Cloudflare DNS-only recommended
 #      until certificate status is Active).
 #
-# Does NOT support path-based multi-service routing — use apps/edge-api for
-# api.stawi.org path prefixes.
+# Does NOT support path-based multi-service routing — use one hostname per
+# service, or route paths in Cloudflare if legacy api.stawi.org/* is needed.
 
 resource "google_cloud_run_domain_mapping" "this" {
   count = var.enabled ? 1 : 0

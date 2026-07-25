@@ -1,156 +1,113 @@
-# Public edge DNS → Cloud Run
+# Public edge DNS → Cloud Run (host per service)
 
-Cutover of production hostnames from the K8s Gateway (`deployment.manifests`) to Cloud Run.
+Each migrated Cloud Run service gets its **own hostname** on `stawi.org`.  
+There is **no** Cloud Run path router / edge proxy.
 
 **Registry:** [`config/public-edge.yaml`](../config/public-edge.yaml)  
-**DNS provider today:** Cloudflare (stawi.org zone — orange-cloud IPs).
+**DNS today:** Cloudflare (orange-cloud on stawi.org).  
+**Module:** [`modules/cloudrun-domain-mapping`](../modules/cloudrun-domain-mapping)
 
-## Target map (prod)
-
-### Host exceptions (one service per hostname)
+## Host map (prod)
 
 | Hostname | Cloud Run service | Project | Health |
 |----------|-------------------|---------|--------|
-| `accounts.stawi.org` | `identity-authentication` | `stawi-identity` | Frame **`/healthz`** |
-| `oauth2.stawi.org` | `identity-oauth2-hydra` | `stawi-identity` | Ory **`/health/ready`** |
+| `accounts.stawi.org` | `identity-authentication` | stawi-identity | Frame `/healthz` |
+| `oauth2.stawi.org` | `identity-oauth2-hydra` | stawi-identity | Ory `/health/ready` |
+| `profile.stawi.org` | `identity-profile` | stawi-identity | `/healthz` |
+| `tenancy.stawi.org` | `identity-tenancy` | stawi-identity | `/healthz` |
+| `identity.stawi.org` | `identity-identity` | stawi-identity | `/healthz` |
+| `devices.stawi.org` | `platform-devices` | stawi-platform | `/healthz` |
+| `settings.stawi.org` | `platform-settings` | stawi-platform | `/healthz` |
+| `geolocation.stawi.org` | `platform-geolocation` | stawi-platform | `/healthz` |
+| `files.stawi.org` | `platform-files` | stawi-platform | `/healthz` |
 
-### Path-based API (`api.stawi.org`)
+**Not public:** Keto read/write.
 
-Cloud Run **domain mapping cannot path-route**. A dedicated edge app **`edge-api`** (Caddy) terminates `api.stawi.org` and reverse-proxies with **prefix strip** (parity with K8s `ReplacePrefixMatch: "/"`):
+### Legacy `api.stawi.org/...` paths
 
-| Path | Backend |
-|------|---------|
-| `/profile/*` | `identity-profile` |
-| `/tenancy/*` | `identity-tenancy` |
-| `/identity/*` | `identity-identity` |
-| `/devices/*` | `platform-devices` |
-| `/settings/*` | `platform-settings` |
-| `/geolocation/*` | `platform-geolocation` |
-| `/files/*` | `platform-files` |
+K8s Gateway used path prefixes on `api.stawi.org`. If those URLs must keep working, implement **Cloudflare** routing (Worker, origin rules, or load balancer) to the hostnames above — **not** a Cloud Run edge service in this repo.
 
-**Not public:** Keto read/write (private / mesh-style; no public DNS).
-
-Backend URL template (stable, no custom domain required for backends):
+Example (conceptual):
 
 ```text
-https://{service}-{project_number}.europe-west9.run.app
+api.stawi.org/devices/*  →  devices.stawi.org/*   (optional prefix strip in CF)
+api.stawi.org/profile/*  →  profile.stawi.org/*
 ```
-
-| Project | Number |
-|---------|--------|
-| stawi-identity | `721554040672` |
-| stawi-platform | `305282281906` |
 
 ## Prerequisites
 
-### 1. Google domain verification (required for domain mapping)
+### 1. Google domain verification
 
-Cloud Run custom domains need the domain verified for your Google account/project:
+Cloud Run domain mapping needs the domain verified for your user/project:
 
 ```bash
-# Interactive browser verification (Search Console / DNS TXT)
 gcloud domains verify stawi.org
-
-# Confirm
 gcloud domains list-user-verified
 ```
 
-Until this succeeds, leave `enable_domain_mapping = false` in:
+Until verified, leave `enable_domain_mapping = false` in each app’s `envs/stawi-prod.tfvars`.
 
-- `apps/identity-authentication/cloudrun/envs/stawi-prod.tfvars`
-- `apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars`
-- `apps/edge-api/cloudrun/envs/stawi-prod.tfvars`
+### 2. Enable mapping per app
 
-### 2. Deploy edge-api + services (no DNS change yet)
+Each public app has:
 
-```bash
-gh workflow run app-apply.yml -f app=edge-api -f env=stawi-prod
-# identity + platform services already deployed
+```hcl
+public_hostname       = "profile.stawi.org"  # example
+enable_domain_mapping = false                # flip true after verify
 ```
 
-Smoke path router via **run.app** URL (before cutover):
+Hydra also has `advertise_public_hostname` — set **true only after** DNS for `oauth2.stawi.org` points at the Cloud Run mapping (so Hydra advertises public URLs).
+
+Helper:
 
 ```bash
-EDGE=$(gcloud run services describe edge-api --project=stawi-identity --region=europe-west9 --format='value(status.url)')
-curl -sS -o /dev/null -w '%{http_code}\n' "$EDGE/healthz"
-# Expect 200
-curl -sS -o /dev/null -w '%{http_code}\n' "$EDGE/devices/"   # backend may 401/404 — not 502
+./scripts/setup-public-edge-domains.sh status
+./scripts/setup-public-edge-domains.sh verify-hint
+./scripts/setup-public-edge-domains.sh enable-tfvars   # flips flags when ready
 ```
 
-## Enable domain mappings
-
-1. Verify domain (above).
-2. Set `enable_domain_mapping = true` for auth, hydra, edge-api tfvars; commit + apply.
-3. Read DNS records OpenTofu wants:
+### 3. Apply and read DNS records
 
 ```bash
-# After apply, from CI logs outputs or local tofu:
-# module.domain.dns_records → typically CNAME → ghs.googlehosted.com
-```
+gh workflow run app-apply.yml -f app=identity-profile -f env=stawi-prod
+# …
 
-Or:
-
-```bash
-gcloud beta run domain-mappings describe --domain=oauth2.stawi.org \
+gcloud beta run domain-mappings describe --domain=profile.stawi.org \
   --region=europe-west9 --project=stawi-identity
 ```
 
-4. In **Cloudflare** (stawi.org zone), create the records Google prints.
-   - Prefer **DNS only** (grey cloud) until certificate status is **Active**.
-   - Then optionally re-enable proxy (orange) with SSL mode **Full (strict)** once cert is good.
+Create the printed records in **Cloudflare** (prefer **DNS-only / grey cloud** until certificate is Active). Typical target: `ghs.googlehosted.com` CNAME.
 
-| Record | Type | Target (example) |
-|--------|------|------------------|
-| `oauth2` | CNAME | `ghs.googlehosted.com` |
-| `accounts` | CNAME | `ghs.googlehosted.com` |
-| `api` | CNAME | `ghs.googlehosted.com` |
+Then optionally orange-cloud with SSL **Full (strict)**.
 
-Exact `rrdata` comes from the domain-mapping status — always use the values Google returns.
+## Cutover order
 
-## Cutover sequence (production)
+1. Verify domain.  
+2. Enable + apply domain mappings (all public apps).  
+3. Add Cloudflare CNAMEs for each hostname.  
+4. Wait until mapping certificate **Active**.  
+5. Set `advertise_public_hostname = true` on Hydra; re-apply.  
+6. Point remaining clients / env at the new hosts (or CF path aliases).  
+7. Retire K8s Gateway routes for these hosts in `deployment.manifests` when traffic is confirmed.
 
-Do **host exceptions first**, then API:
+## OpenTofu knobs (per app)
 
-1. **oauth2.stawi.org**  
-   - Domain mapping Active → switch Cloudflare DNS from k8s/CF proxy to mapping target  
-   - Set `advertise_public_hostname = true` on `identity-oauth2-hydra` and re-apply  
-   - Smoke: `curl -sS https://oauth2.stawi.org/.well-known/openid-configuration | jq .issuer`
+| Variable | Purpose |
+|----------|---------|
+| `public_hostname` | FQDN for this service |
+| `enable_domain_mapping` | Create `google_cloud_run_domain_mapping` |
+| `advertise_public_hostname` | Hydra only — use public host in OIDC URLs |
 
-2. **accounts.stawi.org**  
-   - Domain mapping Active → DNS cutover  
-   - Smoke: `curl -sSI https://accounts.stawi.org/s/login` → 303/200
+## Frame health
 
-3. **api.stawi.org**  
-   - Domain mapping on `edge-api` Active → DNS cutover  
-   - Smoke each path: `/profile`, `/tenancy`, `/identity`, `/devices`, `/settings`, `/geolocation`, `/files`  
-   - Update any remaining apps still using `*.run.app` for `OAUTH2_SERVICE_URI` to `https://oauth2.stawi.org` (post-hydra advertise)
-
-4. Disable K8s Gateway routes / external-dns for cut-over hosts once traffic is confirmed (in `deployment.manifests` — out of band).
-
-## OpenTofu knobs
-
-| App | Variables |
-|-----|-----------|
-| `identity-oauth2-hydra` | `public_hostname`, `enable_domain_mapping`, `advertise_public_hostname` |
-| `identity-authentication` | `public_hostname`, `enable_domain_mapping` |
-| `edge-api` | `public_hostname`, `enable_domain_mapping`, project numbers for backends |
-
-Modules:
-
-- `modules/cloudrun-domain-mapping` — host → service mapping  
-- `modules/cloudrun-keep-warm` — Scheduler pings (cheap warm)  
-- `apps/edge-api` — path router  
-
-## Frame health reminder
-
-Frame default health endpoint is **`GET /healthz`** (not Ory `/health/ready`). Use `/healthz` for probes and keep-warm on Frame services.
+Frame default health path: **`GET /healthz`**.  
+Ory Hydra/Keto: `/health/ready` (not Frame).
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---------|--------|-----|
-| Domain mapping create 403 / not verified | No Search Console verification | `gcloud domains verify stawi.org` |
-| Mapping stuck CertificatePending | DNS not pointing at Google target, or orange-cloud during issuance | Grey-cloud CNAME to `ghs.googlehosted.com` until Active |
-| api.stawi.org 404 for /devices | Traffic still on old edge or edge-api not deployed | Confirm DNS → edge-api mapping; check Caddyfile secret |
-| Backend 502 via edge-api | Wrong project_number / region in tfvars | Match live `gcloud run services describe` URL |
-| Hydra still advertises run.app | `advertise_public_hostname=false` | Flip true after oauth2 DNS cutover |
+| Symptom | Fix |
+|---------|-----|
+| Mapping create: domain not verified | `gcloud domains verify stawi.org` |
+| CertificatePending | Grey-cloud CNAME to Google target until Active |
+| 404 on custom host | Mapping missing or DNS still on old origin |
+| Hydra discovery still shows `*.run.app` | Set `advertise_public_hostname = true` after oauth2 DNS cutover |

@@ -71,3 +71,15 @@ variable "identity_region" {
   default     = "europe-west9"
   description = "Region of identity Cloud Run services"
 }
+
+variable "public_hostname" {
+  type        = string
+  default     = ""
+  description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
+}
+
+variable "enable_domain_mapping" {
+  type        = bool
+  default     = false
+  description = "Create Cloud Run domain mapping (requires gcloud domains verify stawi.org)"
+}

@@ -27,15 +27,16 @@ Pub/Sub: regional `{app}-events` + push to `/_frame/queue/{app}-events`.
 
 ## Public DNS / edge
 
-Platform services are exposed under **`api.stawi.org/<path>`** via the shared **`edge-api`** Cloud Run path router (not per-service hostnames):
+**One hostname per service** (Cloud Run domain mapping). No shared edge router.
 
-| Path | Service |
+| Host | Service |
 |------|---------|
-| `/devices` | `platform-devices` |
-| `/settings` | `platform-settings` |
-| `/geolocation` | `platform-geolocation` |
-| `/files` | `platform-files` |
+| `devices.stawi.org` | `platform-devices` |
+| `settings.stawi.org` | `platform-settings` |
+| `geolocation.stawi.org` | `platform-geolocation` |
+| `files.stawi.org` | `platform-files` |
 
+Legacy `api.stawi.org/devices` style paths: optional **Cloudflare** routing to these hosts.  
 See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** and `config/public-edge.yaml`.
 
 ## Neon (required)
