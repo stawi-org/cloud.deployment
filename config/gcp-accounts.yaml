@@ -105,6 +105,32 @@ accounts:
           domain: platform
           managed-by: cloud-deployment
         sops_auth_path: credentials/gcp/platform/stawi-prod/auth.yaml
+  operations:
+    description: Operations domain GCP (ops tooling, internal admin, shared ops workloads)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-dev:
+        project_id: stawi-operations-dev
+        region: europe-west9
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
+        deploy_service_account: tofu-deploy@stawi-operations-dev.iam.gserviceaccount.com
+        labels:
+          environment: dev
+          domain: operations
+          managed-by: cloud-deployment
+      stawi-prod:
+        # Filled/confirmed by scripts/bootstrap-gcp-account.sh
+        project_id: stawi-operations
+        region: europe-west9
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-operations.iam.gserviceaccount.com
+        sops_auth_path: credentials/gcp/operations/stawi-prod/auth.yaml
+        labels:
+          environment: prod
+          domain: operations
+          managed-by: cloud-deployment
   labs:
     description: Experimental GCP project(s); no production data
     owners:
