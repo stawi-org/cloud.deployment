@@ -7,6 +7,13 @@
 
 locals {
   hostnames = sort(keys(var.hosts))
+  # Content-addressed cert name so domain SAN changes + create_before_destroy
+  # can provision a new cert without 409 on a fixed name (edge-*-cert-v2).
+  cert_name = substr(
+    "${var.name}-cert-${substr(sha1(join(",", local.hostnames)), 0, 8)}",
+    0,
+    63,
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -25,9 +32,7 @@ resource "google_certificate_manager_dns_authorization" "host" {
 
 resource "google_certificate_manager_certificate" "this" {
   project  = var.project_id
-  # -v2: recreate after ACME DNS cutover so Certificate Manager re-runs
-  # domain authorization (stuck FAILED attempts do not always recheck promptly).
-  name     = "${var.name}-cert-v2"
+  name     = local.cert_name
   labels   = var.labels
   location = "global"
 
