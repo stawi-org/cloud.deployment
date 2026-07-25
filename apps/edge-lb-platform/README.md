@@ -1,6 +1,10 @@
 # edge-lb-platform
 
-Global HTTPS load balancer for platform public hostnames.
+OpenTofu-owned public edge for platform hostnames:
+
+- Global HTTPS LB + serverless NEGs → Cloud Run
+- Certificate Manager (Google-managed TLS)
+- Cloudflare DNS (`A` + ACME `CNAME`) via provider token
 
 | Host | Backend Cloud Run |
 |------|-------------------|
@@ -9,4 +13,4 @@ Global HTTPS load balancer for platform public hostnames.
 | geolocation.stawi.org | platform-geolocation |
 | files.stawi.org | platform-files |
 
-See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).
+Requires repo secret `CLOUDFLARE_API_TOKEN`. See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).

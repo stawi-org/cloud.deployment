@@ -1,13 +1,10 @@
 # Cloud Run custom domain mapping (host → single service, path / only).
 #
-# Prerequisites:
-#   1. Domain verified for the GCP project/user:
-#        gcloud domains verify stawi.org
-#   2. After apply, add DNS records from outputs (Cloudflare DNS-only recommended
-#      until certificate status is Active).
+# DEPRECATED for this fleet: europe-west9 returns 501 for domain mappings.
+# Public edge is OpenTofu-managed via modules/cloudrun-host-lb + edge-lb-* apps
+# (Global HTTPS LB + Certificate Manager + Cloudflare DNS). Keep `enabled=false`.
 #
-# Does NOT support path-based multi-service routing — use one hostname per
-# service, or route paths in Cloudflare if legacy api.stawi.org/* is needed.
+# Does NOT support path-based multi-service routing.
 
 resource "google_cloud_run_domain_mapping" "this" {
   count = var.enabled ? 1 : 0

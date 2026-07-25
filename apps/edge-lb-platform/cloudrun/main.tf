@@ -1,9 +1,12 @@
-# Global HTTPS LB for platform public hostnames.
-# Classic Cloud Run domain mapping is not available in europe-west9.
+# Global HTTPS LB + Cloudflare DNS for platform public hostnames.
 
 provider "google" {
   project = var.project_id
   region  = var.region
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 module "lb" {
@@ -19,4 +22,7 @@ module "lb" {
     "geolocation.stawi.org" = { service = "platform-geolocation" }
     "files.stawi.org"       = { service = "platform-files" }
   }
+
+  cloudflare_zone_id = var.cloudflare_zone_id
+  cloudflare_proxied = var.cloudflare_proxied
 }

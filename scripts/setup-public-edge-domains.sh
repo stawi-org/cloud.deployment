@@ -1,106 +1,75 @@
 #!/usr/bin/env bash
-# Operator helper for per-service Cloud Run domain mappings.
+# Status helper for the OpenTofu-managed public edge (HTTPS LB + Cloudflare DNS).
+#
+# DNS, certs, and host routing are owned by:
+#   apps/edge-lb-identity  (stawi-identity)
+#   apps/edge-lb-platform  (stawi-platform)
+# See docs/PUBLIC_EDGE_DNS.md — do not hand-edit Cloudflare for these hosts.
 #
 # Usage:
 #   ./scripts/setup-public-edge-domains.sh status
-#   ./scripts/setup-public-edge-domains.sh verify-hint
-#   ./scripts/setup-public-edge-domains.sh enable-tfvars
-#   ./scripts/setup-public-edge-domains.sh describe
-#
-# Requires domain verification first:
-#   gcloud domains verify stawi.org
+#   ./scripts/setup-public-edge-domains.sh apply-hint
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGION="${REGION:-europe-west9}"
 
-# hostname|project|service
-HOSTS=(
-  "accounts.stawi.org|stawi-identity|identity-authentication"
-  "oauth2.stawi.org|stawi-identity|identity-oauth2-hydra"
-  "profile.stawi.org|stawi-identity|identity-profile"
-  "tenancy.stawi.org|stawi-identity|identity-tenancy"
-  "identity.stawi.org|stawi-identity|identity-identity"
-  "devices.stawi.org|stawi-platform|platform-devices"
-  "settings.stawi.org|stawi-platform|platform-settings"
-  "geolocation.stawi.org|stawi-platform|platform-geolocation"
-  "files.stawi.org|stawi-platform|platform-files"
-)
-
-TFVARS=(
-  "apps/identity-authentication/cloudrun/envs/stawi-prod.tfvars"
-  "apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars"
-  "apps/identity-profile/cloudrun/envs/stawi-prod.tfvars"
-  "apps/identity-tenancy/cloudrun/envs/stawi-prod.tfvars"
-  "apps/identity-identity/cloudrun/envs/stawi-prod.tfvars"
-  "apps/platform-devices/cloudrun/envs/stawi-prod.tfvars"
-  "apps/platform-settings/cloudrun/envs/stawi-prod.tfvars"
-  "apps/platform-geolocation/cloudrun/envs/stawi-prod.tfvars"
-  "apps/platform-files/cloudrun/envs/stawi-prod.tfvars"
-)
+IDENTITY_HOSTS=(accounts oauth2 profile tenancy identity)
+PLATFORM_HOSTS=(devices settings geolocation files)
 
 cmd="${1:-status}"
 
 case "$cmd" in
   status)
-    echo "=== Google verified domains ==="
-    gcloud domains list-user-verified 2>&1 || true
+    echo "=== Certificate Manager (identity) ==="
+    gcloud certificate-manager certificates describe edge-id-cert \
+      --project=stawi-identity --location=global \
+      --format='yaml(managed.state,managed.provisioningIssue,managed.authorizationAttemptInfo)' 2>&1 || true
     echo
-    for entry in "${HOSTS[@]}"; do
-      IFS='|' read -r host project service <<<"$entry"
-      echo "=== $host → $project/$service ==="
-      gcloud beta run domain-mappings describe --domain="$host" \
-        --region="$REGION" --project="$project" 2>&1 | head -20 || echo "(not mapped)"
+    echo "=== Certificate Manager (platform) ==="
+    gcloud certificate-manager certificates describe edge-pl-cert \
+      --project=stawi-platform --location=global \
+      --format='yaml(managed.state,managed.provisioningIssue,managed.authorizationAttemptInfo)' 2>&1 || true
+    echo
+    echo "=== Global LB IPs ==="
+    gcloud compute addresses describe edge-id-ip --global --project=stawi-identity \
+      --format='value(address)' 2>&1 || true
+    gcloud compute addresses describe edge-pl-ip --global --project=stawi-platform \
+      --format='value(address)' 2>&1 || true
+    echo
+    echo "=== Live DNS (public resolvers) ==="
+    for h in "${IDENTITY_HOSTS[@]}" "${PLATFORM_HOSTS[@]}"; do
+      printf '%-40s ' "${h}.stawi.org"
+      dig +short "${h}.stawi.org" A 2>/dev/null | tr '\n' ' ' || true
       echo
     done
-    echo "=== tfvars flags ==="
-    for f in "${TFVARS[@]}"; do
+    echo
+    echo "=== Service public hostname flags (advertise only; mapping stays false) ==="
+    for f in \
+      apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars \
+      apps/identity-authentication/cloudrun/envs/stawi-prod.tfvars
+    do
       echo "--- $f ---"
-      grep -E 'public_hostname|enable_domain|advertise_public' "$ROOT/$f" 2>/dev/null || echo "(no domain vars yet)"
+      grep -E 'public_hostname|enable_domain|advertise_public' "$ROOT/$f" 2>/dev/null || true
     done
     ;;
-  verify-hint)
+  apply-hint)
     cat <<'EOF'
-1) gcloud domains verify stawi.org
-2) gcloud domains list-user-verified
-3) ./scripts/setup-public-edge-domains.sh enable-tfvars
-4) commit + apply each public app (or push and let CI fan out)
-5) For each host, copy DNS records from:
-     gcloud beta run domain-mappings describe --domain=<host> \
-       --region=europe-west9 --project=<project>
-   into Cloudflare (DNS-only until cert Active).
-6) After oauth2.stawi.org is live:
-     advertise_public_hostname = true on identity-oauth2-hydra
+Public edge is fully OpenTofu-managed. Do not create Cloud Run domain mappings
+(europe-west9 returns 501) and do not hand-edit Cloudflare for these hosts.
 
-Optional: Cloudflare path aliases api.stawi.org/* → *.stawi.org (not in this repo).
+1) Repo secret CLOUDFLARE_API_TOKEN (Zone:DNS:Edit on stawi.org)
+2) Apply edge LBs (creates LB + certs + CF A + ACME CNAMEs):
+     gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
+     gh workflow run app-apply.yml -f app=edge-lb-platform -f env=stawi-prod
+3) Wait until Certificate Manager state=ACTIVE
+4) Smoke hosts, then set advertise_public_hostname=true on Hydra and re-apply
 
-See docs/PUBLIC_EDGE_DNS.md
+Details: docs/PUBLIC_EDGE_DNS.md
 EOF
     ;;
-  enable-tfvars)
-    for f in "${TFVARS[@]}"; do
-      path="$ROOT/$f"
-      [[ -f "$path" ]] || { echo "skip missing $f"; continue; }
-      if grep -q 'enable_domain_mapping' "$path"; then
-        sed -i 's/enable_domain_mapping[[:space:]]*=[[:space:]]*false/enable_domain_mapping = true/' "$path"
-        echo "enabled mapping: $f"
-      else
-        echo "WARN: no enable_domain_mapping in $f — add public_hostname vars first"
-      fi
-      grep -E 'public_hostname|enable_domain' "$path" || true
-    done
-    ;;
-  describe)
-    for entry in "${HOSTS[@]}"; do
-      IFS='|' read -r host project _ <<<"$entry"
-      echo "=== $host ($project) ==="
-      gcloud beta run domain-mappings describe --domain="$host" \
-        --region="$REGION" --project="$project" 2>&1 || echo "(not mapped)"
-      echo
-    done
-    ;;
   *)
-    echo "Usage: $0 {status|verify-hint|enable-tfvars|describe}" >&2
+    echo "Usage: $0 {status|apply-hint}" >&2
     exit 2
     ;;
 esac

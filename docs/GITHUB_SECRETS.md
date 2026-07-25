@@ -10,8 +10,9 @@ Canonical credential model for this repo.
 | `R2_ACCESS_KEY_ID` | OpenTofu state |
 | `R2_SECRET_ACCESS_KEY` | OpenTofu state |
 | `SOPS_AGE_KEY` | Private age key matching `.sops.yaml` — decrypts `credentials/{gcp,neon}/**` |
+| `CLOUDFLARE_API_TOKEN` | **Required for `edge-lb-*` apps** — Zone:DNS:Edit on `stawi.org` so OpenTofu manages public host A + cert ACME CNAMEs |
 
-No other repository secrets are required for deploy.
+Core deploy (services only) works without `CLOUDFLARE_API_TOKEN`. Public edge DNS cutover (`edge-lb-identity` / `edge-lb-platform`) requires it.
 
 ## How credentials are selected (no GitHub Environments)
 
@@ -69,4 +70,8 @@ Neon API key is loaded **only** when `app.yaml` has `neon.account`.
 ./scripts/bootstrap-gcp-account.sh --account platform --env stawi-prod --project stawi-platform
 ./scripts/bootstrap-neon-account.sh --account platform --api-key "$PLATFORM_NEON_API_KEY" \
   --org-hint "Stawi Platform" --org-id org-calm-cell-68997035
+
+# 4) Cloudflare DNS for public edge (edge-lb-identity / edge-lb-platform)
+#    Token needs Zone → DNS → Edit on stawi.org (same scope as deployment.infra 04-dns).
+#    gh secret set CLOUDFLARE_API_TOKEN --body "$TOKEN"
 ```

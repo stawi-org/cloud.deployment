@@ -32,3 +32,18 @@ output "host_backends" {
 output "forwarding_rule_https" {
   value = google_compute_global_forwarding_rule.https.name
 }
+
+output "cloudflare_dns_managed" {
+  value = local.manage_cf
+}
+
+output "cloudflare_traffic_records" {
+  value = local.manage_cf ? {
+    for h, r in cloudflare_dns_record.traffic_a : h => {
+      name    = r.name
+      type    = r.type
+      content = r.content
+      proxied = r.proxied
+    }
+  } : {}
+}

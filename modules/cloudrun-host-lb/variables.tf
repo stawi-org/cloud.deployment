@@ -31,3 +31,20 @@ variable "enable_http_redirect" {
   default     = true
   description = "Also create HTTP (port 80) forwarding that redirects to HTTPS"
 }
+
+variable "cloudflare_zone_id" {
+  type        = string
+  default     = ""
+  description = "If set, manage Cloudflare DNS (A + ACME CNAMEs) in this zone via OpenTofu"
+}
+
+variable "cloudflare_proxied" {
+  type        = bool
+  default     = false
+  description = "Orange-cloud proxy for traffic A records. Keep false until cert is ACTIVE (Full Strict)."
+}
+
+variable "cloudflare_ttl" {
+  type    = number
+  default = 60
+}

@@ -1,7 +1,14 @@
-# Cloudflare DNS records for Cloud Run public edge (live)
+# Cloudflare DNS records for Cloud Run public edge
 
-Generated after `edge-lb-identity` / `edge-lb-platform` apply (2026-07-25).  
-**Add these in the Cloudflare `stawi.org` zone.** Use **DNS only (grey cloud)** until certs are Active.
+**Preferred:** managed by OpenTofu in `edge-lb-identity` / `edge-lb-platform`  
+(requires repo secret `CLOUDFLARE_API_TOKEN`). See [PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md).
+
+The tables below are the **expected** records (for debugging / one-time import).  
+Do **not** hand-edit if OpenTofu owns them — re-apply the edge-lb apps instead.
+
+---
+
+Historical snapshot after first LB apply (2026-07-25).
 
 ## 1) Certificate validation CNAMEs (add first)
 

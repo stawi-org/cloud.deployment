@@ -1,6 +1,12 @@
 # edge-lb-identity
 
-Global HTTPS load balancer for identity public hostnames (Cloud Run domain mapping is **not** available in `europe-west9`).
+OpenTofu-owned public edge for identity hostnames:
+
+- Global HTTPS LB + serverless NEGs → Cloud Run
+- Certificate Manager (Google-managed TLS)
+- Cloudflare DNS (`A` + ACME `CNAME`) via provider token
+
+Classic Cloud Run domain mapping is **not** available in `europe-west9`.
 
 | Host | Backend Cloud Run |
 |------|-------------------|
@@ -10,4 +16,4 @@ Global HTTPS load balancer for identity public hostnames (Cloud Run domain mappi
 | tenancy.stawi.org | identity-tenancy |
 | identity.stawi.org | identity-identity |
 
-See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).
+Requires repo secret `CLOUDFLARE_API_TOKEN`. See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).

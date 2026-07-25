@@ -23,7 +23,25 @@ variable "neon_region_id" {
   default = "aws-eu-central-1"
 }
 variable "image" {
-  type    = string
-  default = "unused"
+  type        = string
+  default     = "unused"
   description = "Unused — LB stack has no container image"
+}
+
+variable "cloudflare_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare API token (Zone:DNS:Edit on stawi.org). From TF_VAR_cloudflare_api_token / GH secret CLOUDFLARE_API_TOKEN"
+}
+
+variable "cloudflare_zone_id" {
+  type        = string
+  default     = "706bf604a333d866bb38c03bf643e79a"
+  description = "Cloudflare zone id for stawi.org"
+}
+
+variable "cloudflare_proxied" {
+  type        = bool
+  default     = false
+  description = "CF orange-cloud on traffic A records (false until certs ACTIVE)"
 }

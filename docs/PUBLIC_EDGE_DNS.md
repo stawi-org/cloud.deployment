@@ -1,111 +1,105 @@
-# Public edge DNS → Cloud Run (host per service)
+# Public edge DNS → Cloud Run (fully OpenTofu-managed)
 
-Each migrated Cloud Run service gets its **own hostname** on `stawi.org`.  
-There is **no** Cloud Run path router.
+Each public service has its own hostname. Front doors:
 
-**Important:** Classic Cloud Run **domain mapping is not available in `europe-west9`**.  
-Public hostnames use a **Global HTTPS Application Load Balancer** + **Certificate Manager**
-(serverless NEGs → Cloud Run) instead.
+| Stack | OpenTofu app | GCP project | Hosts |
+|-------|--------------|-------------|-------|
+| Identity | `edge-lb-identity` | stawi-identity | accounts, oauth2, profile, tenancy, identity |
+| Platform | `edge-lb-platform` | stawi-platform | devices, settings, geolocation, files |
+
+**What OpenTofu manages**
+
+| Layer | Resource |
+|-------|----------|
+| Global anycast IP | `google_compute_global_address` |
+| Serverless NEGs → Cloud Run | `google_compute_region_network_endpoint_group` |
+| HTTPS URL map (host rules) | `google_compute_url_map` |
+| Managed TLS | Certificate Manager cert + map |
+| Cert DNS validation | Cloudflare `CNAME` `_acme-challenge.<host>` |
+| Traffic DNS | Cloudflare `A` `<host>` → LB IP |
+| HTTP→HTTPS | Port 80 redirect on same IP |
+
+**Why not Cloud Run domain mapping?** Not available in `europe-west9` (API returns 501).
 
 **Registry:** [`config/public-edge.yaml`](../config/public-edge.yaml)  
-**OpenTofu:** `apps/edge-lb-identity`, `apps/edge-lb-platform`  
 **Module:** [`modules/cloudrun-host-lb`](../modules/cloudrun-host-lb)
 
-## Host map (prod)
+## One-time secret
 
-### Identity LB (`edge-lb-identity` → one anycast IP)
+Repository secret **`CLOUDFLARE_API_TOKEN`** with **Zone → DNS → Edit** on zone `stawi.org`  
+(zone id `706bf604a333d866bb38c03bf643e79a`, same as `deployment.infra` 04-dns).
 
-| Hostname | Cloud Run service |
-|----------|-------------------|
-| `accounts.stawi.org` | `identity-authentication` |
-| `oauth2.stawi.org` | `identity-oauth2-hydra` |
-| `profile.stawi.org` | `identity-profile` |
-| `tenancy.stawi.org` | `identity-tenancy` |
-| `identity.stawi.org` | `identity-identity` |
+```bash
+# GitHub → Settings → Secrets → Actions
+# Name: CLOUDFLARE_API_TOKEN
+# Value: <token>
+```
 
-### Platform LB (`edge-lb-platform` → second anycast IP)
+CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` only.
 
-| Hostname | Cloud Run service |
-|----------|-------------------|
-| `devices.stawi.org` | `platform-devices` |
-| `settings.stawi.org` | `platform-settings` |
-| `geolocation.stawi.org` | `platform-geolocation` |
-| `files.stawi.org` | `platform-files` |
-
-**Not public:** Keto.
-
-### Legacy `api.stawi.org/...`
-
-Optional **Cloudflare** path routing to the hosts above (not in this repo).
-
-## Deploy
+## Apply (after secret is set)
 
 ```bash
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 gh workflow run app-apply.yml -f app=edge-lb-platform -f env=stawi-prod
 ```
 
-### Outputs to collect after apply
+OpenTofu will:
 
-```text
-ip_address                  # A record target (DNS-only recommended initially)
-dns_authorization_records   # Certificate Manager CNAMEs for cert validation
-```
+1. Ensure LB + certs exist  
+2. Upsert Cloudflare ACME CNAMEs (validation)  
+3. Upsert Cloudflare A records to the LB IPs (grey cloud by default)
 
-From CI logs or:
+Watch certs become ACTIVE:
 
 ```bash
-# After apply, tofu outputs are in the job log "Outputs:" section
+gcloud certificate-manager certificates list --project=stawi-identity --location=global
+gcloud certificate-manager certificates list --project=stawi-platform --location=global
 ```
 
-## Cloudflare DNS (two steps)
+## Host map
 
-### A) Certificate validation (required first)
+| Hostname | Service |
+|----------|---------|
+| accounts.stawi.org | identity-authentication |
+| oauth2.stawi.org | identity-oauth2-hydra |
+| profile.stawi.org | identity-profile |
+| tenancy.stawi.org | identity-tenancy |
+| identity.stawi.org | identity-identity |
+| devices.stawi.org | platform-devices |
+| settings.stawi.org | platform-settings |
+| geolocation.stawi.org | platform-geolocation |
+| files.stawi.org | platform-files |
 
-For each hostname, Certificate Manager emits a **CNAME** (often under `_acme-challenge_...` or similar).  
-Add those records in Cloudflare (**DNS-only / grey cloud**).
+## After certs ACTIVE
 
-Wait until the certificate is **ACTIVE**.
+1. Smoke:
 
-### B) Traffic cutover
-
-Point each hostname at the LB IP:
-
-| Hostnames | Type | Content |
-|-----------|------|---------|
-| accounts, oauth2, profile, tenancy, identity | **A** | identity LB `ip_address` |
-| devices, settings, geolocation, files | **A** | platform LB `ip_address` |
-
-- Start with **DNS-only** until you confirm HTTPS works.
-- Then optional orange-cloud + SSL Full (strict).
-
-HTTP port 80 on the LB redirects to HTTPS.
-
-## Hydra public URLs
-
-After `oauth2.stawi.org` serves Cloud Run Hydra:
-
-```hcl
-# apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars
-advertise_public_hostname = true
+```bash
+curl -sSI https://oauth2.stawi.org/health/ready
+curl -sSI https://profile.stawi.org/healthz
+curl -sSI https://devices.stawi.org/healthz
 ```
 
-Re-apply hydra so OIDC discovery advertises the public host.
+2. Hydra: set `advertise_public_hostname = true` in  
+   `apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars` and re-apply.
 
-## Cost note
+3. Optional: set `cloudflare_proxied = true` in edge-lb tfvars for orange-cloud (SSL Full strict).
 
-Global external Application Load Balancer has a fixed base cost (~\$15–20/mo per forwarding rule setup) plus traffic.  
-This replaces classic domain mapping (which is free but **unsupported in europe-west9**).
+4. Optional: Cloudflare path aliases for legacy `api.stawi.org/*` (not in this repo).
 
-## Troubleshooting
+## Drift / existing records
 
-| Symptom | Fix |
-|---------|-----|
-| Domain mapping 501 in europe-west9 | Expected — use edge-lb-* apps |
-| Certificate PROVISIONING | Missing/wrong DNS auth CNAME; use grey cloud |
-| 502 from LB | Cloud Run service missing or wrong region/name in hosts map |
-| 404 on host | URL map host rule missing or DNS still on old origin |
+If Cloudflare already has an `A` for e.g. `accounts` (old cluster / CF proxy), apply may fail with “identical record” or create a second record. Resolve once:
 
-## Frame health
+```bash
+# List CF record id, then import into tofu state (example keys):
+# module.lb.cloudflare_dns_record.traffic_a["accounts.stawi.org"]
+# zone_id/record_id
+```
 
-Frame: **`GET /healthz`**. Ory Hydra: `/health/ready`.
+Prefer deleting the old A/CNAME for that name (if safe) and re-apply so OpenTofu owns a single record.
+
+## Cost
+
+Global external Application Load Balancer base charge applies per project (~\$15–25/mo each for identity + platform forwarding rules) plus traffic. Required substitute for domain mapping in europe-west9.

@@ -173,3 +173,56 @@ resource "google_compute_global_forwarding_rule" "http" {
   target                = google_compute_target_http_proxy.redirect[0].id
   ip_address            = google_compute_global_address.this.id
 }
+
+# ---------------------------------------------------------------------------
+# Cloudflare DNS (OpenTofu-managed) — A traffic + ACME validation CNAMEs
+# Requires provider "cloudflare" configured by the root module (api_token).
+# ---------------------------------------------------------------------------
+
+locals {
+  manage_cf = var.cloudflare_zone_id != ""
+
+  # FQDN "profile.stawi.org" → relative name "profile" for Cloudflare zone records.
+  # ACME name from Google is like "_acme-challenge.profile.stawi.org." → "_acme-challenge.profile"
+  host_short = {
+    for h in local.hostnames :
+    h => trimsuffix(trimsuffix(h, "."), ".stawi.org")
+  }
+}
+
+resource "cloudflare_dns_record" "acme" {
+  for_each = local.manage_cf ? var.hosts : {}
+
+  zone_id = var.cloudflare_zone_id
+  # Relative name under the zone (Cloudflare appends the zone).
+  name    = "_acme-challenge.${local.host_short[each.key]}"
+  type    = google_certificate_manager_dns_authorization.host[each.key].dns_resource_record[0].type
+  content = trimsuffix(google_certificate_manager_dns_authorization.host[each.key].dns_resource_record[0].data, ".")
+  ttl     = 60
+  proxied = false # required for Certificate Manager validation
+
+  comment = "Managed by cloud.deployment ${var.name} (cert validation)"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "cloudflare_dns_record" "traffic_a" {
+  for_each = local.manage_cf ? var.hosts : {}
+
+  zone_id = var.cloudflare_zone_id
+  name    = local.host_short[each.key]
+  type    = "A"
+  content = google_compute_global_address.this.address
+  ttl     = var.cloudflare_proxied ? 1 : var.cloudflare_ttl
+  proxied = var.cloudflare_proxied
+
+  comment = "Managed by cloud.deployment ${var.name} → Cloud Run via HTTPS LB"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [cloudflare_dns_record.acme]
+}
