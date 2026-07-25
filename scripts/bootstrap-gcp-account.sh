@@ -590,7 +590,9 @@ for role in \
   roles/iam.serviceAccountAdmin \
   roles/iam.serviceAccountUser \
   roles/storage.objectViewer \
-  roles/serviceusage.serviceUsageConsumer
+  roles/serviceusage.serviceUsageConsumer \
+  roles/logging.viewer \
+  roles/artifactregistry.admin
 do
   ensure_iam_binding "$role" "serviceAccount:${SA_EMAIL}" || warn "could not bind $role"
   say "  $role"

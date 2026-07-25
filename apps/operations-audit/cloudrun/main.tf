@@ -97,6 +97,9 @@ locals {
     HTTP_PORT                         = tostring(var.container_port)
     SERVER_PORT                       = ":${var.container_port}"
     LOG_LEVEL                         = "INFO"
+    OTEL_TRACES_EXPORTER              = "none"
+    OTEL_METRICS_EXPORTER             = "none"
+    OTEL_LOGS_EXPORTER                = "none"
     AUTHORIZATION_MODE                = "keto"
     OAUTH2_SERVICE_URI                = local.oauth2_origin
     OAUTH2_SERVICE_ADMIN_URI          = local.oauth2_origin

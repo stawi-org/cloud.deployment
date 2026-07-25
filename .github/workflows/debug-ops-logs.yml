@@ -81,3 +81,18 @@ jobs:
             "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$SVC\"" \
             --project="$PROJ" --limit=100 --freshness=6h \
             --format='table(timestamp,severity,textPayload)' 2>&1 || true
+
+          echo "=== Neon extensions via DATABASE_URL secret (if present) ==="
+          SECRET_ID="${SVC}-database-url-direct"
+          if gcloud secrets describe "$SECRET_ID" --project="$PROJ" >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client >/dev/null
+            URL=$(gcloud secrets versions access latest --secret="$SECRET_ID" --project="$PROJ")
+            echo "probing $(echo "$URL" | sed -E 's#://([^:]+):[^@]+@#://\1:***@#')"
+            psql "$URL" -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension ORDER BY 1;" 2>&1 || true
+            psql "$URL" -v ON_ERROR_STOP=1 -c \
+              "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\" CASCADE;" 2>&1 || true
+            psql "$URL" -v ON_ERROR_STOP=1 -c "SELECT extname, extversion FROM pg_extension ORDER BY 1;" 2>&1 || true
+          else
+            echo "secret $SECRET_ID not found"
+          fi
