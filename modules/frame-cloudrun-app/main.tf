@@ -47,7 +47,16 @@ locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
 
-  extra_version_ids = length(var.extra_version_ids) > 0 ? var.extra_version_ids : toset(keys(var.extra_secret_values))
+  # for_each keys must never be sensitive (keys() of a sensitive map is sensitive).
+  extra_version_ids = (
+    length(var.extra_version_ids) > 0
+    ? var.extra_version_ids
+    : (
+      length(var.extra_secret_values) > 0
+      ? nonsensitive(toset(keys(var.extra_secret_values)))
+      : toset([])
+    )
+  )
 
   secret_ids = setunion(
     var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
