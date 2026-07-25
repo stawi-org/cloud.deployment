@@ -59,8 +59,8 @@ App-local only:
 | `min_instance_count` | `0` |
 | `migrate_execute` | `false` |
 | `disable_otel_exporters` | `true` |
-| Keto URIs | Direct CR (not `api.stawi.org` proxy) |
-| `KETO_SERVICE_ADMIN_URI` | Set when `enable_keto_admin` |
+| OAuth2 / Keto URIs (prod) | DNS: `oauth2`, `oauth2-w`, `authz`, `authz-w` `.stawi.org` |
+| `KETO_SERVICE_ADMIN_URI` | Set when `enable_keto_admin` (→ `authz-w` in prod) |
 | Neon extensions | base suite when DB enabled |
 | Region | `europe-west9` |
 

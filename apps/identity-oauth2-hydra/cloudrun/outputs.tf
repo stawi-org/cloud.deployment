@@ -4,7 +4,12 @@ output "service_uri" {
 }
 
 output "admin_uri" {
-  description = "Hydra admin base URL (IAM-protected; not on edge LB)"
+  description = "Hydra admin base URL (IAM-protected; DNS oauth2-w.* when advertised)"
+  value       = local.admin_origin
+}
+
+output "admin_run_uri" {
+  description = "Hydra admin Cloud Run URL (always; for debugging)"
   value       = module.service_admin.uri
 }
 

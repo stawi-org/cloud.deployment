@@ -68,8 +68,10 @@ locals {
   # Deterministic admin Cloud Run URL (K8s: hydra-admin ClusterIP only).
   admin_service_name = "${var.app_name}-admin"
   admin_run_url      = "https://${local.admin_service_name}-${data.google_project.this.number}.${var.region}.run.app"
+  # Stable DNS when edge-lb-identity maps oauth2-w.* (still IAM-authenticated).
+  admin_origin = var.advertise_admin_hostname ? "https://${var.admin_hostname}" : local.admin_run_url
 
-  # Identity runtimes that may call Hydra admin (client mgmt, etc.).
+  # Identity + cross-project runtimes that may call Hydra admin (client mgmt, etc.).
   admin_invoker_members = setunion(
     toset([
       for id in toset([
@@ -101,8 +103,8 @@ locals {
     URLS_POST_LOGOUT_REDIRECT                   = "${local.accounts_origin}/logout-successful"
     URLS_SELF_PUBLIC                            = local.oauth2_origin
     URLS_SELF_ISSUER                            = local.issuer
-    # Admin is a separate private Cloud Run service (not the public origin).
-    URLS_SELF_ADMIN                                  = local.admin_run_url
+    # Admin is a separate IAM-authenticated service (oauth2-w.* DNS when advertised).
+    URLS_SELF_ADMIN                                  = local.admin_origin
     WEBFINGER_OIDC_DISCOVERY_TOKEN_URL               = "${local.oauth2_origin}/oauth2/token"
     WEBFINGER_OIDC_DISCOVERY_AUTH_URL                = "${local.oauth2_origin}/oauth2/auth"
     WEBFINGER_OIDC_DISCOVERY_CLIENT_REGISTRATION_URL = "${local.oauth2_origin}/clients"
@@ -134,7 +136,7 @@ locals {
   hydra_admin_env = merge(local.hydra_env, {
     SERVE_ADMIN_HOST                           = "0.0.0.0"
     SERVE_ADMIN_PORT                           = "4445"
-    SERVE_ADMIN_BASE_URL                       = local.admin_run_url
+    SERVE_ADMIN_BASE_URL                       = local.admin_origin
     SERVE_ADMIN_REQUEST_LOG_DISABLE_FOR_HEALTH = "true"
   })
 }
@@ -213,7 +215,7 @@ module "service" {
   depends_on = [module.secrets, module.messaging, module.migrate]
 }
 
-# Admin API (K8s: hydra-admin ClusterIP only — never on Gateway).
+# Admin API (K8s: hydra-admin ClusterIP only — IAM-authenticated; DNS oauth2-w.*).
 module "service_admin" {
   source                = "../../../modules/cloudrun-service"
   name                  = local.admin_service_name
@@ -227,6 +229,7 @@ module "service_admin" {
   memory                = "512Mi"
   exposure              = var.admin_exposure
   invoker_members       = local.admin_invoker_members
+  custom_audiences      = var.advertise_admin_hostname ? ["https://${var.admin_hostname}"] : []
   env = merge(
     local.hydra_admin_env,
     module.messaging.service_env,

@@ -133,6 +133,13 @@ locals {
     ]),
     var.additional_invoker_members,
   )
+
+  is_prod          = var.platform == "stawi-prod"
+  authz_read_host  = local.is_prod ? "https://authz.stawi.org" : "https://authz.stawi.dev"
+  authz_write_host = local.is_prod ? "https://authz-w.stawi.org" : "https://authz-w.stawi.dev"
+  # Accept OIDC audiences for DNS hostnames (edge LB) in addition to run.app.
+  keto_read_audiences  = [local.authz_read_host]
+  keto_write_audiences = [local.authz_write_host]
 }
 
 module "secrets" {
@@ -195,14 +202,15 @@ module "service_read" {
   container_port        = 4466
   # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
   # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
-  args            = ["serve", "read", "-c", "/etc/keto/keto.yml"]
-  memory          = "512Mi"
-  exposure        = var.exposure
-  invoker_members = local.keto_invoker_members
-  env             = local.keto_common_env
-  secret_env      = local.keto_secret_env
-  secret_volumes  = local.keto_secret_volumes
-  gcs_volumes     = local.keto_gcs_volumes
+  args             = ["serve", "read", "-c", "/etc/keto/keto.yml"]
+  memory           = "512Mi"
+  exposure         = var.exposure
+  invoker_members  = local.keto_invoker_members
+  custom_audiences = local.keto_read_audiences
+  env              = local.keto_common_env
+  secret_env       = local.keto_secret_env
+  secret_volumes   = local.keto_secret_volumes
+  gcs_volumes      = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,
@@ -248,12 +256,13 @@ module "service_write" {
   args                  = ["serve", "write", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
   # Write is higher risk — same exposure mode, same invoker allow-list (tighten later).
-  exposure        = var.exposure
-  invoker_members = local.keto_invoker_members
-  env             = local.keto_common_env
-  secret_env      = local.keto_secret_env
-  secret_volumes  = local.keto_secret_volumes
-  gcs_volumes     = local.keto_gcs_volumes
+  exposure         = var.exposure
+  invoker_members  = local.keto_invoker_members
+  custom_audiences = local.keto_write_audiences
+  env              = local.keto_common_env
+  secret_env       = local.keto_secret_env
+  secret_volumes   = local.keto_secret_volumes
+  gcs_volumes      = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,

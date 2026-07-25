@@ -1,39 +1,28 @@
-# Global HTTPS LB + Cloudflare DNS for identity public hostnames.
-# Classic Cloud Run domain mapping is not available in europe-west9.
+# Global HTTPS LB + Cloudflare DNS for operations public hostnames.
 
 provider "google" {
   project = var.project_id
   region  = var.region
 }
 
-# Token from CI: CLOUDFLARE_API_TOKEN / TF_VAR_cloudflare_api_token
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
 locals {
   zone_name = "stawi.org"
-  # All identity Cloud Run services get stable DNS.
-  # Control-plane hosts (oauth2-w, authz, authz-w) stay IAM-authenticated — DNS ≠ public.
   hosts = {
-    "accounts.stawi.org" = { service = "identity-authentication" }
-    "oauth2.stawi.org"   = { service = "identity-oauth2-hydra" }
-    "oauth2-w.stawi.org" = { service = "identity-oauth2-hydra-admin" }
-    "authz.stawi.org"    = { service = "identity-authorization-keto-read" }
-    "authz-w.stawi.org"  = { service = "identity-authorization-keto-write" }
-    "profile.stawi.org"  = { service = "identity-profile" }
-    "tenancy.stawi.org"  = { service = "identity-tenancy" }
-    "identity.stawi.org" = { service = "identity-identity" }
+    "audit.stawi.org"      = { service = "operations-audit" }
+    "formstore.stawi.org"  = { service = "operations-formstore" }
+    "queuestore.stawi.org" = { service = "operations-queuestore" }
+    "redirect.stawi.org"   = { service = "operations-redirect" }
+    "thesa.stawi.org"      = { service = "operations-thesa" }
+    "trustage.stawi.org"   = { service = "operations-trustage" }
   }
   host_short = {
     for h in keys(local.hosts) : h => trimsuffix(h, ".${local.zone_name}")
   }
 }
-
-# ---------------------------------------------------------------------------
-# Adopt pre-existing Cloudflare records (legacy CNAME / wrong A) so OpenTofu
-# can replace them with the LB A records. Import blocks must live at root.
-# ---------------------------------------------------------------------------
 
 data "cloudflare_dns_records" "zone" {
   zone_id   = var.cloudflare_zone_id
@@ -41,14 +30,11 @@ data "cloudflare_dns_records" "zone" {
 }
 
 locals {
-  # CF returns FQDN names; index by short label under stawi.org.
   cf_records_by_short = {
     for r in try(data.cloudflare_dns_records.zone.result, []) :
     trimsuffix(trimsuffix(lower(r.name), "."), ".${local.zone_name}") => r...
   }
 
-  # Prefer importing a CNAME/A/AAAA for each traffic host (first match).
-  # Resources already in state skip import automatically.
   traffic_to_import = {
     for host, short in local.host_short :
     host => {
@@ -63,7 +49,6 @@ locals {
     ]) > 0
   }
 
-  # ACME CNAMEs Google already expects — adopt if present (same content preferred).
   acme_to_import = {
     for host, short in local.host_short :
     host => {
@@ -94,7 +79,7 @@ import {
 module "lb" {
   source     = "../../../modules/cloudrun-host-lb"
   project_id = var.project_id
-  name       = "edge-id"
+  name       = "edge-ops"
   region     = var.region
   labels     = var.labels
 

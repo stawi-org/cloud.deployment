@@ -1,9 +1,10 @@
-# Public edge contract for Cloud Run (host-per-service).
+# Edge contract for Cloud Run (host-per-service).
 #
 # europe-west9 does NOT support classic Cloud Run domain mappings.
-# Hostnames are served via Global HTTPS LBs (apps/edge-lb-identity, edge-lb-platform)
-# with Certificate Manager + serverless NEGs.
+# Hostnames are served via Global HTTPS LBs (apps/edge-lb-*) with Certificate
+# Manager + serverless NEGs + Cloudflare DNS.
 #
+# DNS ≠ public: control-plane hosts can have DNS while remaining IAM-authenticated.
 # Optional: Cloudflare can still map api.stawi.org/<path> → these hosts.
 
 version: 1
@@ -17,6 +18,9 @@ prod:
       hosts:
         accounts.stawi.org: identity-authentication
         oauth2.stawi.org: identity-oauth2-hydra
+        oauth2-w.stawi.org: identity-oauth2-hydra-admin
+        authz.stawi.org: identity-authorization-keto-read
+        authz-w.stawi.org: identity-authorization-keto-write
         profile.stawi.org: identity-profile
         tenancy.stawi.org: identity-tenancy
         identity.stawi.org: identity-identity
@@ -27,9 +31,20 @@ prod:
         settings.stawi.org: platform-settings
         geolocation.stawi.org: platform-geolocation
         files.stawi.org: platform-files
-  private:
+    edge-lb-operations:
+      gcp_project: stawi-operations
+      hosts:
+        audit.stawi.org: operations-audit
+        formstore.stawi.org: operations-formstore
+        queuestore.stawi.org: operations-queuestore
+        redirect.stawi.org: operations-redirect
+        thesa.stawi.org: operations-thesa
+        trustage.stawi.org: operations-trustage
+  # IAM-authenticated control plane (no allUsers). Still have DNS via edge-lb-identity.
+  authenticated:
     - identity-authorization-keto-read
     - identity-authorization-keto-write
+    - identity-oauth2-hydra-admin
   cloudflare_path_aliases:
     api.stawi.org:
       /profile: profile.stawi.org
@@ -39,3 +54,9 @@ prod:
       /settings: settings.stawi.org
       /geolocation: geolocation.stawi.org
       /files: files.stawi.org
+      /audit: audit.stawi.org
+      /formstore: formstore.stawi.org
+      /queuestore: queuestore.stawi.org
+      /redirect: redirect.stawi.org
+      /thesa: thesa.stawi.org
+      /trustage: trustage.stawi.org

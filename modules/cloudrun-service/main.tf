@@ -51,6 +51,9 @@ resource "google_cloud_run_v2_service" "this" {
   ingress  = local.resolved_ingress
   labels   = var.labels
 
+  # Accept ID tokens minted for stable DNS hosts (edge LB), not only run.app.
+  custom_audiences = var.custom_audiences
+
   deletion_protection = var.deletion_protection
 
   # client/client_version are mutated by gcloud/API clients.

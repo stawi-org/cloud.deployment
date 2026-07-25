@@ -175,6 +175,12 @@ variable "invoker_members" {
   description = "IAM members granted roles/run.invoker (e.g. serviceAccount:app@project.iam.gserviceaccount.com). Required for authenticated/private unless empty bootstrap."
 }
 
+variable "custom_audiences" {
+  type        = list(string)
+  default     = []
+  description = "Extra OIDC audiences accepted by Cloud Run (e.g. https://authz.stawi.org). Needed when callers use DNS hostnames as ID-token audience while the service is fronted by an external LB."
+}
+
 variable "startup_probe_path" {
   type        = string
   default     = ""

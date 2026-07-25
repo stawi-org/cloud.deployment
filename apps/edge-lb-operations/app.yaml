@@ -1,0 +1,11 @@
+name: edge-lb-operations
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: operations
+# No Neon — HTTPS LB + Certificate Manager front door for operations hosts.
+runtime: cloudrun
+domain: operations
+version: 1

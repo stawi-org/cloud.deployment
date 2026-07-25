@@ -66,11 +66,22 @@ variable "public_hostname" {
   description = "Canonical public host (K8s parity). Used when advertise_public_hostname=true."
 }
 
-
 variable "advertise_public_hostname" {
   type        = bool
   default     = false
-  description = "When true, Hydra URLs/issuer endpoints use https://public_hostname instead of run.app"
+  description = "When true, Hydra public URLs use https://public_hostname instead of run.app"
+}
+
+variable "admin_hostname" {
+  type        = string
+  default     = "oauth2-w.stawi.org"
+  description = "Canonical Hydra admin host (DNS via edge-lb-identity). IAM-authenticated, not anonymous-public."
+}
+
+variable "advertise_admin_hostname" {
+  type        = bool
+  default     = false
+  description = "When true, Hydra admin base URL uses https://admin_hostname instead of run.app"
 }
 
 variable "admin_exposure" {
@@ -86,5 +97,5 @@ variable "admin_exposure" {
 variable "additional_admin_invoker_members" {
   type        = set(string)
   default     = []
-  description = "Extra run.invoker members for Hydra admin (cross-project SAs if needed)"
+  description = "Extra run.invoker members for Hydra admin (cross-project runtime SAs)"
 }

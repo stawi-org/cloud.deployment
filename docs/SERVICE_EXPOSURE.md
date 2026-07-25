@@ -7,39 +7,61 @@ mode on `modules/cloudrun-service`.
 Secrets stay **per GCP project** (unchanged). This document is about **network
 and IAM reachability**, not Secret Manager placement.
 
+## DNS does not mean public
+
+Every service should have a **stable hostname** (`*.stawi.org`) via the domain
+edge LB (`edge-lb-identity`, `edge-lb-platform`, `edge-lb-operations`).
+
+| Layer | What it does |
+|-------|----------------|
+| **DNS** | Name → LB IP |
+| **HTTPS LB + serverless NEG** | Host rule → Cloud Run service |
+| **Cloud Run IAM** (`roles/run.invoker`) | Who may invoke (anonymous vs allow-list) |
+| **Ingress** | `ALL` vs `INTERNAL_ONLY` (VPC) |
+
+Adding DNS for `authz.stawi.org` or `oauth2-w.stawi.org` does **not** open
+anonymous internet access. Without `allUsers` invoker, unauthenticated calls
+still receive **403**.
+
 ## Modes
 
 | Mode | Ingress | Anonymous (`allUsers`) | Cross-project callers | Typical use |
 |------|---------|------------------------|----------------------|-------------|
 | **public** | ALL | yes | n/a | Product APIs, Hydra **public**, accounts UI |
-| **authenticated** | ALL | **no** — IAM `run.invoker` required | Yes (grant SA invoker) | **Keto read/write**, Hydra **admin** |
+| **authenticated** | ALL | **no** — IAM `run.invoker` required | Yes (grant SA invoker) | **Keto**, Hydra **admin** |
 | **private** | INTERNAL_ONLY | no | Only via Shared VPC / PSC | After private networking lands |
 
 ### Why not only `private` today?
 
 `INGRESS_TRAFFIC_INTERNAL_ONLY` rejects traffic that is not from a VPC path.
-Ops/platform services in **other projects** currently call identity over
-`*.run.app` HTTPS. Until Shared VPC / Private Service Connect is in place,
-**`authenticated` is the robust multi-account default**: no anonymous internet,
-but invoker-grantable cross-project.
+Ops/platform services in **other projects** call identity over HTTPS (custom
+hosts or `*.run.app`). Until Shared VPC / Private Service Connect is in place,
+**`authenticated` is the multi-account default**: no anonymous internet, but
+invoker-grantable cross-project.
 
 Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 (Hydra admin) when private networking is ready.
 
-## Inventory (identity control plane)
+## Hostname inventory (prod)
 
-| Service | Mode | Edge host | Notes |
-|---------|------|-----------|--------|
-| `identity-oauth2-hydra` (public) | **public** | `oauth2.stawi.org` | OIDC authorize/token/JWKS only (`serve public`) |
-| `identity-oauth2-hydra-admin` | **authenticated** | **none** | `serve admin`; invoker allow-list |
-| `identity-authorization-keto-read` | **authenticated** | **none** | Never on edge-lb-identity |
-| `identity-authorization-keto-write` | **authenticated** | **none** | Same allow-list; higher risk surface |
-| Frame product apps | **public** | accounts / api / profile | Unchanged |
-| Tenancy product API | **public** | `api…/tenancy`, optional host | `_internal/*` must stay app-authz hardened |
+| Hostname | Cloud Run service | Mode | Notes |
+|----------|-------------------|------|--------|
+| `accounts.stawi.org` | identity-authentication | public | Login UI |
+| `oauth2.stawi.org` | identity-oauth2-hydra | **public** | OIDC authorize/token/JWKS (`serve public`) |
+| `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Hydra admin (`serve admin`) |
+| `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Keto read API |
+| `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Keto write API |
+| `profile.stawi.org` | identity-profile | public | Product |
+| `tenancy.stawi.org` | identity-tenancy | public | Product API |
+| `identity.stawi.org` | identity-identity | public | Product |
+| `devices.stawi.org` … | platform-* | public | Platform product |
+| `audit.stawi.org` … | operations-* | public | Operations product |
+
+Registry: [`config/public-edge.yaml`](../config/public-edge.yaml).
 
 ## Invoker allow-list (Keto / Hydra admin)
 
-Default members (identity project runtime SAs):
+### Default (identity project runtime SAs)
 
 - `identity-authentication@…`
 - `identity-identity@…`
@@ -48,18 +70,37 @@ Default members (identity project runtime SAs):
 - `identity-oauth2-hydra@…` (Hydra)
 - Keto runtime SA (self + keep-warm OIDC)
 
-Cross-project (ops/platform) — **opt-in** via tfvars:
+### Cross-project (ops + platform) — required for multi-project
+
+Configured in prod tfvars so **all** domain runtimes that call Keto / Hydra
+admin can invoke:
 
 ```hcl
 # apps/identity-authorization-keto/cloudrun/envs/stawi-prod.tfvars
+# apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars (admin)
 additional_invoker_members = [
   "serviceAccount:operations-audit@stawi-operations.iam.gserviceaccount.com",
-  "serviceAccount:operations-trustage@stawi-operations.iam.gserviceaccount.com",
-  # …each ops/platform runtime that calls AUTHORIZATION_SERVICE_* URIs
+  "serviceAccount:operations-formstore@stawi-operations.iam.gserviceaccount.com",
+  # …all operations-* and platform-* runtime SAs
 ]
 ```
 
-Without these grants, ops/platform get **403** after Keto is locked down (expected).
+Callers use their Cloud Run **runtime service account** and Google identity
+tokens (`roles/run.invoker`). Without a grant, cross-project calls get **403**.
+
+## Application config (stable DNS)
+
+Frame apps (`modules/frame-cloudrun-app`) in **prod** wire:
+
+| Env | Value |
+|-----|--------|
+| `OAUTH2_SERVICE_URI` | `https://oauth2.stawi.org` |
+| `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
+| `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
+| `AUTHORIZATION_SERVICE_WRITE_URI` | `https://authz-w.stawi.org` |
+| `KETO_SERVICE_ADMIN_URI` | `https://authz-w.stawi.org` (when `enable_keto_admin`) |
+
+Same URLs work from **operations** and **platform** projects (after invoker grants).
 
 ## Keep-warm on non-public services
 
@@ -93,21 +134,32 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 | K8s | Cloud Run |
 |-----|-----------|
 | NetworkPolicy default-deny + allow gateway/prod NS | `authenticated` / `private` + invoker members |
-| No HTTPRoute for Keto / Hydra admin | No edge-lb host for those services |
-| HTTPRoute for Hydra public / accounts / api paths | `exposure=public` + edge-lb-identity |
-| ClusterIP `*.identity.svc` | IAM-protected `*.run.app` (or internal URL later) |
+| No HTTPRoute for Keto / Hydra admin | No **public** product semantics; **DNS still exists** for stable names |
+| HTTPRoute for Hydra public / accounts / api paths | `exposure=public` + edge LB |
+| ClusterIP `*.identity.svc` | IAM-protected hostnames / `*.run.app` |
 
 ## Operational checklist
 
-1. Apply **Keto** first with identity invokers.
-2. Add **ops/platform** SAs to `additional_invoker_members` before those domains call Keto.
-3. Apply **Hydra** (public + new admin service). Point admin consumers at `admin_uri` output.
-4. Confirm anonymous curl to keto-read/write and hydra-admin returns **403**.
-5. Confirm identity Frame apps still authorize (invoker + app JWT).
-6. Later: Shared VPC → flip Keto/admin to `private`.
+1. Apply **edge-lb-identity** (hosts including `oauth2-w`, `authz`, `authz-w`).
+2. Wait for Certificate Manager certs **ACTIVE** on new hostnames.
+3. Apply **Keto** with identity + ops/platform invokers.
+4. Apply **Hydra** (public + admin) with admin invokers + `advertise_admin_hostname`.
+5. Apply **Frame** apps (identity, then ops/platform) so they use DNS control-plane URLs.
+6. Confirm anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
+7. Later: Shared VPC → flip Keto/admin to `exposure=private`.
+
+## Tenancy product vs internal routes
+
+| Surface | Exposure | Protection |
+|---------|----------|------------|
+| Product API (`/tenancy/…`) | **public** + `tenancy.stawi.org` | App OAuth / product authz |
+| `/_internal/*` | Same Cloud Run service today | **App-level** authz (service identity); not IAM-private like Keto |
+
+Recommended follow-up: split `_internal` onto a second **authenticated** service
+(same pattern as Hydra admin).
 
 ## Out of scope (this pass)
 
 - Secret Manager centralization (secrets stay per project)
 - Full VPC / PSC mesh
-- Splitting tenancy `_internal` into a second service (recommended follow-up)
+- Splitting tenancy `_internal` into a second service

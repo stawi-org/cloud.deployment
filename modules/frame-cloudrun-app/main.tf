@@ -66,13 +66,30 @@ locals {
     var.extra_secret_values,
   )
 
-  oauth2_origin = data.google_cloud_run_v2_service.hydra.uri
-  # Prefer dedicated admin service (IAM-only); fall back to public if admin missing.
-  oauth2_admin_origin = try(data.google_cloud_run_v2_service.hydra_admin[0].uri, local.oauth2_origin)
-  token_url           = "${local.oauth2_origin}/oauth2/token"
+  # Stable DNS hosts (edge LB). Prod prefers DNS over run.app so every GCP project
+  # shares the same identity control-plane URLs. DNS alone does not make a host public —
+  # Keto / Hydra admin stay IAM-authenticated (see docs/SERVICE_EXPOSURE.md).
+  oauth2_public_host = local.is_prod ? "oauth2.stawi.org" : "oauth2.stawi.dev"
+  oauth2_admin_host  = local.is_prod ? "oauth2-w.stawi.org" : "oauth2-w.stawi.dev"
+  authz_read_host    = local.is_prod ? "authz.stawi.org" : "authz.stawi.dev"
+  authz_write_host   = local.is_prod ? "authz-w.stawi.org" : "authz-w.stawi.dev"
 
-  keto_read_uri  = var.enable_keto ? data.google_cloud_run_v2_service.keto_read[0].uri : local.api_base
-  keto_write_uri = var.enable_keto ? data.google_cloud_run_v2_service.keto_write[0].uri : local.api_base
+  # Prod: DNS hostnames. Non-prod: Cloud Run URLs (edge LB may not exist).
+  oauth2_origin = local.is_prod ? "https://${local.oauth2_public_host}" : data.google_cloud_run_v2_service.hydra.uri
+  oauth2_admin_origin = local.is_prod ? "https://${local.oauth2_admin_host}" : try(
+    data.google_cloud_run_v2_service.hydra_admin[0].uri,
+    local.oauth2_origin,
+  )
+  token_url = "${local.oauth2_origin}/oauth2/token"
+
+  keto_read_uri = (
+    !var.enable_keto ? local.api_base :
+    local.is_prod ? "https://${local.authz_read_host}" : data.google_cloud_run_v2_service.keto_read[0].uri
+  )
+  keto_write_uri = (
+    !var.enable_keto ? local.api_base :
+    local.is_prod ? "https://${local.authz_write_host}" : data.google_cloud_run_v2_service.keto_write[0].uri
+  )
 
   frame_oauth_env = merge(
     {
@@ -216,7 +233,7 @@ module "secrets" {
   source     = "../app-secrets"
   project_id = var.project_id
   labels     = var.labels
-  # Rebuild as plain sets so for_each never sees a sensitive-mark (OpenTofu panics).
+  # Literal string lists only — never keys() of sensitive maps.
   secret_ids = toset(concat(
     var.has_database ? [local.database_secret_id, local.database_direct_secret_id] : [],
     sort(tolist(var.extra_secret_ids)),
