@@ -7,9 +7,12 @@
 #
 # audit-signing-key: service expects hex-encoded key material (hex.DecodeString).
 
+# Read identity PSK so private_key_jwt webhooks match accounts.stawi.org.
+# Requires secretAccessor (+ viewer) for tofu-deploy@stawi-operations on this secret.
 data "google_secret_manager_secret_version" "identity_hydra_psk" {
   project = var.identity_project_id
   secret  = "hydra-webhook-psk"
+  version = "latest"
 }
 
 resource "random_bytes" "audit_signing" {

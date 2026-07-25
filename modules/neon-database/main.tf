@@ -50,8 +50,12 @@ resource "neon_database" "app" {
 
 # Single provisioner for the full extension set (idempotent CREATE IF NOT EXISTS).
 # Re-runs when the sorted list changes so missing extensions are repaired without
-# manual taint. Parallel per-extension for_each previously left some apps without
-# btree_gin / btree_gist when early applies partially succeeded.
+# manual taint. One script avoids parallel for_each races that left some apps
+# without btree_gin / btree_gist.
+#
+# Shell vars must use $${NAME} (Terraform → ${NAME}) or a single $NAME that is
+# not a Terraform ${...} sequence. Never use $$NAME alone for env vars — that
+# becomes $NAME only if Terraform sees $$; prefer $${NAME} for clarity.
 resource "terraform_data" "extensions" {
   count = length(var.extensions) > 0 ? 1 : 0
 
@@ -66,11 +70,16 @@ resource "terraform_data" "extensions" {
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     environment = {
+      # connection_uri is sensitive; local-exec still receives the real value.
       DATABASE_URL = neon_project.this.connection_uri
       EXT_LIST     = join(",", sort(var.extensions))
     }
     command = <<-EOT
       set -euo pipefail
+      if [[ -z "$${DATABASE_URL}" ]]; then
+        echo "ERROR: DATABASE_URL is empty (neon_project.connection_uri unset)" >&2
+        exit 1
+      fi
       if ! command -v psql >/dev/null 2>&1; then
         if command -v apt-get >/dev/null 2>&1; then
           sudo apt-get update -qq
@@ -82,11 +91,11 @@ resource "terraform_data" "extensions" {
       fi
       IFS=',' read -r -a exts <<< "$${EXT_LIST}"
       for ext in "$${exts[@]}"; do
-        [[ -n "$$ext" ]] || continue
+        [[ -n "$${ext}" ]] || continue
         # Neon allows CREATE EXTENSION for supported extensions as DB owner.
-        psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 \
-          -c "CREATE EXTENSION IF NOT EXISTS \"$$ext\" CASCADE;"
-        echo "extension ok: $$ext"
+        psql "$${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+          -c "CREATE EXTENSION IF NOT EXISTS \"$${ext}\" CASCADE;"
+        echo "extension ok: $${ext}"
       done
     EOT
   }
