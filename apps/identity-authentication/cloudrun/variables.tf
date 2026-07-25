@@ -60,6 +60,18 @@ variable "extra_secret_ids" {
   description = "SM secret IDs to create without versions (fill versions outside git)"
 }
 
+variable "public_hostname" {
+  type        = string
+  default     = "accounts.stawi.org"
+  description = "Canonical public host for the accounts UI"
+}
+
+variable "enable_domain_mapping" {
+  type        = bool
+  default     = false
+  description = "Create Cloud Run domain mapping for public_hostname (needs domain verification)"
+}
+
 variable "google_oauth_client_id" {
   type        = string
   default     = ""

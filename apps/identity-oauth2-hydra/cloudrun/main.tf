@@ -30,9 +30,10 @@ locals {
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
   # Public edge host (DNS later). Until mapped, Cloud Run URL is used for discovery/token.
-  oauth2_edge   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
-  oauth2_run    = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
-  oauth2_origin = local.oauth2_run
+  oauth2_edge = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  oauth2_run  = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  # Before DNS cutover: run.app. After mapping + DNS + advertise_public_hostname: oauth2.stawi.org
+  oauth2_origin = var.advertise_public_hostname ? "https://${var.public_hostname}" : local.oauth2_run
   api_base      = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
   issuer        = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
   cookie_domain = local.is_prod ? "stawi.org" : "stawi.dev"
@@ -188,12 +189,22 @@ module "service" {
 # Cheap keep-warm: ping every 5m instead of paying idle min_instance_count=1.
 # Frame apps fail OIDC discovery hard if Hydra is fully cold + Neon sleeping.
 module "keep_warm" {
-  source            = "../../../modules/cloudrun-keep-warm"
-  project_id        = var.project_id
-  name              = "keep-warm-${var.app_name}"
-  uri               = "${module.service.uri}/health/ready"
-  schedule          = "*/5 * * * *"
+  source           = "../../../modules/cloudrun-keep-warm"
+  project_id       = var.project_id
+  name             = "keep-warm-${var.app_name}"
+  uri              = "${module.service.uri}/health/ready"
+  schedule         = "*/5 * * * *"
   attempt_deadline = "180s"
   scheduler_region = "europe-west1"
   depends_on       = [module.service]
+}
+
+module "domain" {
+  source       = "../../../modules/cloudrun-domain-mapping"
+  project_id   = var.project_id
+  region       = var.region
+  domain       = var.public_hostname
+  service_name = module.service.name
+  enabled      = var.enable_domain_mapping
+  depends_on   = [module.service]
 }

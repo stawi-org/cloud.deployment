@@ -59,3 +59,21 @@ variable "extra_secret_ids" {
   default     = []
   description = "SM secret IDs to create without versions (fill versions outside git)"
 }
+
+variable "public_hostname" {
+  type        = string
+  default     = "oauth2.stawi.org"
+  description = "Canonical public host (K8s parity). Used when advertise_public_hostname=true."
+}
+
+variable "enable_domain_mapping" {
+  type        = bool
+  default     = false
+  description = "Create Cloud Run domain mapping for public_hostname (needs domain verification)"
+}
+
+variable "advertise_public_hostname" {
+  type        = bool
+  default     = false
+  description = "When true, Hydra URLs/issuer endpoints use https://public_hostname instead of run.app"
+}

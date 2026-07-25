@@ -248,17 +248,26 @@ module "service" {
   ]
 }
 
-# Cheap keep-warm for login/consent path (avoids ~$13/mo idle min instance).
-# /s/login returns 303 and reaches the container even if /healthz is not public.
+# Cheap keep-warm — Frame default health is /healthz.
 module "keep_warm" {
   source           = "../../../modules/cloudrun-keep-warm"
   project_id       = var.project_id
   name             = "keep-warm-${var.app_name}"
-  uri              = "${module.service.uri}/s/login"
+  uri              = "${module.service.uri}/healthz"
   schedule         = "*/5 * * * *"
   attempt_deadline = "180s"
   scheduler_region = "europe-west1"
   depends_on       = [module.service]
+}
+
+module "domain" {
+  source       = "../../../modules/cloudrun-domain-mapping"
+  project_id   = var.project_id
+  region       = var.region
+  domain       = var.public_hostname
+  service_name = module.service.name
+  enabled      = var.enable_domain_mapping
+  depends_on   = [module.service]
 }
 
 # Pub/Sub push OIDC: allow the runtime SA to be used as push identity,

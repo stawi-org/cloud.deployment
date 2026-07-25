@@ -69,6 +69,18 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 
 ---
 
+## Public DNS / edge
+
+Canonical hosts and path map: **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** + `config/public-edge.yaml`.
+
+| Host | Service |
+|------|---------|
+| `accounts.stawi.org` | `identity-authentication` |
+| `oauth2.stawi.org` | `identity-oauth2-hydra` |
+| `api.stawi.org` | `edge-api` (path router → profile/tenancy/identity + platform apps) |
+
+Domain mapping requires `gcloud domains verify stawi.org` first; see operator script `scripts/setup-public-edge-domains.sh`.
+
 ## Container images (Artifact Registry)
 
 GHCR pulls via org `cache.europe-docker.pkg.dev` often fail without cache credentials.

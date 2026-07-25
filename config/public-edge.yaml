@@ -1,0 +1,72 @@
+# Public edge contract for Cloud Run cutover (parity with K8s Gateway / catalog).
+#
+# Host exceptions (one Cloud Run service per hostname):
+#   accounts.stawi.org → identity-authentication
+#   oauth2.stawi.org   → identity-oauth2-hydra
+#
+# Path-based API (single hostname, path router strips prefix → backend /):
+#   api.stawi.org/<path> → Cloud Run service
+#
+# Keto is intentionally not public (in-cluster / private only).
+# DNS is on Cloudflare (stawi.org zone). Domain mapping requires Google
+# domain verification first — see docs/PUBLIC_EDGE_DNS.md.
+
+version: 1
+prod:
+  zone: stawi.org
+  issuer: https://stawi.org
+  hosts:
+    accounts.stawi.org:
+      kind: host
+      gcp_project: stawi-identity
+      region: europe-west9
+      cloud_run_service: identity-authentication
+      health_path: /healthz
+      notes: Login/consent UI + auth webhooks
+    oauth2.stawi.org:
+      kind: host
+      gcp_project: stawi-identity
+      region: europe-west9
+      cloud_run_service: identity-oauth2-hydra
+      health_path: /health/ready
+      notes: Ory Hydra public OIDC
+    api.stawi.org:
+      kind: path_router
+      gcp_project: stawi-identity
+      region: europe-west9
+      cloud_run_service: edge-api
+      health_path: /healthz
+      notes: Path-based API gateway (Caddy) to per-service Cloud Run backends
+  api_paths:
+    # path_prefix → backend Cloud Run (project + service). Prefix is stripped.
+    /profile:
+      gcp_project: stawi-identity
+      cloud_run_service: identity-profile
+      project_number: "721554040672"
+    /tenancy:
+      gcp_project: stawi-identity
+      cloud_run_service: identity-tenancy
+      project_number: "721554040672"
+    /identity:
+      gcp_project: stawi-identity
+      cloud_run_service: identity-identity
+      project_number: "721554040672"
+    /devices:
+      gcp_project: stawi-platform
+      cloud_run_service: platform-devices
+      project_number: "305282281906"
+    /settings:
+      gcp_project: stawi-platform
+      cloud_run_service: platform-settings
+      project_number: "305282281906"
+    /geolocation:
+      gcp_project: stawi-platform
+      cloud_run_service: platform-geolocation
+      project_number: "305282281906"
+    /files:
+      gcp_project: stawi-platform
+      cloud_run_service: platform-files
+      project_number: "305282281906"
+  # Deterministic Cloud Run URL template (stable before custom domain):
+  #   https://{service}-{project_number}.{region}.run.app
+  run_url_template: "https://{service}-{project_number}.{region}.run.app"

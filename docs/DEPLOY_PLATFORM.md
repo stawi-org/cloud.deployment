@@ -25,6 +25,19 @@ Cloud Run + migrate jobs: Ready in `stawi-platform` / `europe-west9`.
 DB secrets: `{app}-database-url` (+ `-direct`) in Secret Manager (Neon pooled/direct hosts, `eu-central-1`).  
 Pub/Sub: regional `{app}-events` + push to `/_frame/queue/{app}-events`.
 
+## Public DNS / edge
+
+Platform services are exposed under **`api.stawi.org/<path>`** via the shared **`edge-api`** Cloud Run path router (not per-service hostnames):
+
+| Path | Service |
+|------|---------|
+| `/devices` | `platform-devices` |
+| `/settings` | `platform-settings` |
+| `/geolocation` | `platform-geolocation` |
+| `/files` | `platform-files` |
+
+See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** and `config/public-edge.yaml`.
+
 ## Neon (required)
 
 Every platform app uses **`neon.account: platform`** only — not identity.
