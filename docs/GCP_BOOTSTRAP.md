@@ -12,6 +12,8 @@ GCP bootstrap is **independent of Neon**. It never writes Neon keys.
 
 If `--account` / `--env` are **not** already in the registry, bootstrap **creates** them in the PR (defaults: `owners: [platform]`, `sensitivity: medium`). You do not need to edit `gcp-accounts.yaml` by hand first.
 
+Existing clones (including `~/cloud.deployment` and `--repo-path`) are **always** `git fetch` + hard-reset to `origin/main` (or `--base-branch`) so registry/script fixes land without a manual pull. Dirty trees are stashed first.
+
 CI uses **WIF** from the SOPS file (or registry mirror) — no long-lived GCP keys in GitHub.
 
 ## Prerequisites

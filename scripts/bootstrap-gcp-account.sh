@@ -329,31 +329,97 @@ github_create_pr() {
   return 1
 }
 
+# Bring an existing checkout onto origin/${BASE_BRANCH} (latest main by default).
+# Stashes local dirt so Cloud Shell re-runs always pick up registry/script fixes.
+sync_checkout_to_base() {
+  local dest="$1"
+  [[ -d "$dest/.git" ]] || die "not a git checkout: $dest"
+
+  say "syncing ${dest} → origin/${BASE_BRANCH}"
+
+  # Prefer origin as the GitHub remote; tolerate alternate remote names.
+  if ! git -C "$dest" remote get-url origin >/dev/null 2>&1; then
+    if git -C "$dest" remote | grep -qx 'upstream'; then
+      git -C "$dest" remote rename upstream origin 2>/dev/null || true
+    fi
+  fi
+  if git -C "$dest" remote get-url origin >/dev/null 2>&1; then
+    local cur
+    cur=$(git -C "$dest" remote get-url origin 2>/dev/null || true)
+    if [[ -n "$cur" && "$cur" != *"${GITHUB_REPO}"* && "$cur" != *"${GITHUB_REPO%.git}"* ]]; then
+      warn "origin remote is '${cur}' (expected ${GITHUB_REPO}); fetching anyway"
+    fi
+  else
+    say "adding origin → ${CLONE_URL}"
+    git -C "$dest" remote add origin "$CLONE_URL"
+  fi
+
+  if ! git -C "$dest" fetch --prune origin "$BASE_BRANCH"; then
+    # Fallback: full fetch if branch refspec fails
+    git -C "$dest" fetch --prune origin || die "git fetch origin failed — check network / GITHUB_TOKEN"
+  fi
+  git -C "$dest" rev-parse --verify --quiet "origin/${BASE_BRANCH}" >/dev/null \
+    || die "origin/${BASE_BRANCH} not found after fetch"
+
+  # Drop bootstrap worktrees that would block checkout (recreated later).
+  if [[ -d "$dest/.worktrees" ]]; then
+    git -C "$dest" worktree prune 2>/dev/null || true
+  fi
+
+  if [[ -n "$(git -C "$dest" status --porcelain 2>/dev/null || true)" ]]; then
+    local stash_msg="bootstrap-gcp-account auto-stash $(date -u +%Y%m%dT%H%M%SZ)"
+    warn "dirty working tree in ${dest} — stashing before reset (${stash_msg})"
+    git -C "$dest" stash push -u -m "$stash_msg" || warn "stash failed; attempting hard reset anyway"
+  fi
+
+  # Detach any local branch tip onto remote tip (handles diverged local main).
+  git -C "$dest" checkout -B "$BASE_BRANCH" "origin/${BASE_BRANCH}" \
+    || die "could not checkout ${BASE_BRANCH} from origin/${BASE_BRANCH}"
+  git -C "$dest" reset --hard "origin/${BASE_BRANCH}" \
+    || die "git reset --hard origin/${BASE_BRANCH} failed"
+  # Drop untracked noise that is not stashed (e.g. leftover editor files)
+  git -C "$dest" clean -fd --exclude='.worktrees' 2>/dev/null || true
+
+  local sha subject
+  sha=$(git -C "$dest" rev-parse --short HEAD)
+  subject=$(git -C "$dest" log -1 --pretty=format:'%s' 2>/dev/null || true)
+  say "checkout at ${sha} on ${BASE_BRANCH}${subject:+ — ${subject}}"
+}
+
 ensure_git_clone() {
   local dest="$1"
   if [[ -d "$dest/.git" && -f "$dest/config/gcp-accounts.yaml" ]]; then
-    say "reusing clone at $dest"
-    git -C "$dest" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null || true
-    git -C "$dest" checkout "$BASE_BRANCH" --quiet 2>/dev/null \
-      || git -C "$dest" checkout -B "$BASE_BRANCH" "origin/${BASE_BRANCH}" --quiet 2>/dev/null || true
-    git -C "$dest" pull --ff-only origin "$BASE_BRANCH" --quiet 2>/dev/null || true
+    say "existing clone at $dest — updating to latest ${BASE_BRANCH}"
+    sync_checkout_to_base "$dest"
     return 0
   fi
   if [[ -e "$dest" && ! -d "$dest/.git" ]]; then
     die "$dest exists but is not a git clone"
   fi
-  say "cloning ${CLONE_URL} → ${dest}"
+  if [[ -d "$dest/.git" ]]; then
+    # Partial/broken tree: has .git but missing registry — still try sync then validate
+    say "git repo at $dest missing registry file — fetching ${BASE_BRANCH}"
+    sync_checkout_to_base "$dest"
+    [[ -f "$dest/config/gcp-accounts.yaml" ]] || die "after sync, still missing config/gcp-accounts.yaml in $dest"
+    return 0
+  fi
+  say "cloning ${CLONE_URL} → ${dest} (branch ${BASE_BRANCH})"
   mkdir -p "$(dirname "$dest")"
   git clone --branch "$BASE_BRANCH" --single-branch "$CLONE_URL" "$dest" \
     || git clone "$CLONE_URL" "$dest" \
     || die "git clone failed"
+  # Ensure we are exactly on latest tip (clone can race with a push)
+  sync_checkout_to_base "$dest"
 }
 
 resolve_repo_path() {
   if [[ -n "$REPO_PATH" ]]; then
-    if [[ ! -f "$REPO_PATH/config/gcp-accounts.yaml" ]]; then
+    if [[ ! -f "$REPO_PATH/config/gcp-accounts.yaml" || ! -d "$REPO_PATH/.git" ]]; then
       [[ "$NO_CLONE" == "true" ]] && die "--repo-path not a cloud.deployment checkout"
       ensure_git_clone "$REPO_PATH"
+    else
+      # Explicit path that already looks valid — still pull latest main
+      sync_checkout_to_base "$REPO_PATH"
     fi
   else
     local detected
@@ -361,6 +427,7 @@ resolve_repo_path() {
     if [[ -n "$detected" && -f "$detected/config/gcp-accounts.yaml" ]]; then
       REPO_PATH="$detected"
       say "using checkout: $REPO_PATH"
+      sync_checkout_to_base "$REPO_PATH"
     elif [[ "$NO_CLONE" == "true" ]]; then
       die "not in cloud.deployment checkout and --no-clone set"
     else
