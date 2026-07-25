@@ -124,7 +124,7 @@ accounts:
         # Filled/confirmed by scripts/bootstrap-gcp-account.sh
         project_id: stawi-operations
         region: europe-west9
-        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-actions
+        workload_identity_provider: projects/1050361697827/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-operations.iam.gserviceaccount.com
         sops_auth_path: credentials/gcp/operations/stawi-prod/auth.yaml
         labels:
