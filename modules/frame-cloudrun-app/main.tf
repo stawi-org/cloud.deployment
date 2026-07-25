@@ -214,9 +214,15 @@ module "secrets" {
   source     = "../app-secrets"
   project_id = var.project_id
   labels     = var.labels
-  # Force unmarked sets — OpenTofu panics if for_each keys are sensitive-marked.
-  secret_ids       = nonsensitive(local.secret_ids)
-  version_ids      = nonsensitive(local.version_ids)
+  # Rebuild as plain sets so for_each never sees a sensitive-mark (OpenTofu panics).
+  secret_ids = toset(concat(
+    var.has_database ? [local.database_secret_id, local.database_direct_secret_id] : [],
+    sort(tolist(var.extra_secret_ids)),
+  ))
+  version_ids = toset(concat(
+    var.has_database ? [local.database_secret_id, local.database_direct_secret_id] : [],
+    sort(tolist(local.extra_version_ids)),
+  ))
   secret_values    = local.secret_values
   accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
 }
