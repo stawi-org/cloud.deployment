@@ -188,11 +188,17 @@ jobs:
             exit 0
           fi
           set +e
-          tofu refresh -target=module.db.neon_project.this "${TF_COMMON[@]}" >/tmp/neon-refresh.log 2>&1
+          # Neon provider can hang on refresh; bound wait so deploys are not stuck for hours.
+          timeout 120 tofu refresh -target=module.db.neon_project.this "${TF_COMMON[@]}" >/tmp/neon-refresh.log 2>&1
           RC=$?
           set -e
           if [[ $RC -eq 0 ]]; then
             echo "Neon project refresh OK with current credentials"
+            exit 0
+          fi
+          if [[ $RC -eq 124 ]]; then
+            echo "::warning::Neon project refresh timed out after 120s — skipping rebind (state left intact)"
+            cat /tmp/neon-refresh.log || true
             exit 0
           fi
           echo "::warning::Neon project refresh failed (likely org switch or deleted project). State-rm module.db.* for rebind."
