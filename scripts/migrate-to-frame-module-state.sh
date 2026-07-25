@@ -19,9 +19,12 @@ fi
 # Match exact resource OR any resource under a module prefix.
 in_state() {
   local needle="$1"
-  printf '%s\n' "${STATE[@]}" | grep -qxF "$needle" && return 0
-  # Module / nested module: any child under needle.
-  printf '%s\n' "${STATE[@]}" | grep -qE "^$(printf '%s' "$needle" | sed 's/[.[\*?^$(){}+|]/g' | sed 's/]/\\[/g')\." && return 0
+  local line
+  for line in "${STATE[@]}"; do
+    if [[ "$line" == "$needle" || "$line" == "$needle".* || "$line" == "$needle"[* ]]; then
+      return 0
+    fi
+  done
   return 1
 }
 
