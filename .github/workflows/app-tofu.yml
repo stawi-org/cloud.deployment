@@ -195,19 +195,35 @@ jobs:
             cat /tmp/tofu-state-list.err || true
             exit 0
           fi
-          if ! grep -qE '^module\.db\.neon_project\.this$' /tmp/tofu-state-list.txt; then
-            echo "No module.db.neon_project.this in state — skip rebind"
+          # Skip targeted refresh when moved.tf is present (moves cannot run under -target).
+          if [[ -f moved.tf ]]; then
+            echo "moved.tf present — skip Neon targeted refresh (full apply will relocate state)"
+            exit 0
+          fi
+          # Support both legacy module.db and frame-cloudrun-app composition.
+          NEON_ADDR=""
+          if grep -qE '^module\.frame\.module\.db\[0\]\.neon_project\.this$' /tmp/tofu-state-list.txt; then
+            NEON_ADDR='module.frame.module.db[0].neon_project.this'
+            DB_STATE_PREFIX='^module\.frame\.module\.db\[0\]\.'
+          elif grep -qE '^module\.db\.neon_project\.this$' /tmp/tofu-state-list.txt; then
+            NEON_ADDR='module.db.neon_project.this'
+            DB_STATE_PREFIX='^module\.db\.'
+          elif grep -qE '^module\.db\[0\]\.neon_project\.this$' /tmp/tofu-state-list.txt; then
+            NEON_ADDR='module.db[0].neon_project.this'
+            DB_STATE_PREFIX='^module\.db\[0\]\.'
+          else
+            echo "No neon_project in state — skip rebind"
             exit 0
           fi
           set +e
           # Diagnostic only: -lock=false so a hung/killed Neon refresh cannot leave
           # a stale state lock that blocks the subsequent apply.
           # Bound wait — Neon provider has been observed to hang indefinitely.
-          timeout 90 tofu refresh -lock=false -target=module.db.neon_project.this "${TF_COMMON[@]}" >/tmp/neon-refresh.log 2>&1
+          timeout 90 tofu refresh -lock=false -target="${NEON_ADDR}" "${TF_COMMON[@]}" >/tmp/neon-refresh.log 2>&1
           RC=$?
           set -e
           if [[ $RC -eq 0 ]]; then
-            echo "Neon project refresh OK with current credentials"
+            echo "Neon project refresh OK with current credentials (${NEON_ADDR})"
             exit 0
           fi
           cat /tmp/neon-refresh.log || true
@@ -225,12 +241,12 @@ jobs:
             echo "::warning::Neon refresh failed with non-rebind error — leaving module.db state intact"
             exit 0
           fi
-          echo "::warning::Neon project refresh failed (likely org switch or deleted project). State-rm module.db.* for rebind."
+          echo "::warning::Neon project refresh failed (likely org switch or deleted project). State-rm db module for rebind."
           while read -r addr; do
             [[ -z "$addr" ]] && continue
             echo "state rm $addr"
             tofu state rm "$addr" || true
-          done < <(grep -E '^module\.db\.' /tmp/tofu-state-list.txt || true)
+          done < <(grep -E "${DB_STATE_PREFIX}" /tmp/tofu-state-list.txt || true)
 
       # Pub/Sub topics/subs may exist in GCP while missing from R2 state (partial
       # applies, target-only runs). Import so apply does not 409 Conflict.
@@ -273,21 +289,27 @@ jobs:
             fi
           }
 
-          # Default Frame/Ory events topic + optional push sub + DLQ
+          # Default Frame/Ory events topic + optional push sub + DLQ.
+          # Prefer frame-cloudrun-app addresses when main.tf uses module "frame".
+          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null; then
+            MSG_PREFIX='module.frame.module.messaging[0]'
+          else
+            MSG_PREFIX='module.messaging'
+          fi
           TOPIC="${APP}-events"
           DLQ="${APP}-events-dlq"
           if gcloud pubsub topics describe "$TOPIC" --project="$PROJECT_ID" >/dev/null 2>&1; then
-            import_if_missing 'module.messaging.google_pubsub_topic.this["events"]' \
+            import_if_missing "${MSG_PREFIX}.google_pubsub_topic.this[\"events\"]" \
               "projects/${PROJECT_ID}/topics/${TOPIC}"
           fi
           if gcloud pubsub topics describe "$DLQ" --project="$PROJECT_ID" >/dev/null 2>&1; then
-            import_if_missing 'module.messaging.google_pubsub_topic.dlq[0]' \
+            import_if_missing "${MSG_PREFIX}.google_pubsub_topic.dlq[0]" \
               "projects/${PROJECT_ID}/topics/${DLQ}"
           fi
           # Push subscription (Frame) or pull (same name as topic for Ory)
           for SUB in "${TOPIC}-push" "$TOPIC"; do
             if gcloud pubsub subscriptions describe "$SUB" --project="$PROJECT_ID" >/dev/null 2>&1; then
-              import_if_missing 'module.messaging.google_pubsub_subscription.this["events"]' \
+              import_if_missing "${MSG_PREFIX}.google_pubsub_subscription.this[\"events\"]" \
                 "projects/${PROJECT_ID}/subscriptions/${SUB}"
               break
             fi
@@ -336,12 +358,45 @@ jobs:
             -var="region=${REGION}"
           )
 
-          # LB-only / infra-only apps (e.g. edge-lb-*) have no module.db — full apply only.
-          if ! grep -qE 'module\s+"db"' main.tf 2>/dev/null; then
+          # Composition module (all Frame apps) vs legacy hand-rolled modules.
+          USE_FRAME=false
+          if grep -qE 'module\s+"frame"' main.tf 2>/dev/null; then
+            USE_FRAME=true
+          fi
+
+          # moved.tf + -target is unsupported in OpenTofu — must full-apply once.
+          if [[ -f moved.tf ]]; then
+            echo "::group::Apply full stack (moved.tf state relocation — no targeting)"
+            tofu apply -auto-approve "${TF_COMMON[@]}"
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          # LB-only / infra-only apps (e.g. edge-lb-*) have no Neon — full apply only.
+          if [[ "$USE_FRAME" == "false" ]] && ! grep -qE 'module\s+"db"' main.tf 2>/dev/null; then
             echo "::group::Apply full stack (no Neon/migrate phases)"
             tofu apply -auto-approve "${TF_COMMON[@]}"
             echo "::endgroup::"
             exit 0
+          fi
+
+          # Resolve module address prefixes for phased apply.
+          if [[ "$USE_FRAME" == "true" ]]; then
+            T_DB='module.frame.module.db'
+            T_SECRETS='module.frame.module.secrets'
+            T_MSG='module.frame.module.messaging'
+            T_MIGRATE='module.frame.module.migrate'
+            T_SA='module.frame.google_service_account.runtime'
+            T_SVC='module.frame.module.service'
+            T_WARM='module.frame.module.keep_warm'
+          else
+            T_DB='module.db'
+            T_SECRETS='module.secrets'
+            T_MSG='module.messaging'
+            T_MIGRATE='module.migrate'
+            T_SA='google_service_account.runtime'
+            T_SVC='module.service'
+            T_WARM='module.keep_warm'
           fi
 
           # Phase 1: DB + secrets + migrate job definition (no service yet).
@@ -350,11 +405,11 @@ jobs:
           echo "::group::Apply infra + migrate job"
           set +e
           timeout 300 tofu apply -auto-approve \
-            -target=module.db \
-            -target=module.secrets \
-            -target=module.messaging \
-            -target=module.migrate \
-            -target=google_service_account.runtime \
+            -target="${T_DB}" \
+            -target="${T_SECRETS}" \
+            -target="${T_MSG}" \
+            -target="${T_MIGRATE}" \
+            -target="${T_SA}" \
             "${TF_COMMON[@]}"
           P1_RC=$?
           set -e
@@ -406,8 +461,8 @@ jobs:
           if [[ $P3_RC -eq 124 || $P3_RC -ne 0 ]]; then
             echo "::warning::Full apply exit ${P3_RC} — trying service-only -refresh=false"
             tofu apply -auto-approve -refresh=false \
-              -target=module.service \
-              -target=module.keep_warm \
+              -target="${T_SVC}" \
+              -target="${T_WARM}" \
               -target=module.domain \
               "${TF_COMMON[@]}"
           fi
