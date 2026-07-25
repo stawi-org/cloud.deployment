@@ -44,15 +44,14 @@ resource "neon_database" "app" {
 # postgresql-client). Extensions are applied on the direct (non-pooler) URI.
 # ---------------------------------------------------------------------------
 
-resource "null_resource" "extensions" {
+resource "terraform_data" "extensions" {
   for_each = toset(var.extensions)
 
-  triggers = {
+  input = {
     project_id = neon_project.this.id
     database   = neon_database.app.name
     extension  = each.key
-    # re-run if role/db recreated
-    role = neon_role.app.name
+    role       = neon_role.app.name
   }
 
   provisioner "local-exec" {

@@ -220,10 +220,12 @@ module "service" {
       ENCRYPTION_PHRASE     = { secret = "service-files-encryption" }
     },
   )
-  depends_on = concat(
-    [module.secrets, module.messaging],
-    var.has_database ? [module.migrate[0]] : [],
-  )
+  depends_on = [
+    module.secrets,
+    module.messaging,
+    module.db,
+    module.migrate,
+  ]
 }
 
 resource "google_service_account_iam_member" "pubsub_push_token_creator" {

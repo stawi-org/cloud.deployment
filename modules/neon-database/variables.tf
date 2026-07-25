@@ -68,11 +68,7 @@ variable "extensions" {
       - postgis (and postgis_topology when needed)
     Avoid pg_search on new Neon projects (deprecated for new installs as of 2026-03).
   EOT
-  default = [
-    "uuid-ossp",
-    "pg_stat_statements",
-    "pg_trgm",
-    "btree_gin",
-    "btree_gist",
-  ]
+  # Empty by default so existing apps are unchanged until they opt in.
+  # Operations apps set this explicitly (see apps/operations-*/envs/*.tfvars).
+  default = []
 }
