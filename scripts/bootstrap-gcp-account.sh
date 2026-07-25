@@ -427,6 +427,7 @@ gcloud services enable \
   cloudresourcemanager.googleapis.com \
   sts.googleapis.com \
   artifactregistry.googleapis.com \
+  cloudscheduler.googleapis.com \
   serviceusage.googleapis.com \
   --project="$PROJECT" \
   --quiet

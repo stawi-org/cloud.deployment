@@ -164,8 +164,7 @@ module "service" {
   container_port        = 4444
   args                  = ["serve", "public"]
   memory                = "512Mi"
-  # Keep one warm instance: platform + Frame apps discover OIDC at cold start.
-  min_instance_count    = 1
+  # min instances = 0; cheap keep-warm via Cloud Scheduler (module.keep_warm).
   env = merge(
     local.hydra_env,
     module.messaging.service_env,
@@ -184,4 +183,17 @@ module "service" {
   }
 
   depends_on = [module.secrets, module.messaging, module.migrate]
+}
+
+# Cheap keep-warm: ping every 5m instead of paying idle min_instance_count=1.
+# Frame apps fail OIDC discovery hard if Hydra is fully cold + Neon sleeping.
+module "keep_warm" {
+  source            = "../../../modules/cloudrun-keep-warm"
+  project_id        = var.project_id
+  name              = "keep-warm-${var.app_name}"
+  uri               = "${module.service.uri}/health/ready"
+  schedule          = "*/5 * * * *"
+  attempt_deadline = "180s"
+  scheduler_region = "europe-west1"
+  depends_on       = [module.service]
 }

@@ -214,7 +214,7 @@ module "service" {
   container_port        = 8080
   memory                = "1Gi"
   cpu                   = "1"
-  min_instance_count    = 1 # login/consent path — keep warm
+  # min instances = 0; cheap keep-warm via Cloud Scheduler (module.keep_warm).
   startup_probe_path    = "/healthz"
   liveness_probe_path   = "/healthz"
   env = merge(
@@ -246,6 +246,19 @@ module "service" {
     module.migrate,
     google_secret_manager_secret_iam_member.hydra_webhook_psk,
   ]
+}
+
+# Cheap keep-warm for login/consent path (avoids ~$13/mo idle min instance).
+# /s/login returns 303 and reaches the container even if /healthz is not public.
+module "keep_warm" {
+  source           = "../../../modules/cloudrun-keep-warm"
+  project_id       = var.project_id
+  name             = "keep-warm-${var.app_name}"
+  uri              = "${module.service.uri}/s/login"
+  schedule         = "*/5 * * * *"
+  attempt_deadline = "180s"
+  scheduler_region = "europe-west1"
+  depends_on       = [module.service]
 }
 
 # Pub/Sub push OIDC: allow the runtime SA to be used as push identity,

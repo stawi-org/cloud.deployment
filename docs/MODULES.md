@@ -185,6 +185,24 @@ resource "google_cloud_run_v2_service_iam_member" "pubsub_push_invoker" {
 
 ---
 
+## Keep-warm (`modules/cloudrun-keep-warm`)
+
+Cloud Scheduler HTTP ping as a **cheap alternative to `min_instance_count=1`**.
+
+```hcl
+module "keep_warm" {
+  source           = "../../../modules/cloudrun-keep-warm"
+  project_id       = var.project_id
+  name             = "keep-warm-${var.app_name}"
+  uri              = "${module.service.uri}/health/ready"
+  schedule         = "*/5 * * * *"
+  attempt_deadline = "180s"
+  scheduler_region = "europe-west1"
+}
+```
+
+Used on identity Hydra, Keto-read, and authentication so Frame OIDC/authz cold starts stay reliable without continuous idle billing.
+
 ## Platforms (`platforms/stawi-dev`, `platforms/stawi-prod`)
 
 Local-only packs (no resources). App roots select one with a count-switch:

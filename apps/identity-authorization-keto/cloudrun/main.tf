@@ -171,19 +171,31 @@ module "service_read" {
   container_port        = 4466
   # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
   # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
-  args               = ["serve", "read", "-c", "/etc/keto/keto.yml"]
-  memory             = "512Mi"
-  min_instance_count = 1 # warm for Frame AUTHORIZATION_MODE=keto cold starts
-  env                = local.keto_common_env
-  secret_env         = local.keto_secret_env
-  secret_volumes     = local.keto_secret_volumes
-  gcs_volumes        = local.keto_gcs_volumes
+  args           = ["serve", "read", "-c", "/etc/keto/keto.yml"]
+  memory         = "512Mi"
+  # min instances = 0; cheap keep-warm via Cloud Scheduler (module.keep_warm_read).
+  env            = local.keto_common_env
+  secret_env     = local.keto_secret_env
+  secret_volumes = local.keto_secret_volumes
+  gcs_volumes    = local.keto_gcs_volumes
   depends_on = [
     module.secrets,
     module.migrate,
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
   ]
+}
+
+# Cheap keep-warm for keto-read (Frame AUTHORIZATION_MODE=keto).
+module "keep_warm_read" {
+  source           = "../../../modules/cloudrun-keep-warm"
+  project_id       = var.project_id
+  name             = "keep-warm-${var.app_name}-read"
+  uri              = "${module.service_read.uri}/health/ready"
+  schedule         = "*/5 * * * *"
+  attempt_deadline = "180s"
+  scheduler_region = "europe-west1"
+  depends_on       = [module.service_read]
 }
 
 module "service_write" {

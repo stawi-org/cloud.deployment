@@ -89,13 +89,23 @@ Mirror before first apply or when bootstrap tag changes:
 
 Routine rolls still use decentralized **cloudrun-ship** (OpenTofu ignores image). Prefer shipping AR tags once the service repo is configured for dual push (GHCR + AR).
 
-### Warm instances (usability)
+### Keep-warm (cheap, not min instances)
 
-| Service | `min_instance_count` | Why |
-|---------|----------------------|-----|
-| `identity-oauth2-hydra` | 1 | OIDC discovery used by every Frame cold start |
-| `identity-authorization-keto-read` | 1 | ReBAC checks from Frame services |
-| `identity-authentication` | 1 | Login/consent path |
+Frame apps fail hard if Hydra OIDC discovery is cold at process start. Instead of
+paying ~$30/mo for `min_instance_count=1`, each critical service has a **Cloud
+Scheduler** job that GETs a health/login path every **5 minutes**:
+
+| Service | Scheduler job | Path |
+|---------|---------------|------|
+| `identity-oauth2-hydra` | `keep-warm-identity-oauth2-hydra` | `/health/ready` |
+| `identity-authorization-keto-read` | `keep-warm-identity-authorization-keto-read` | `/health/ready` |
+| `identity-authentication` | `keep-warm-identity-authentication` | `/s/login` |
+
+Module: [`modules/cloudrun-keep-warm`](../modules/cloudrun-keep-warm).  
+Cost is request/active seconds only (cents–few dollars/month at idle), not idle min-instance rates.  
+Scheduler region: `europe-west1` (HTTP target still hits Cloud Run in `europe-west9`).
+
+To pause keep-warm temporarily: set `paused = true` on the module or pause the job in GCP console.
 
 ## Still incomplete without extra work
 
