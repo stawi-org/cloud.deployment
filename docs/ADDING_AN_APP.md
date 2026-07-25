@@ -38,45 +38,53 @@ runtime: cloudrun
 
 ## 3. Configure OpenTofu root (`apps/<name>/cloudrun`)
 
-1. Edit `envs/stawi-dev.tfvars` (and `stawi-prod.tfvars` if listed):
+1. Edit `envs/stawi-prod.tfvars` (and `stawi-dev.tfvars` if listed):
    - `image` — container image for Cloud Run
    - `platform` — must match the env file (`stawi-dev` / `stawi-prod`)
+   - `resource_path` — OAuth path under `api.stawi.org` (e.g. `/devices`)
 2. Leave `app_name` as a placeholder if you like; CI always passes `-var=app_name=<directory>`.
 3. Do **not** change the R2 backend pattern: state key is  
    `cloud-deployment/apps/<app>/<env>/terraform.tfstate`  
    (see [BACKEND.md](BACKEND.md)).
 
-The template already composes:
+### Shared stack: `modules/frame-cloudrun-app`
 
-| Module | Role |
-|--------|------|
-| `modules/edge-contract` | Public edge env (OAuth, CORS hosts, OTel) |
-| `modules/neon-database` | One Neon project per app |
-| `modules/app-secrets` | Secret Manager (pooled + **direct** DB URLs) |
-| `modules/pubsub` | Messaging — regional `{app}-events` topic + Frame push subscription |
-| `modules/cloudrun-migrate-job` | **Migrations on apply** (`migrate` for Frame; override for Hydra/Keto) |
-| `modules/cloudrun-service` | Cloud Run service (starts after migrate job succeeds) |
+Frame apps call **one** composition module (see [FRAME_CLOUDRUN_APP.md](FRAME_CLOUDRUN_APP.md)):
+
+| Piece | Role |
+|-------|------|
+| Hydra + Keto data | OIDC + ReBAC URIs (same- or cross-project) |
+| `edge-contract` | Public edge defaults |
+| Neon + SM | Pooled runtime URL + direct migrate URL |
+| Pub/Sub | Regional `{app}-events` + Frame push OIDC |
+| Migrate job | `execute=false` by default; `mem://` events |
+| Cloud Run | h2c, public invoker, OAuth/Keto env |
+| Push IAM | Pub/Sub token creator + run.invoker |
+
+**Not for Hydra/Keto/edge-lb** — those stay special-cased.
+
+App `main.tf` should only set:
+
+- `module.frame` inputs (identity project, resource path, memory, …)
+- `app_env` / `secret_env_extra` for **app-only** knobs
+- Optional `generated_secrets.tf` when this app owns SM values
 
 Migrations use the Neon **direct** connection string; the service uses the **pooled** URL.
 
 ### Messaging (automatic)
 
-**Pub/Sub is automatic.** The template includes `module "messaging"` with defaults:
+**Pub/Sub is automatic** inside `frame-cloudrun-app`:
 
-- Topic: `{app_name}-events` with **regional** `message_storage_policy` (workload region only)
-- Push subscription: `{app_name}-events-push` → `POST https://{service}/_frame/queue/{app}-events`
-- Runtime env (Frame ≥2.0.10):
-  - `EVENTS_QUEUE_PUBLISH_URL=gcppubsub://{project}/{app}-events`
-  - `EVENTS_QUEUE_SUBSCRIBE_URL=push://{app}-events?protocol=gcppubsub`
-  - `EVENTS_QUEUE_NAME={app}-events` (demux ref for handlers)
-  - Full `FRAME_QUEUE_PUSH_OIDC_*` suite: `AUTH=oidc`, `REQUIRE_AUTH=true`, `AUDIENCE` (push URL), `ISSUERS` (Google), `JWKS_URL` (Google certs), `ALLOWED_EMAILS` (runtime SA)
-- Frame apps dispatch via `WithRegisterEvents` handlers registered against that ref
+- Topic: `{app_name}-events` with **regional** `message_storage_policy`
+- Push subscription → `POST https://{service}/_frame/queue/{app}-events`
+- Runtime env (Frame ≥2.0.10): dual-URL `EVENTS_QUEUE_*` + full `FRAME_QUEUE_PUSH_OIDC_*`
 - Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate`
-- Services must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` and depend on Frame ≥ **v2.0.10** (prefer **v2.0.11+**)
+- Services must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` and depend on Frame ≥ **v2.0.10**
 
-Do **not** wire cluster NATS/JetStream into apps in this repo. Override `topics` / `subscriptions` on the pubsub module only when you need extra topics.
+Do **not** wire cluster NATS/JetStream here. Multi-topic apps (e.g. trustage) pass
+`messaging_topics` / `messaging_subscriptions` into `module.frame`.
 
-Pub/Sub resources live in the **same GCP project** as Cloud Run (`local.platform.project_id`).
+Pub/Sub resources live in the **same GCP project** as Cloud Run.
 
 ## 4. Neon credentials (multi-account)
 

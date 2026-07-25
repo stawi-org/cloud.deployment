@@ -16,7 +16,7 @@ variable "project_id" {
 variable "region" {
   type        = string
   description = "GCP region from gcp-accounts registry"
-  default     = "europe-west1"
+  default     = "europe-west9"
 }
 
 variable "labels" {
@@ -37,25 +37,62 @@ variable "neon_region_id" {
 
 variable "neon_org_id" {
   type        = string
-  description = "Neon organization id (from neon-accounts registry / SOPS); required for project create"
+  description = "Neon organization id (from neon-accounts registry / SOPS)"
   default     = ""
 }
 
 variable "neon_api_key" {
   type        = string
   sensitive   = true
-  description = "Neon org API key (from SOPS credentials via CI (SOPS_AGE_KEY) — never commit)"
+  description = "Neon org API key (from SOPS credentials via CI — never commit)"
 }
 
-variable "extra_secret_values" {
-  type        = map(string)
-  sensitive   = true
-  default     = {}
-  description = "Additional SM secrets (id → value) managed by tofu; prefer empty and out-of-band for human secrets"
+variable "identity_project_id" {
+  type        = string
+  default     = "stawi-identity"
+  description = "Identity GCP project (Hydra/Keto). Identity-domain apps: set null in main."
 }
 
-variable "extra_secret_ids" {
-  type        = set(string)
+variable "identity_region" {
+  type        = string
+  default     = "europe-west9"
+  description = "Region of identity Cloud Run services"
+}
+
+variable "resource_path" {
+  type        = string
+  default     = ""
+  description = "OAuth resource path under api base (empty → derived from app_name)"
+}
+
+variable "requested_audience_paths" {
+  type        = list(string)
+  default     = ["/profile", "/tenancy"]
+  description = "Extra OAuth audience paths under api base"
+}
+
+variable "neon_extensions" {
+  type        = list(string)
   default     = []
-  description = "SM secret IDs to create without versions (fill versions outside git)"
+  description = "Empty → base suite (uuid-ossp, pg_stat_statements, pg_trgm, btree_gin, btree_gist)"
+}
+
+variable "has_database" {
+  type    = bool
+  default = true
+}
+
+variable "container_port" {
+  type    = number
+  default = 8080
+}
+
+variable "memory" {
+  type    = string
+  default = "512Mi"
+}
+
+variable "migrate_args" {
+  type    = list(string)
+  default = ["migrate"]
 }
