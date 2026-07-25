@@ -203,9 +203,7 @@ resource "cloudflare_dns_record" "acme" {
 
   comment = "Managed by cloud.deployment ${var.name} (cert validation)"
 
-  lifecycle {
-    create_before_destroy = true
-  }
+  # Destroy-before-create: CNAME↔content swaps cannot coexist at the same name.
 }
 
 resource "cloudflare_dns_record" "traffic_a" {
@@ -220,9 +218,8 @@ resource "cloudflare_dns_record" "traffic_a" {
 
   comment = "Managed by cloud.deployment ${var.name} → Cloud Run via HTTPS LB"
 
-  lifecycle {
-    create_before_destroy = true
-  }
+  # Destroy-before-create so legacy CNAME (proxied) can be replaced by A.
+  # create_before_destroy fails with CF 81054 when a CNAME already owns the name.
 
   depends_on = [cloudflare_dns_record.acme]
 }
