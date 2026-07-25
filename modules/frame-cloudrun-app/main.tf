@@ -211,11 +211,12 @@ module "db" {
 # ---------------------------------------------------------------------------
 
 module "secrets" {
-  source           = "../app-secrets"
-  project_id       = var.project_id
-  labels           = var.labels
-  secret_ids       = local.secret_ids
-  version_ids      = local.version_ids
+  source     = "../app-secrets"
+  project_id = var.project_id
+  labels     = var.labels
+  # Force unmarked sets — OpenTofu panics if for_each keys are sensitive-marked.
+  secret_ids       = nonsensitive(local.secret_ids)
+  version_ids      = nonsensitive(local.version_ids)
   secret_values    = local.secret_values
   accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
 }

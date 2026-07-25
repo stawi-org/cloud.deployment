@@ -48,7 +48,12 @@ module "frame" {
   startup_probe_path  = "/healthz"
   liveness_probe_path = "/healthz"
 
-  extra_secret_ids    = toset(keys(local.generated_secret_values))
+  # Literal ids only (never keys() of sensitive maps — OpenTofu for_each panic).
+  extra_secret_ids = toset([
+    "identity-authentication-csrf-secret",
+    "identity-authentication-cookie-hash-key",
+    "identity-authentication-cookie-block-key",
+  ])
   extra_secret_values = local.generated_secret_values
   secret_env_extra = merge(
     {

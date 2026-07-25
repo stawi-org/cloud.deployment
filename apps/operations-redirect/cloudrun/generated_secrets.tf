@@ -8,8 +8,8 @@ resource "random_password" "service_files_encryption" {
 }
 
 locals {
+  generated_secret_ids = toset(["service-files-encryption"])
   generated_secret_values = {
     "service-files-encryption" = random_password.service_files_encryption.result
   }
-  generated_secret_ids = toset(keys(local.generated_secret_values))
 }
