@@ -22,13 +22,17 @@ resource "google_cloud_run_v2_service" "this" {
 
   deletion_protection = var.deletion_protection
 
-  # Image is rolled by decentralized GH release ship (cloudrun-ship workflow).
-  # OpenTofu owns infra/env/secrets; service repos own the binary tag.
+  # Image is rolled by decentralized GH release ship (cloudrun-ship workflow)
+  # when ignore_image_changes is true (default). Set false for first-deploy
+  # bootstrap so OpenTofu can push the AR bootstrap tag.
   lifecycle {
-    ignore_changes = [
+    ignore_changes = var.ignore_image_changes ? [
       client,
       client_version,
       template[0].containers[0].image,
+    ] : [
+      client,
+      client_version,
     ]
   }
 
