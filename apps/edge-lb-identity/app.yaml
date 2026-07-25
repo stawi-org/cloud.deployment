@@ -1,0 +1,11 @@
+name: edge-lb-identity
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: identity
+# No Neon — HTTPS LB + Certificate Manager front door for identity hosts.
+runtime: cloudrun
+domain: identity
+version: 1

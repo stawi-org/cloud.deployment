@@ -428,6 +428,8 @@ gcloud services enable \
   sts.googleapis.com \
   artifactregistry.googleapis.com \
   cloudscheduler.googleapis.com \
+  compute.googleapis.com \
+  certificatemanager.googleapis.com \
   serviceusage.googleapis.com \
   --project="$PROJECT" \
   --quiet
@@ -505,6 +507,8 @@ for role in \
   roles/secretmanager.admin \
   roles/pubsub.admin \
   roles/cloudscheduler.admin \
+  roles/compute.admin \
+  roles/certificatemanager.owner \
   roles/iam.serviceAccountAdmin \
   roles/iam.serviceAccountUser \
   roles/storage.objectViewer \

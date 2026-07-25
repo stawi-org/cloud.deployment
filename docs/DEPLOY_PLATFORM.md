@@ -36,8 +36,9 @@ Pub/Sub: regional `{app}-events` + push to `/_frame/queue/{app}-events`.
 | `geolocation.stawi.org` | `platform-geolocation` |
 | `files.stawi.org` | `platform-files` |
 
-Legacy `api.stawi.org/devices` style paths: optional **Cloudflare** routing to these hosts.  
-See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** and `config/public-edge.yaml`.
+Front door: **`edge-lb-platform`** (Global HTTPS LB).  
+Legacy `api.stawi.org/*` paths: optional **Cloudflare** routing.  
+See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
 
 ## Neon (required)
 

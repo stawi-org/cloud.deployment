@@ -1,0 +1,11 @@
+name: edge-lb-platform
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: platform
+# No Neon — HTTPS LB + Certificate Manager front door for platform hosts.
+runtime: cloudrun
+domain: platform
+version: 1

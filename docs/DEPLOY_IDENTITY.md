@@ -83,8 +83,8 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 
 Optional legacy `api.stawi.org/<path>` → implement in **Cloudflare**, not Cloud Run.
 
-Domain mapping: `gcloud domains verify stawi.org` then `enable_domain_mapping = true`.  
-Helper: `scripts/setup-public-edge-domains.sh`.
+Front door: **`edge-lb-identity`** (Global HTTPS LB — domain mapping unavailable in europe-west9).  
+See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
 
 ## Container images (Artifact Registry)
 

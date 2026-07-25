@@ -1,78 +1,35 @@
 # Public edge contract for Cloud Run (host-per-service).
 #
-# Each public service gets its own FQDN on stawi.org. Cloud Run domain mapping
-# attaches that hostname to the service (path / only — no Cloud Run path router).
+# europe-west9 does NOT support classic Cloud Run domain mappings.
+# Hostnames are served via Global HTTPS LBs (apps/edge-lb-identity, edge-lb-platform)
+# with Certificate Manager + serverless NEGs.
 #
-# Historical K8s Gateway used path prefixes on api.stawi.org. If clients still
-# need those paths, implement routing in Cloudflare (Worker / Transform Rules /
-# Load Balancing) → these hostnames. Do not reintroduce a Cloud Run edge proxy.
-#
-# Domain mapping requires Google domain verification first:
-#   gcloud domains verify stawi.org
-# See docs/PUBLIC_EDGE_DNS.md.
+# Optional: Cloudflare can still map api.stawi.org/<path> → these hosts.
 
 version: 1
 prod:
   zone: stawi.org
   issuer: https://stawi.org
   region: europe-west9
-
-  # Host → Cloud Run service (one mapping each)
-  hosts:
-    accounts.stawi.org:
-      cloud_run_service: identity-authentication
+  front_doors:
+    edge-lb-identity:
       gcp_project: stawi-identity
-      health_path: /healthz          # Frame default
-      notes: Login/consent UI + auth webhooks
-
-    oauth2.stawi.org:
-      cloud_run_service: identity-oauth2-hydra
-      gcp_project: stawi-identity
-      health_path: /health/ready     # Ory Hydra
-      notes: OIDC public endpoints
-
-    profile.stawi.org:
-      cloud_run_service: identity-profile
-      gcp_project: stawi-identity
-      health_path: /healthz
-
-    tenancy.stawi.org:
-      cloud_run_service: identity-tenancy
-      gcp_project: stawi-identity
-      health_path: /healthz
-
-    identity.stawi.org:
-      cloud_run_service: identity-identity
-      gcp_project: stawi-identity
-      health_path: /healthz
-
-    devices.stawi.org:
-      cloud_run_service: platform-devices
+      hosts:
+        accounts.stawi.org: identity-authentication
+        oauth2.stawi.org: identity-oauth2-hydra
+        profile.stawi.org: identity-profile
+        tenancy.stawi.org: identity-tenancy
+        identity.stawi.org: identity-identity
+    edge-lb-platform:
       gcp_project: stawi-platform
-      health_path: /healthz
-
-    settings.stawi.org:
-      cloud_run_service: platform-settings
-      gcp_project: stawi-platform
-      health_path: /healthz
-
-    geolocation.stawi.org:
-      cloud_run_service: platform-geolocation
-      gcp_project: stawi-platform
-      health_path: /healthz
-
-    files.stawi.org:
-      cloud_run_service: platform-files
-      gcp_project: stawi-platform
-      health_path: /healthz
-
-  # Not public (no DNS / domain mapping)
+      hosts:
+        devices.stawi.org: platform-devices
+        settings.stawi.org: platform-settings
+        geolocation.stawi.org: platform-geolocation
+        files.stawi.org: platform-files
   private:
     - identity-authorization-keto-read
     - identity-authorization-keto-write
-
-  # Optional Cloudflare-only path façade (not provisioned in this repo).
-  # Map these on Cloudflare → origin host above if legacy clients need them.
   cloudflare_path_aliases:
     api.stawi.org:
       /profile: profile.stawi.org
@@ -82,9 +39,3 @@ prod:
       /settings: settings.stawi.org
       /geolocation: geolocation.stawi.org
       /files: files.stawi.org
-      /authentication: accounts.stawi.org   # if needed; accounts host is preferred
-
-  run_url_template: "https://{service}-{project_number}.{region}.run.app"
-  project_numbers:
-    stawi-identity: "721554040672"
-    stawi-platform: "305282281906"

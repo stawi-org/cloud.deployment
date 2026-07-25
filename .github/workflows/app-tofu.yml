@@ -284,6 +284,14 @@ jobs:
             -var="region=${REGION}"
           )
 
+          # LB-only / infra-only apps (e.g. edge-lb-*) have no module.db — full apply only.
+          if ! grep -qE 'module\s+"db"' main.tf 2>/dev/null; then
+            echo "::group::Apply full stack (no Neon/migrate phases)"
+            tofu apply -auto-approve "${TF_COMMON[@]}"
+            echo "::endgroup::"
+            exit 0
+          fi
+
           # Phase 1: DB + secrets + migrate job definition (no service yet)
           echo "::group::Apply infra + migrate job"
           tofu apply -auto-approve \
