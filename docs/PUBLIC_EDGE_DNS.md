@@ -90,15 +90,12 @@ curl -sSI https://devices.stawi.org/healthz
 
 ## Drift / existing records
 
-If Cloudflare already has an `A` for e.g. `accounts` (old cluster / CF proxy), apply may fail with “identical record” or create a second record. Resolve once:
+`edge-lb-*` roots self-heal via `data.cloudflare_dns_records` + `import` blocks (same pattern as `deployment.infra` 04-dns):
 
-```bash
-# List CF record id, then import into tofu state (example keys):
-# module.lb.cloudflare_dns_record.traffic_a["accounts.stawi.org"]
-# zone_id/record_id
-```
+- Existing **A / AAAA / CNAME** for a traffic host is imported into `traffic_a` and replaced with the LB A record.
+- Existing **ACME CNAMEs** are imported into `acme` if already present.
 
-Prefer deleting the old A/CNAME for that name (if safe) and re-apply so OpenTofu owns a single record.
+Re-apply after legacy cluster CNAMEs (orange-cloud) without hand-editing Cloudflare.
 
 ## Cost
 
