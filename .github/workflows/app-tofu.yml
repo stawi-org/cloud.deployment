@@ -195,11 +195,6 @@ jobs:
             cat /tmp/tofu-state-list.err || true
             exit 0
           fi
-          # Skip targeted refresh when moved.tf is present (moves cannot run under -target).
-          if [[ -f moved.tf ]]; then
-            echo "moved.tf present — skip Neon targeted refresh (full apply will relocate state)"
-            exit 0
-          fi
           # Support both legacy module.db and frame-cloudrun-app composition.
           NEON_ADDR=""
           if grep -qE '^module\.frame\.module\.db\[0\]\.neon_project\.this$' /tmp/tofu-state-list.txt; then
