@@ -330,22 +330,36 @@ jobs:
             exit 0
           fi
 
-          # Phase 1: DB + secrets + migrate job definition (no service yet)
+          # Phase 1: DB + secrets + migrate job definition (no service yet).
+          # Neon provider can hang; bound wait so service deploys still land.
+          SKIP_MIGRATE_EXECUTE=false
           echo "::group::Apply infra + migrate job"
-          tofu apply -auto-approve \
+          set +e
+          timeout 300 tofu apply -auto-approve \
             -target=module.db \
             -target=module.secrets \
             -target=module.messaging \
             -target=module.migrate \
             -target=google_service_account.runtime \
             "${TF_COMMON[@]}"
+          P1_RC=$?
+          set -e
+          if [[ $P1_RC -eq 124 ]]; then
+            echo "::warning::DB/migrate phase timed out after 300s (often Neon refresh hang) — service apply with -refresh=false"
+            SKIP_MIGRATE_EXECUTE=true
+          elif [[ $P1_RC -ne 0 ]]; then
+            echo "::error::DB/migrate phase failed (exit ${P1_RC})"
+            exit "$P1_RC"
+          fi
           echo "::endgroup::"
 
           # Phase 2: always run migrations (idempotent). Failures are fatal for Ory apps
           # (hydra/keto). Frame apps may still bootstrap after schema — warn and continue
           # so the service can still deploy (tenancy service-bot is a known follow-up).
           MIGRATE_JOB="${APP}-migrate"
-          if gcloud run jobs describe "${MIGRATE_JOB}" --project="${PROJECT_ID}" --region="${REGION}" >/dev/null 2>&1; then
+          if [[ "$SKIP_MIGRATE_EXECUTE" == "true" ]]; then
+            echo "::warning::Skipping migrate execute after DB phase timeout (existing schema assumed)"
+          elif gcloud run jobs describe "${MIGRATE_JOB}" --project="${PROJECT_ID}" --region="${REGION}" >/dev/null 2>&1; then
             echo "::group::Execute migrate job ${MIGRATE_JOB}"
             if gcloud run jobs execute "${MIGRATE_JOB}" \
               --project="${PROJECT_ID}" \
@@ -368,7 +382,19 @@ jobs:
             echo "::warning::No migrate job ${MIGRATE_JOB} — skipping execute"
           fi
 
-          # Phase 3: full apply (Cloud Run service etc.)
+          # Phase 3: full apply (Cloud Run service etc.). On Neon hang, fall back to
+          # service-only without refresh so env/image changes still ship.
           echo "::group::Apply full stack"
-          tofu apply -auto-approve "${TF_COMMON[@]}"
+          set +e
+          timeout 600 tofu apply -auto-approve "${TF_COMMON[@]}"
+          P3_RC=$?
+          set -e
+          if [[ $P3_RC -eq 124 || $P3_RC -ne 0 ]]; then
+            echo "::warning::Full apply exit ${P3_RC} — trying service-only -refresh=false"
+            tofu apply -auto-approve -refresh=false \
+              -target=module.service \
+              -target=module.keep_warm \
+              -target=module.domain \
+              "${TF_COMMON[@]}"
+          fi
           echo "::endgroup::"
