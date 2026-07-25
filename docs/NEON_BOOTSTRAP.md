@@ -4,10 +4,13 @@ Neon is **independent of GCP**. This script never touches GCP projects.
 
 ## What it does
 
-1. Validates the org API key (best-effort `GET /users/me`).  
-2. Writes SOPS-encrypted `credentials/neon/<account>/auth.yaml`.  
-3. Updates non-secret metadata on `config/neon-accounts.yaml` (`sops_auth_path`, org hint).  
-4. Opens a PR (optional).
+1. Syncs the checkout to latest `origin/main` (fetch + hard-reset; stashes dirt).  
+2. Validates the org API key (best-effort `GET /users/me`).  
+3. Writes SOPS-encrypted `credentials/neon/<account>/auth.yaml`.  
+4. Updates non-secret metadata on `config/neon-accounts.yaml` (`sops_auth_path`, org hint).  
+   If `--account` is **missing** from the registry, it is **auto-created** (defaults:  
+   `owners: [platform]`, `sensitivity: medium`, `allowed_app_prefixes: [<account>-]`).  
+5. Opens a PR (optional).
 
 CI decrypts the SOPS file with repository secret **`SOPS_AGE_KEY`**. No GitHub Environments.
 
@@ -39,11 +42,17 @@ export GITHUB_TOKEN=ghp_xxx   # for push/PR
   --api-key "$API_KEY" \
   --org-hint "Stawi Payments" \
   --repo-path "$PWD"
+
+# New domain (auto-registers accounts.operations if missing)
+./scripts/bootstrap-neon-account.sh --account operations \
+  --api-key "$API_KEY" \
+  --org-hint "Stawi Operations" \
+  --org-id org-xxxx
 ```
 
 | Flag | Purpose |
 |------|---------|
-| `--account` | Key in `config/neon-accounts.yaml` (required) |
+| `--account` | Key in `config/neon-accounts.yaml` (required; auto-created if new) |
 | `--api-key` | Org API key (or env `API_KEY` / `NEON_ORG_API_KEY`) |
 | `--org-hint` | Human label |
 | `--metadata-only` | Registry metadata without writing API key |

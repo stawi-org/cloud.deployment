@@ -23,12 +23,13 @@
 #     --org-hint "Stawi Payments"
 #
 # Flags:
-#   --account <KEY>       neon-accounts.yaml key (required): identity|payments|…
+#   --account <KEY>       neon-accounts.yaml key (required): identity|platform|operations|…
+#                         New keys are auto-created in the registry PR if missing.
 #   --api-key <KEY>       Neon org API key (or env API_KEY / NEON_ORG_API_KEY)
 #   --org-hint <NAME>     Optional human label for the Neon org
 #   --org-id <ID>         Optional Neon org id (metadata only)
 #   --sync-github-env     DEPRECATED no-op (CI uses SOPS, not neon--* GH envs)
-#   --repo-path <PATH>    cloud.deployment checkout
+#   --repo-path <PATH>    cloud.deployment checkout (always synced to origin/main)
 #   --no-clone / --no-push / --no-pr / --force-repo-write / --metadata-only
 #
 set -euo pipefail
@@ -94,7 +95,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$ACCOUNT" ]] || die "--account is required (e.g. identity)"
+[[ -n "$ACCOUNT" ]] || die "--account is required (e.g. identity | operations)"
+if [[ ! "$ACCOUNT" =~ ^[a-z][a-z0-9-]*$ ]]; then
+  die "--account must match ^[a-z][a-z0-9-]*$ (got: ${ACCOUNT})"
+fi
 if [[ "$ACCOUNT" == *"/"* || "$ACCOUNT" == *".."* ]]; then
   die "--account must be a single path segment"
 fi
@@ -402,35 +406,94 @@ PY
   say "  set ${env_name} / API_KEY via REST"
 }
 
+# Bring an existing checkout onto origin/${BASE_BRANCH} (latest main by default).
+sync_checkout_to_base() {
+  local dest="$1"
+  [[ -d "$dest/.git" ]] || die "not a git checkout: $dest"
+
+  say "syncing ${dest} → origin/${BASE_BRANCH}"
+
+  if ! git -C "$dest" remote get-url origin >/dev/null 2>&1; then
+    if git -C "$dest" remote | grep -qx 'upstream'; then
+      git -C "$dest" remote rename upstream origin 2>/dev/null || true
+    fi
+  fi
+  if git -C "$dest" remote get-url origin >/dev/null 2>&1; then
+    local cur
+    cur=$(git -C "$dest" remote get-url origin 2>/dev/null || true)
+    if [[ -n "$cur" && "$cur" != *"${GITHUB_REPO}"* && "$cur" != *"${GITHUB_REPO%.git}"* ]]; then
+      warn "origin remote is '${cur}' (expected ${GITHUB_REPO}); fetching anyway"
+    fi
+  else
+    say "adding origin → ${CLONE_URL}"
+    git -C "$dest" remote add origin "$CLONE_URL"
+  fi
+
+  if ! git -C "$dest" fetch --prune origin "$BASE_BRANCH"; then
+    git -C "$dest" fetch --prune origin || die "git fetch origin failed — check network / GITHUB_TOKEN"
+  fi
+  git -C "$dest" rev-parse --verify --quiet "origin/${BASE_BRANCH}" >/dev/null \
+    || die "origin/${BASE_BRANCH} not found after fetch"
+
+  if [[ -d "$dest/.worktrees" ]]; then
+    git -C "$dest" worktree prune 2>/dev/null || true
+  fi
+
+  if [[ -n "$(git -C "$dest" status --porcelain 2>/dev/null || true)" ]]; then
+    local stash_msg="bootstrap-neon-account auto-stash $(date -u +%Y%m%dT%H%M%SZ)"
+    warn "dirty working tree in ${dest} — stashing before reset (${stash_msg})"
+    git -C "$dest" stash push -u -m "$stash_msg" || warn "stash failed; attempting hard reset anyway"
+  fi
+
+  git -C "$dest" checkout -B "$BASE_BRANCH" "origin/${BASE_BRANCH}" \
+    || die "could not checkout ${BASE_BRANCH} from origin/${BASE_BRANCH}"
+  git -C "$dest" reset --hard "origin/${BASE_BRANCH}" \
+    || die "git reset --hard origin/${BASE_BRANCH} failed"
+  git -C "$dest" clean -fd --exclude='.worktrees' 2>/dev/null || true
+
+  local sha subject
+  sha=$(git -C "$dest" rev-parse --short HEAD)
+  subject=$(git -C "$dest" log -1 --pretty=format:'%s' 2>/dev/null || true)
+  say "checkout at ${sha} on ${BASE_BRANCH}${subject:+ — ${subject}}"
+}
+
 ensure_git_clone() {
   local dest="$1"
   if [[ -d "$dest/.git" && -f "$dest/config/neon-accounts.yaml" ]]; then
-    say "reusing clone at $dest"
-    git -C "$dest" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null || true
-    git -C "$dest" checkout "$BASE_BRANCH" --quiet 2>/dev/null \
-      || git -C "$dest" checkout -B "$BASE_BRANCH" "origin/${BASE_BRANCH}" --quiet 2>/dev/null || true
-    git -C "$dest" pull --ff-only origin "$BASE_BRANCH" --quiet 2>/dev/null || true
+    say "existing clone at $dest — updating to latest ${BASE_BRANCH}"
+    sync_checkout_to_base "$dest"
     return 0
   fi
   [[ -e "$dest" && ! -d "$dest/.git" ]] && die "$dest exists but is not a git clone"
-  say "cloning ${CLONE_URL} → ${dest}"
+  if [[ -d "$dest/.git" ]]; then
+    say "git repo at $dest missing registry file — fetching ${BASE_BRANCH}"
+    sync_checkout_to_base "$dest"
+    [[ -f "$dest/config/neon-accounts.yaml" ]] || die "after sync, still missing config/neon-accounts.yaml in $dest"
+    return 0
+  fi
+  say "cloning ${CLONE_URL} → ${dest} (branch ${BASE_BRANCH})"
   mkdir -p "$(dirname "$dest")"
   git clone --branch "$BASE_BRANCH" --single-branch "$CLONE_URL" "$dest" \
     || git clone "$CLONE_URL" "$dest" \
     || die "git clone failed"
+  sync_checkout_to_base "$dest"
 }
 
 resolve_repo_path() {
   if [[ -n "$REPO_PATH" ]]; then
-    if [[ ! -f "$REPO_PATH/config/neon-accounts.yaml" ]]; then
+    if [[ ! -f "$REPO_PATH/config/neon-accounts.yaml" || ! -d "$REPO_PATH/.git" ]]; then
       [[ "$NO_CLONE" == "true" ]] && die "not a cloud.deployment checkout"
       ensure_git_clone "$REPO_PATH"
+    else
+      sync_checkout_to_base "$REPO_PATH"
     fi
   else
     local detected
     detected=$(git rev-parse --show-toplevel 2>/dev/null || true)
     if [[ -n "$detected" && -f "$detected/config/neon-accounts.yaml" ]]; then
       REPO_PATH="$detected"
+      say "using checkout: $REPO_PATH"
+      sync_checkout_to_base "$REPO_PATH"
     elif [[ "$NO_CLONE" == "true" ]]; then
       die "not in cloud.deployment checkout and --no-clone set"
     else
@@ -453,8 +516,11 @@ done
 
 resolve_repo_path
 
+# Registry entry is optional going in — missing account keys are created in the PR.
 if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REPO_PATH/config/neon-accounts.yaml" >/dev/null 2>&1; then
-  die "account '${ACCOUNT}' not in config/neon-accounts.yaml — add the domain key to the registry first"
+  say "account '${ACCOUNT}' not yet in neon-accounts.yaml — will create it in the bootstrap PR"
+else
+  say "registry already has accounts.${ACCOUNT} (will refresh metadata / SOPS path)"
 fi
 
 # Optional live check against Neon API
@@ -507,20 +573,46 @@ git -C "$REPO_PATH" worktree add -b "$BRANCH" "$WORKTREE" "origin/${BASE_BRANCH}
   || die "could not create worktree"
 say "worktree: $WORKTREE"
 
-# Optional metadata updates on registry (non-secret)
+# Registry: auto-create account if missing, then set non-secret metadata.
+REG_FILE="$WORKTREE/config/neon-accounts.yaml"
+CREATED_ACCOUNT="false"
+if ! yq -e ".accounts[\"${ACCOUNT}\"]" "$REG_FILE" >/dev/null 2>&1; then
+  CREATED_ACCOUNT="true"
+fi
+
+# Defaults for new domains — operators can refine owners/prefixes in a follow-up PR.
+HINT_DEFAULT="${ORG_HINT:-Stawi ${ACCOUNT}}"
+DESC_DEFAULT="Neon organization for ${ACCOUNT} domain (auto-registered by bootstrap-neon-account.sh)"
+
+yq -i "
+  .accounts[\"${ACCOUNT}\"] = (.accounts[\"${ACCOUNT}\"] // {}) |
+  .accounts[\"${ACCOUNT}\"].description = (.accounts[\"${ACCOUNT}\"].description // \"${DESC_DEFAULT}\") |
+  .accounts[\"${ACCOUNT}\"].owners = (.accounts[\"${ACCOUNT}\"].owners // [\"platform\"]) |
+  .accounts[\"${ACCOUNT}\"].allowed_deploy_envs = (.accounts[\"${ACCOUNT}\"].allowed_deploy_envs // [\"stawi-dev\", \"stawi-prod\"]) |
+  .accounts[\"${ACCOUNT}\"].allowed_app_prefixes = (.accounts[\"${ACCOUNT}\"].allowed_app_prefixes // [\"${ACCOUNT}-\"]) |
+  .accounts[\"${ACCOUNT}\"].sensitivity = (.accounts[\"${ACCOUNT}\"].sensitivity // \"medium\") |
+  .accounts[\"${ACCOUNT}\"].sops_auth_path = \"${AUTH_REL}\" |
+  del(.accounts[\"${ACCOUNT}\"].github_environment) |
+  del(.accounts[\"${ACCOUNT}\"].deprecated) |
+  del(.accounts[\"${ACCOUNT}\"].deprecated_message)
+" "$REG_FILE"
+
 if [[ -n "$ORG_HINT" ]]; then
-  yq -i ".accounts[\"${ACCOUNT}\"].neon_org_hint = \"${ORG_HINT}\"" \
-    "$WORKTREE/config/neon-accounts.yaml"
+  yq -i ".accounts[\"${ACCOUNT}\"].neon_org_hint = \"${ORG_HINT}\"" "$REG_FILE"
+elif ! yq -e ".accounts[\"${ACCOUNT}\"].neon_org_hint" "$REG_FILE" >/dev/null 2>&1 \
+  || [[ "$(yq -r ".accounts[\"${ACCOUNT}\"].neon_org_hint // \"\"" "$REG_FILE")" == "null" ]] \
+  || [[ -z "$(yq -r ".accounts[\"${ACCOUNT}\"].neon_org_hint // \"\"" "$REG_FILE")" ]]; then
+  yq -i ".accounts[\"${ACCOUNT}\"].neon_org_hint = \"${HINT_DEFAULT}\"" "$REG_FILE"
 fi
+
 if [[ -n "$ORG_ID" ]]; then
-  yq -i ".accounts[\"${ACCOUNT}\"].neon_org_id = \"${ORG_ID}\"" \
-    "$WORKTREE/config/neon-accounts.yaml"
+  yq -i ".accounts[\"${ACCOUNT}\"].neon_org_id = \"${ORG_ID}\"" "$REG_FILE"
 fi
-# Document sops path for operators (non-secret); drop legacy github_environment if present
-yq -i ".accounts[\"${ACCOUNT}\"].sops_auth_path = \"${AUTH_REL}\"" \
-  "$WORKTREE/config/neon-accounts.yaml"
-yq -i "del(.accounts[\"${ACCOUNT}\"].github_environment)" \
-  "$WORKTREE/config/neon-accounts.yaml" 2>/dev/null || true
+
+if [[ "$CREATED_ACCOUNT" == "true" ]]; then
+  say "created accounts.${ACCOUNT} in config/neon-accounts.yaml"
+fi
+say "updated config/neon-accounts.yaml → ${ACCOUNT} (sops_auth_path=${AUTH_REL})"
 
 # SOPS auth with API key (unless metadata-only)
 mkdir -p "$WORKTREE/credentials/neon/${ACCOUNT}"
