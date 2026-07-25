@@ -131,16 +131,23 @@ locals {
     OUTBOX_BATCH_SIZE            = "20"
     DISPATCH_BATCH_SIZE          = "50"
     ADAPTER_HTTP_TIMEOUT_SECONDS = "30"
-    # Workflow internal queues: mem:// until NATS/JetStream or Pub/Sub parity lands.
-    # App defaults to nats://localhost which crashes Cloud Run startup.
-    QUEUE_EXEC_DISPATCH_NAME = "exec-dispatch"
-    QUEUE_EXEC_DISPATCH_URL  = "mem://exec-dispatch"
-    QUEUE_EXEC_WORKER_NAME   = "exec-worker"
-    QUEUE_EXEC_WORKER_URL    = "mem://exec-worker"
-    QUEUE_EVENT_INGEST_NAME  = "event-ingest"
-    QUEUE_EVENT_INGEST_URL   = "mem://event-ingest"
-    QUEUE_EVENT_ROUTER_NAME  = "event-router"
-    QUEUE_EVENT_ROUTER_URL   = "mem://event-router"
+    # Workflow queues: mem:// until NATS/JetStream or multi-topic Pub/Sub lands.
+    # App defaults to nats://localhost (fatal on Cloud Run). mem:// rejects NATS
+    # consumer query params, so zero out ack-pending so the app does not append them.
+    QUEUE_EXEC_DISPATCH_NAME     = "exec-dispatch"
+    QUEUE_EXEC_DISPATCH_URL      = "mem://exec-dispatch"
+    QUEUE_EXEC_WORKER_NAME       = "exec-worker"
+    QUEUE_EXEC_WORKER_URL        = "mem://exec-worker"
+    QUEUE_EVENT_INGEST_NAME      = "event-ingest"
+    QUEUE_EVENT_INGEST_URL       = "mem://event-ingest"
+    QUEUE_EVENT_ROUTER_NAME      = "event-router"
+    QUEUE_EVENT_ROUTER_URL       = "mem://event-router"
+    EXEC_WORKER_MAX_ACK_PENDING  = "0"
+    # Frame events topic via in-process mem for bootstrap (Pub/Sub dual-URL still
+    # created by module.messaging for later cutover).
+    EVENTS_QUEUE_URL             = "mem://operations-trustage-events"
+    EVENTS_QUEUE_PUBLISH_URL     = "mem://operations-trustage-events"
+    EVENTS_QUEUE_SUBSCRIBE_URL   = "mem://operations-trustage-events"
   })
 }
 
