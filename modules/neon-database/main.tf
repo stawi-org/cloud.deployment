@@ -41,7 +41,11 @@ resource "neon_database" "app" {
 # pg_search is deprecated on Neon for new projects (as of 2026-03) — avoid.
 #
 # Requires `psql` on the machine running tofu apply (CI installs
-# postgresql-client). Extensions are applied on the direct (non-pooler) URI.
+# postgresql-client). Extensions are applied on the direct (non-pooler)
+# project connection URI (same DB services use via connection_uri outputs).
+#
+# local-exec defaults to /bin/sh (dash on Ubuntu runners) which rejects
+# `set -o pipefail` — always use bash (see cloudrun-migrate-job).
 # ---------------------------------------------------------------------------
 
 resource "terraform_data" "extensions" {
@@ -55,6 +59,7 @@ resource "terraform_data" "extensions" {
   }
 
   provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
     environment = {
       DATABASE_URL = neon_project.this.connection_uri
       EXT_NAME     = each.key

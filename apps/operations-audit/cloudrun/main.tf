@@ -73,16 +73,21 @@ locals {
 
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  secret_ids = var.has_database ? setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id]),
+  secret_ids = setunion(
+    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
+    local.generated_secret_ids,
     var.extra_secret_ids,
-  ) : var.extra_secret_ids
-  version_ids = var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([])
+  )
+  version_ids = setunion(
+    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
+    local.generated_secret_ids,
+  )
   secret_values = merge(
     var.has_database ? {
       (local.database_secret_id)        = module.db[0].pooled_connection_uri
       (local.database_direct_secret_id) = module.db[0].connection_uri
     } : {},
+    local.generated_secret_values,
     var.extra_secret_values,
   )
 
@@ -138,19 +143,7 @@ module "secrets" {
   accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
 }
 
-resource "google_secret_manager_secret_iam_member" "hydra_webhook_psk" {
-  project   = var.project_id
-  secret_id = "hydra-webhook-psk"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "audit_signing_key" {
-  project   = var.project_id
-  secret_id = "audit-signing-key"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime.email}"
-}
+# Shared secret accessors are granted via module.secrets (generated_secret_ids).
 
 module "messaging" {
   source                          = "../../../modules/pubsub"
@@ -215,8 +208,8 @@ module "service" {
       REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
     } : {},
     {
-      OAUTH2_SIGNER_API_KEY = { secret = "hydra-webhook-psk" },
-      AUDIT_SIGNING_KEY     = { secret = "audit-signing-key" }
+      OAUTH2_SIGNER_API_KEY = { secret = module.secrets.secret_ids["hydra-webhook-psk"] },
+      AUDIT_SIGNING_KEY     = { secret = module.secrets.secret_ids["audit-signing-key"] }
     },
   )
   depends_on = [

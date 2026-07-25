@@ -73,16 +73,21 @@ locals {
 
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
-  secret_ids = var.has_database ? setunion(
-    toset([local.database_secret_id, local.database_direct_secret_id]),
+  secret_ids = setunion(
+    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
+    local.generated_secret_ids,
     var.extra_secret_ids,
-  ) : var.extra_secret_ids
-  version_ids = var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([])
+  )
+  version_ids = setunion(
+    var.has_database ? toset([local.database_secret_id, local.database_direct_secret_id]) : toset([]),
+    local.generated_secret_ids,
+  )
   secret_values = merge(
     var.has_database ? {
       (local.database_secret_id)        = module.db[0].pooled_connection_uri
       (local.database_direct_secret_id) = module.db[0].connection_uri
     } : {},
+    local.generated_secret_values,
     var.extra_secret_values,
   )
 
@@ -139,16 +144,11 @@ module "secrets" {
   accessor_members = ["serviceAccount:${google_service_account.runtime.email}"]
 }
 
+# service-files-encryption accessor via module.secrets (generated_secret_ids).
+# hydra-webhook-psk is owned by operations-audit; grant accessor only.
 resource "google_secret_manager_secret_iam_member" "hydra_webhook_psk" {
   project   = var.project_id
   secret_id = "hydra-webhook-psk"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "service_files_encryption" {
-  project   = var.project_id
-  secret_id = "service-files-encryption"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
@@ -217,7 +217,7 @@ module "service" {
     } : {},
     {
       OAUTH2_SIGNER_API_KEY = { secret = "hydra-webhook-psk" },
-      ENCRYPTION_PHRASE     = { secret = "service-files-encryption" }
+      ENCRYPTION_PHRASE     = { secret = module.secrets.secret_ids["service-files-encryption"] }
     },
   )
   depends_on = [

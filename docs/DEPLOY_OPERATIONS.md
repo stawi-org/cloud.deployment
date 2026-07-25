@@ -43,10 +43,18 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
      --org-id org-xxxx   # optional but recommended
    ```
 3. Repo secrets: `SOPS_AGE_KEY`, `R2_*`, and (if edge hosts later) `CLOUDFLARE_API_TOKEN`.
-4. **Shared secrets** in project `stawi-operations` (create once, same values as identity/platform where applicable):
-   - `hydra-webhook-psk` (same PSK as identity)
-   - `audit-signing-key` (for audit)
-   - `service-files-encryption` (for redirect `ENCRYPTION_PHRASE`)
+4. **Shared secrets** in project `stawi-operations` (OpenTofu-managed on first apply):
+   - `hydra-webhook-psk` — owned by **operations-audit** (generated). Prefer re-seeding with the
+     identity project value so private_key_jwt webhooks to `accounts.stawi.org` succeed:
+     ```bash
+     gcloud secrets versions access latest --secret=hydra-webhook-psk --project=stawi-identity \
+       | gcloud secrets versions add hydra-webhook-psk --project=stawi-operations --data-file=-
+     ```
+   - `audit-signing-key` — owned by **operations-audit**
+   - `service-files-encryption` — owned by **operations-redirect**
+
+   Apply **operations-audit** (and **operations-redirect** if needed) before other ops apps so
+   shared secret IAM bindings succeed.
 5. **Images:** prefer Artifact Registry after mirror:
    ```bash
    ./scripts/mirror-ghcr-to-ar.sh \
