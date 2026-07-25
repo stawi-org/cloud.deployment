@@ -196,13 +196,22 @@ jobs:
             echo "Neon project refresh OK with current credentials"
             exit 0
           fi
+          cat /tmp/neon-refresh.log || true
           if [[ $RC -eq 124 ]]; then
             echo "::warning::Neon project refresh timed out after 120s — skipping rebind (state left intact)"
-            cat /tmp/neon-refresh.log || true
+            exit 0
+          fi
+          # Never state-rm on lock contention or transient API errors — only on hard
+          # "project gone / wrong org" style failures.
+          if grep -qiE 'Error acquiring the state lock|state lock|PreconditionFailed' /tmp/neon-refresh.log; then
+            echo "::error::State lock held during Neon refresh — force-unlock then re-run apply (no state-rm)"
+            exit 1
+          fi
+          if ! grep -qiE 'not found|404|does not exist|forbidden|401|unauthorized|organization' /tmp/neon-refresh.log; then
+            echo "::warning::Neon refresh failed with non-rebind error — leaving module.db state intact"
             exit 0
           fi
           echo "::warning::Neon project refresh failed (likely org switch or deleted project). State-rm module.db.* for rebind."
-          cat /tmp/neon-refresh.log || true
           while read -r addr; do
             [[ -z "$addr" ]] && continue
             echo "state rm $addr"
