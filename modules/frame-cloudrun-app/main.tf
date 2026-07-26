@@ -139,7 +139,7 @@ locals {
     var.enable_keto && var.enable_keto_admin ? {
       KETO_SERVICE_ADMIN_URI = local.keto_write_uri
     } : {},
-    # Permission manifests: setup Job only (Frame ≥ v2.0.17 has no runtime PreStart).
+    # Permission manifests: setup Job only (Frame ≥ v2.1.0 has no runtime PreStart).
     # Still inject URL on runtime so shared images can run setup argv; publishing
     # does not run unless ShouldRunSetup / RunSetupForProcess is invoked.
     var.permissions_registration ? {

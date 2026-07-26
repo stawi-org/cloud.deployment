@@ -1,4 +1,4 @@
-image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-trustage-formstore:v0.4.1"
+image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-trustage-formstore:v0.4.4"
 container_port           = 8081
 resource_path            = "/formstore"
 memory                   = "512Mi"
