@@ -90,6 +90,9 @@ locals {
 # Cluster CronJob parity (deployment.manifests synchronize-partitions):
 # hourly POST /_internal/sync/clients — bulk repair Hydra clients, SA policies,
 # partitions, and Keto accesses. Manual Cloud Run Job kept for operators.
+#
+# Tenancy is exposure=authenticated: bare curl gets 403. Mint a Google ID token
+# from the runtime SA metadata (audience = DNS or run.app) before POSTing.
 module "sync_job" {
   source                = "../../../modules/cloudrun-migrate-job"
   name                  = "${var.app_name}-sync-partitions"
@@ -98,11 +101,21 @@ module "sync_job" {
   image                 = "curlimages/curl:8.20.0"
   service_account_email = module.frame.runtime_service_account_email
   labels                = var.labels
+  command               = ["sh", "-c"]
   args = [
-    "-sS", "-X", "POST",
-    "--retry", "8", "--retry-all-errors",
-    "-o", "/dev/null", "-w", "%%{http_code}",
-    local.sync_invoke_url,
+    <<-EOT
+    set -eu
+    AUD='${local.sync_oidc_audience}'
+    TOKEN=$(curl -sS -H 'Metadata-Flavor: Google' \
+      "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=$${AUD}")
+    CODE=$(curl -sS -X POST \
+      -H "Authorization: Bearer $${TOKEN}" \
+      --retry 8 --retry-all-errors \
+      -o /dev/null -w "%%{http_code}" \
+      '${local.sync_invoke_url}')
+    echo "$${CODE}"
+    case "$${CODE}" in 200|202|204) exit 0;; *) exit 1;; esac
+    EOT
   ]
   execute    = false
   depends_on = [module.frame]
