@@ -11,7 +11,7 @@ Audit of Colony HelmRelease env (deployment.manifests) against
 | `nats://…` `EVENTS_QUEUE_URL` | `gcppubsub://` + dual-URL Frame push (module/pubsub) |
 | `NATS_CREDENTIALS_FILE` / SPIFFE / `K8S_*` | Omitted (not applicable) |
 | `DATABASE_USERNAME` / `PASSWORD` | Single `DATABASE_URL` Secret Manager |
-| `PERMISSIONS_REGISTRATION_URL` | **Setup job** preferred (`setup … permissions` in Frame ≥ setup API). Runtime PreStart optional via `PERMISSIONS_REGISTER_ON_START` (default true for Colony). Prod URL: `https://tenancy.stawi.org/_internal/register/permissions` |
+| `PERMISSIONS_REGISTRATION_URL` | Prefer bulk **setup plan** (`setup.Registry` / Job argv `setup migrate permissions …`). Abstract API: Frame package `setup` (`Step`, `Registry.Run`). Runtime PreStart optional via `PERMISSIONS_REGISTER_ON_START` (default true for Colony). Prod URL: `https://tenancy.stawi.org/_internal/register/permissions` |
 | `redis://valkey.datastore.svc` | `mem://` or omit until Memorystore |
 | OAuth2 / audiences / private_key_jwt | Injected by `frame_oauth_env` (Colony chart parity) |
 
