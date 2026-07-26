@@ -63,32 +63,56 @@ Caller supplies image, service, project, region, WIF, ship SA, optional migrate 
 
 Service allowlist (default): identity Frame apps + platform (`platform-devices`, `platform-settings`, `platform-geolocation`, `platform-files`). Pass `allowed_services` to override.
 
-## Bootstrap images (first deploy)
+## GHCR images are public (no AR mirror)
 
-Cloud Run cannot reliably pull private GHCR via the org cache. For first OpenTofu apply (or when the bootstrap tag is missing from AR), mirror into project Artifact Registry:
+**Policy:** `ghcr.io/antinvestor/*` service images are **public** so Cloud Run can pull them with no registry credentials and without mirroring into Artifact Registry.
+
+| Concern | How |
+|---------|-----|
+| New releases | `antinvestor/common` `docker-release.yml` attempts to set package visibility public after push |
+| Existing private packages | `scripts/make-ghcr-public.sh` or workflow `make-ghcr-public.yml` on `antinvestor/common` |
+| Ship | `cloudrun-ship` uses `ghcr.io/antinvestor/...:vX.Y.Z` directly |
+
+Optional org secret **`GHCR_ADMIN_TOKEN`**: classic PAT with `write:packages` + `read:packages` (package admin / org owner). Needed when the GitHub Packages visibility API is restricted for `GITHUB_TOKEN`.
 
 ```bash
-# Identity
-./scripts/mirror-ghcr-to-ar.sh --project stawi-identity --repo apps \
-  --src ghcr.io/antinvestor/service-authentication:v1.54.53 \
-  --name service-authentication --tag v1.54.53
+# One-shot: make remaining private packages public
+gh auth refresh -h github.com -s read:packages,write:packages
+./scripts/make-ghcr-public.sh
 
-# Platform (same pattern)
-./scripts/mirror-ghcr-to-ar.sh --project stawi-platform --repo apps \
-  --src ghcr.io/antinvestor/service-files:v1.10.54 \
-  --name service-files --tag v1.10.54
+# Or via Actions (after setting GHCR_ADMIN_TOKEN)
+gh workflow run make-ghcr-public.yml -R antinvestor/common
 ```
 
-Point `envs/stawi-prod.tfvars` `image` at `europe-west9-docker.pkg.dev/<project>/apps/<name>:<tag>`.
+Verify anonymous pull:
+
+```bash
+# Should return 200 for a public package
+TOKEN=$(curl -sS "https://ghcr.io/token?service=ghcr.io&scope=repository:antinvestor/service-profile:pull" | jq -r .token)
+curl -sSI -H "Authorization: Bearer $TOKEN" \
+  "https://ghcr.io/v2/antinvestor/service-profile/manifests/latest"
+```
+
+### Emergency: AR mirror (only if a package is still private)
+
+If a package is still private and you cannot change visibility yet:
+
+```bash
+./scripts/mirror-ghcr-to-ar.sh --project stawi-identity --repo apps \
+  --src ghcr.io/antinvestor/service-authentication:v1.54.62 \
+  --name service-authentication --tag v1.54.62
+```
+
+Point `envs/stawi-prod.tfvars` `image` at the AR tag only as a temporary bootstrap.
 
 ## Adding a new Frame service
 
-1. Mirror bootstrap image into project AR (`scripts/mirror-ghcr-to-ar.sh`).
-2. Apply app stack in this repo (service + migrate job + messaging exist).
-3. Grant ship SA `roles/iam.serviceAccountUser` on the new runtime SA (re-run bootstrap with updated `--runtime-sa`).
-4. Add repo to WIF allowlist (`--ship-repo`) if new.
-5. In the service repo `release.yaml`, add a `ship` job calling `cloudrun-ship.yml` after `docker`.
-6. Prefer semver tags; avoid shipping `:latest` to prod. Prefer AR destination once dual-push is wired.
+1. Apply app stack in this repo (service + migrate job + messaging exist).
+2. Grant ship SA `roles/iam.serviceAccountUser` on the new runtime SA (re-run bootstrap with updated `--runtime-sa`).
+3. Add repo to WIF allowlist (`--ship-repo`) if new.
+4. In the service repo `release.yaml`, add a `ship` job calling `cloudrun-ship.yml` after `docker` with **`ghcr.io/...` image**.
+5. Prefer semver tags; avoid shipping `:latest` to prod.
+6. Confirm the GHCR package is **public** (docker-release step or `make-ghcr-public.sh`).
 
 ## Rollback
 
