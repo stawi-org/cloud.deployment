@@ -1,4 +1,4 @@
-image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-files-redirect:v1.10.54"
+image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-files-redirect:v1.10.56"
 container_port           = 80
 resource_path            = "/redirect"
 memory                   = "512Mi"
