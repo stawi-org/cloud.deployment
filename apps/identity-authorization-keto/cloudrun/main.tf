@@ -88,9 +88,12 @@ locals {
     APP_NAME    = var.app_name
     LOG_LEVEL   = "info"
   })
+  # Keto (and its gRPC/pgx stack) uses prepared statements. Neon *pooler*
+  # (transaction mode) drops them → SQLSTATE 26000 "prepared statement pgx_N
+  # does not exist" on TransactRelationTuples. Use the direct endpoint for DSN.
   keto_secret_env = {
-    DSN                  = { secret = module.secrets.secret_ids[local.database_secret_id] }
-    DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_secret_id] }
+    DSN                  = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    DATABASE_URL         = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
     REPLICA_DATABASE_URL = { secret = module.secrets.secret_ids[local.database_secret_id] }
   }
   # Small keto.yml via Secret Manager file mount.
