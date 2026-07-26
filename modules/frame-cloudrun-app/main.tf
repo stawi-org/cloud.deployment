@@ -186,6 +186,8 @@ locals {
     var.oauth_signer_secret != "" ? {
       OAUTH2_SIGNER_API_KEY = { secret = var.oauth_signer_secret }
     } : {},
+    # App secrets needed at migrate/setup time (e.g. ENCRYPTION_PHRASE for files).
+    var.secret_env_extra,
     var.migrate_secret_env_extra,
   )
 }

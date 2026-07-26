@@ -1,5 +1,6 @@
 image           = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication-audit:v1.54.62"
-container_port  = 80
+# Match Cloud Run / Frame HTTP_PORT defaults used by other identity apps.
+container_port  = 8080
 resource_path   = "/audit"
 memory          = "512Mi"
 has_database    = true

@@ -26,6 +26,15 @@ module "frame" {
 
   neon_org_id    = var.neon_org_id
   neon_region_id = var.neon_region_id
+  # PostGIS required for location_points.geom (geometry type).
+  neon_extensions = [
+    "uuid-ossp",
+    "pg_stat_statements",
+    "pg_trgm",
+    "btree_gin",
+    "btree_gist",
+    "postgis",
+  ]
 
   resource_path            = "/geolocation"
   requested_audience_paths = ["/profile", "/tenancy"]
