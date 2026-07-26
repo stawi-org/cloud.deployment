@@ -108,3 +108,18 @@ GCP push → POST /_frame/queue/{app}-events  (OIDC as runtime SA)
 ```
 
 Migrate jobs always use `EVENTS_QUEUE_URL=mem://frame.events.migrate`.
+
+### Tenancy migrate + Keto (service-bot bootstrap)
+
+Tenancy `migrate` does more than schema: after DB migrate it writes root/service-bot
+relation tuples to Keto via Frame’s **gRPC** authorizer. That requires:
+
+1. **Keto Cloud Run** with `use_http2 = true` (h2c) so gRPC works end-to-end.
+2. **Frame client** using TLS for `https://…` AUTHORIZATION URIs and a Google ID
+   token (Cloud Run invoker) — plaintext gRPC only for in-cluster `http://…`.
+3. **Migrate job env** including the same OAuth/Keto URIs as the runtime service
+   (`frame_oauth_env` merged into migrate), plus `OAUTH2_SIGNER_API_KEY` when using
+   private_key_jwt.
+
+`AUTHORIZATION_SERVICE_*` points at **direct Cloud Run URLs** (not edge DNS) for
+reliable gRPC. Invoker grants for `identity-tenancy@…` remain on keto read/write.

@@ -71,8 +71,6 @@ locals {
   # Keto / Hydra admin stay IAM-authenticated (see docs/SERVICE_EXPOSURE.md).
   oauth2_public_host = local.is_prod ? "oauth2.stawi.org" : "oauth2.stawi.dev"
   oauth2_admin_host  = local.is_prod ? "oauth2-w.stawi.org" : "oauth2-w.stawi.dev"
-  authz_read_host    = local.is_prod ? "authz.stawi.org" : "authz.stawi.dev"
-  authz_write_host   = local.is_prod ? "authz-w.stawi.org" : "authz-w.stawi.dev"
 
   # Prod: DNS hostnames. Non-prod: Cloud Run URLs (edge LB may not exist).
   oauth2_origin = local.is_prod ? "https://${local.oauth2_public_host}" : data.google_cloud_run_v2_service.hydra.uri
@@ -82,13 +80,14 @@ locals {
   )
   token_url = "${local.oauth2_origin}/oauth2/token"
 
+  # Prefer direct Cloud Run URLs for AUTHORIZATION_SERVICE_* — Frame talks gRPC
+  # to Keto. run.app + h2c is reliable end-to-end; edge DNS hosts remain for
+  # human/docs and can be set via migrate_env / service_env_extra if needed.
   keto_read_uri = (
-    !var.enable_keto ? local.api_base :
-    local.is_prod ? "https://${local.authz_read_host}" : data.google_cloud_run_v2_service.keto_read[0].uri
+    !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_read[0].uri
   )
   keto_write_uri = (
-    !var.enable_keto ? local.api_base :
-    local.is_prod ? "https://${local.authz_write_host}" : data.google_cloud_run_v2_service.keto_write[0].uri
+    !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_write[0].uri
   )
 
   frame_oauth_env = merge(
@@ -137,7 +136,11 @@ locals {
     } : {},
   )
 
+  # Tenancy (and other Frame) migrate paths load OIDC config and write Keto
+  # tuples (service-bot bootstrap). They need the same OAuth/Keto endpoints as
+  # the runtime service — not only DATABASE_URL.
   migrate_env_default = merge(
+    local.frame_oauth_env,
     {
       LOG_LEVEL             = "INFO"
       EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
@@ -160,6 +163,17 @@ locals {
       OAUTH2_SIGNER_API_KEY = { secret = var.oauth_signer_secret }
     } : {},
     var.secret_env_extra,
+  )
+
+  migrate_secret_env_default = merge(
+    var.has_database ? {
+      DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
+    } : {},
+    # private_key_jwt OIDC load during migrate (same as runtime).
+    var.oauth_signer_secret != "" ? {
+      OAUTH2_SIGNER_API_KEY = { secret = var.oauth_signer_secret }
+    } : {},
+    var.migrate_secret_env_extra,
   )
 }
 
@@ -307,13 +321,8 @@ module "migrate" {
   execute               = var.migrate_execute
   args                  = var.migrate_args
   env                   = local.migrate_env_default
-  secret_env = merge(
-    {
-      DATABASE_URL = { secret = module.secrets.secret_ids[local.database_direct_secret_id] }
-    },
-    var.migrate_secret_env_extra,
-  )
-  depends_on = [module.secrets, module.db]
+  secret_env            = local.migrate_secret_env_default
+  depends_on            = [module.secrets, module.db]
 }
 
 # ---------------------------------------------------------------------------

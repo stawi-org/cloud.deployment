@@ -200,8 +200,10 @@ module "service_read" {
   labels                = var.labels
   service_account_email = google_service_account.runtime.email
   container_port        = 4466
-  # Frame authz client uses HTTP REST (not raw gRPC). Keep default HTTP/1.1 —
-  # h2c breaks REST health/relation-tuple routes on Cloud Run (503).
+  # Frame's Keto adapter uses gRPC (not REST). Cloud Run must advertise h2c so
+  # the GFE speaks HTTP/2 end-to-end with the container. Keep-warm and health
+  # probes still work over HTTPS (GFE ↔ client) with HTTP/2.
+  use_http2        = true
   args             = ["serve", "read", "-c", "/etc/keto/keto.yml"]
   memory           = "512Mi"
   exposure         = var.exposure
@@ -255,6 +257,8 @@ module "service_write" {
   container_port        = 4467
   args                  = ["serve", "write", "-c", "/etc/keto/keto.yml"]
   memory                = "512Mi"
+  # Frame gRPC writes (tuple bootstrap / policy sync) require h2c end-to-end.
+  use_http2 = true
   # Write is higher risk — same exposure mode, same invoker allow-list (tighten later).
   exposure         = var.exposure
   invoker_members  = local.keto_invoker_members

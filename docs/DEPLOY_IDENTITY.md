@@ -130,7 +130,7 @@ To pause keep-warm temporarily: set `paused = true` on the module or pause the j
 |------|--------|
 | Custom domains / DNS | Cloudflare / Cloud Run domain mapping |
 | Ship Frame images to AR | Service-repo release → AR + `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)) |
-| Tenancy service-bot → Keto bootstrap | Optional follow-up if migrate soft-fails |
+| Tenancy service-bot → Keto bootstrap | Requires Frame TLS gRPC client + keto `use_http2` + migrate OAuth/Keto env (see FRAME_CLOUDRUN_APP.md) |
 | Google OAuth client secrets | Optional `google_oauth_*` vars on authentication |
 
 ---
