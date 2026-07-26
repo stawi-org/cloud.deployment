@@ -6,6 +6,12 @@ variable "app_name" {
   description = "Cloud Run service name / Neon project prefix (directory name)"
 }
 
+variable "oauth2_service_client_id" {
+  type        = string
+  default     = ""
+  description = "Hydra OAuth2 client_id for private_key_jwt (colony SA id, e.g. service-profile). Empty derives service-* from app_name."
+}
+
 variable "project_id" {
   type = string
 }

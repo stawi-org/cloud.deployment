@@ -29,6 +29,16 @@ locals {
   resource_path = var.resource_path != "" ? var.resource_path : local.default_resource_path
   audience_paths        = distinct(concat([local.resource_path], var.requested_audience_paths))
 
+  # Hydra SA clients use colony IDs (service-profile, service-devices, …),
+  # not Cloud Run app names (identity-profile, platform-devices).
+  default_oauth2_service_client_id = (
+    startswith(var.app_name, "identity-") ? "service-${trimprefix(var.app_name, "identity-")}" :
+    startswith(var.app_name, "platform-") ? "service-${trimprefix(var.app_name, "platform-")}" :
+    startswith(var.app_name, "operations-") ? "service-${trimprefix(var.app_name, "operations-")}" :
+    var.app_name
+  )
+  oauth2_service_client_id = var.oauth2_service_client_id != "" ? var.oauth2_service_client_id : local.default_oauth2_service_client_id
+
   service_run_url      = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
   events_ref           = "${var.app_name}-events"
   events_push_endpoint = "${local.service_run_url}/_frame/queue/${local.events_ref}"
@@ -114,7 +124,8 @@ locals {
       OAUTH2_CLIENT_ASSERTION_AUD       = local.token_url
       OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
       OAUTH2_JWT_VERIFY_ISSUER          = local.issuer
-      OAUTH2_SERVICE_CLIENT_ID          = var.app_name
+      # Colony Hydra SA clients are service-* (not Cloud Run app names).
+      OAUTH2_SERVICE_CLIENT_ID          = local.oauth2_service_client_id
       OAUTH2_RESOURCE_AUDIENCE          = "${local.api_base}${local.resource_path}"
       OAUTH2_REQUESTED_AUDIENCES        = join(",", [for p in local.audience_paths : "${local.api_base}${p}"])
       OAUTH2_PRIVATE_JWT_KEY = jsonencode({
