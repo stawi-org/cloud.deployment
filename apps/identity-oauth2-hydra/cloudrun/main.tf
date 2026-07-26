@@ -85,13 +85,41 @@ locals {
     var.additional_admin_invoker_members,
   )
 
+  # Browser SPAs (e.g. opportunities.stawi.org) call OIDC discovery and token
+  # endpoints cross-origin. On the Talos path, Cloudflare added CORS * via
+  # transform rules; oauth2.stawi.org now terminates on the Cloud Run edge LB
+  # (Google Frontend), so Hydra itself must emit CORS. OIDC public endpoints
+  # are public by spec — allow * (same as deployment.infra cors-transform-rules).
+  hydra_public_cors_origins = join(",", [
+    "https://opportunities.stawi.org",
+    "https://opportunities.stawi.dev",
+    "https://admin.stawi.org",
+    "https://admin.stawi.dev",
+    "https://admin-dev.stawi.org",
+    "https://admin-dev.stawi.dev",
+    "https://thesa.stawi.org",
+    "https://thesa-dev.stawi.org",
+    "https://accounts.stawi.org",
+    "https://accounts.stawi.dev",
+    "https://api.stawi.org",
+    "https://api.stawi.dev",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ])
+
   # Cluster Helm hydra.config → env (public edge process)
   hydra_env = {
     # Cloud Run requires listen on all interfaces (not localhost)
     SERVE_PUBLIC_HOST                           = "0.0.0.0"
     SERVE_PUBLIC_PORT                           = "4444"
     SERVE_PUBLIC_BASE_URL                       = local.oauth2_origin
-    SERVE_PUBLIC_CORS_ENABLED                   = "false"
+    SERVE_PUBLIC_CORS_ENABLED                   = "true"
+    SERVE_PUBLIC_CORS_ALLOWED_ORIGINS           = local.hydra_public_cors_origins
+    SERVE_PUBLIC_CORS_ALLOWED_METHODS           = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    SERVE_PUBLIC_CORS_ALLOWED_HEADERS           = "Authorization,Content-Type,Accept,Origin,X-Requested-With"
+    SERVE_PUBLIC_CORS_EXPOSED_HEADERS           = "Content-Type"
+    SERVE_PUBLIC_CORS_ALLOW_CREDENTIALS         = "true"
+    SERVE_PUBLIC_CORS_MAX_AGE                   = "86400"
     SERVE_PUBLIC_COOKIES_DOMAIN                 = local.cookie_domain
     SERVE_PUBLIC_COOKIES_SAME_SITE_MODE         = "Lax"
     SERVE_PUBLIC_COOKIES_SECURE                 = "true"

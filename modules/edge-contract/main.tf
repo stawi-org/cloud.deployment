@@ -11,7 +11,12 @@ locals {
     "https://admin-dev.stawi.org",
     "https://thesa.stawi.org",
     "https://thesa-dev.stawi.org",
+    "https://opportunities.stawi.org",
+    "https://opportunities.stawi.dev",
+    "https://accounts.stawi.org",
+    "https://accounts.stawi.dev",
     "http://localhost:5173",
+    "http://localhost:3000",
   ]
   # Minimal shared edge defaults; apps set domain-specific env themselves.
   service_env = {
