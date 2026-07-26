@@ -76,7 +76,7 @@ gcloud certificate-manager certificates list --project=stawi-operations --locati
 | authz.stawi.org | identity-authorization-keto-read | **authenticated** |
 | authz-w.stawi.org | identity-authorization-keto-write | **authenticated** |
 | profile.stawi.org | identity-profile | public |
-| tenancy.stawi.org | identity-tenancy | public product |
+| tenancy.stawi.org | identity-tenancy | authenticated control plane |
 | identity.stawi.org | identity-identity | public |
 
 ### Platform (`edge-lb-platform`)

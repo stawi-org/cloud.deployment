@@ -166,8 +166,26 @@ variable "use_http2" {
 }
 
 variable "public_invoker" {
-  type    = bool
-  default = true
+  type        = bool
+  default     = null
+  description = "Override allUsers invoker. Null → derived from exposure (public only)."
+}
+
+variable "exposure" {
+  type        = string
+  default     = "public"
+  description = "public | authenticated | private — see modules/cloudrun-service and docs/SERVICE_EXPOSURE.md"
+
+  validation {
+    condition     = contains(["public", "authenticated", "private"], var.exposure)
+    error_message = "exposure must be public, authenticated, or private."
+  }
+}
+
+variable "invoker_members" {
+  type        = set(string)
+  default     = []
+  description = "IAM members granted roles/run.invoker when exposure is authenticated/private"
 }
 
 variable "custom_audiences" {

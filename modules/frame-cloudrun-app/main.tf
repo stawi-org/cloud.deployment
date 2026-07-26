@@ -343,7 +343,9 @@ module "service" {
   cpu                   = var.cpu
   min_instance_count    = var.min_instance_count
   max_instance_count    = var.max_instance_count
+  exposure              = var.exposure
   public_invoker        = var.public_invoker
+  invoker_members       = var.invoker_members
   custom_audiences      = var.custom_audiences
   startup_probe_path    = var.startup_probe_path
   liveness_probe_path   = var.liveness_probe_path

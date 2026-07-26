@@ -16,7 +16,7 @@ Classic Cloud Run domain mapping is **not** available in `europe-west9`.
 | authz.stawi.org | identity-authorization-keto-read | authenticated (IAM) |
 | authz-w.stawi.org | identity-authorization-keto-write | authenticated (IAM) |
 | profile.stawi.org | identity-profile | public |
-| tenancy.stawi.org | identity-tenancy | public product |
+| tenancy.stawi.org | identity-tenancy | authenticated (IAM; DNS ≠ anonymous) |
 | identity.stawi.org | identity-identity | public |
 
 DNS does **not** make a service anonymous-public. Keto and Hydra admin still require `roles/run.invoker`. See [docs/SERVICE_EXPOSURE.md](../../docs/SERVICE_EXPOSURE.md).

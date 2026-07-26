@@ -63,6 +63,12 @@ variable "extra_secret_ids" {
 variable "public_hostname" {
   type        = string
   default     = ""
-  description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
+  description = "Canonical FQDN for this service (edge LB DNS; IAM-authenticated, not allUsers)"
+}
+
+variable "additional_invoker_members" {
+  type        = set(string)
+  default     = []
+  description = "Extra run.invoker members (ops/platform runtime SAs that call tenancy)"
 }
 

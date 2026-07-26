@@ -1,9 +1,10 @@
 # identity-tenancy — Frame Cloud Run via modules/frame-cloudrun-app.
 # Extra: partition sync job (not part of the shared frame stack).
 #
-# Canonical public DNS: tenancy.stawi.org (edge-lb-identity + public-edge.yaml).
-# Sync / internal callers must use that host (not *.run.app) so OIDC audience and
-# product routing stay stable.
+# Exposure: authenticated (no allUsers) — same model as Keto / Hydra admin.
+# DNS tenancy.stawi.org remains (edge-lb-identity); callers need run.invoker +
+# Google ID token (audience = https://tenancy.stawi.org). Sync scheduler uses
+# OIDC as the tenancy runtime SA.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -20,6 +21,23 @@ locals {
   tenancy_public_url  = local.tenancy_public_host != "" ? "https://${local.tenancy_public_host}" : ""
   # Sync endpoint path (same as K8s CronJob synchronize-partitions).
   sync_clients_path = "/_internal/sync/clients"
+
+  # Callers allowed to invoke IAM-authenticated tenancy (identity + ops + platform).
+  # Mirrors keto additional_invoker_members + identity runtimes + self (scheduler OIDC).
+  identity_runtime_account_ids = toset([
+    "identity-authentication",
+    "identity-identity",
+    "identity-profile",
+    "identity-tenancy",
+    "identity-oauth2-hydra",
+  ])
+  tenancy_invoker_members = setunion(
+    toset([
+      for id in local.identity_runtime_account_ids :
+      "serviceAccount:${id}@${var.project_id}.iam.gserviceaccount.com"
+    ]),
+    var.additional_invoker_members,
+  )
 }
 
 module "frame" {
@@ -43,6 +61,10 @@ module "frame" {
   enable_keto_admin        = true
   migrate_execute          = false
 
+  # Control plane: IAM required (no allUsers). DNS still works via edge LB.
+  exposure         = "authenticated"
+  public_invoker   = false
+  invoker_members  = local.tenancy_invoker_members
   # Accept Google ID tokens minted for https://tenancy.stawi.org (edge LB).
   custom_audiences = local.tenancy_public_url != "" ? [local.tenancy_public_url] : []
 

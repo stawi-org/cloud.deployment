@@ -52,7 +52,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Keto read API |
 | `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Keto write API |
 | `profile.stawi.org` | identity-profile | public | Product |
-| `tenancy.stawi.org` | identity-tenancy | public | Product API |
+| `tenancy.stawi.org` | identity-tenancy | **authenticated** | Tenancy control plane (IAM invoker; app OAuth still applied in-process) |
 | `identity.stawi.org` | identity-identity | public | Product |
 | `devices.stawi.org` … | platform-* | public | Platform product |
 | `audit.stawi.org` … | operations-* | public | Operations product |
@@ -152,15 +152,16 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 6. Confirm anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
 7. Later: Shared VPC → flip Keto/admin to `exposure=private`.
 
-## Tenancy product vs internal routes
+## Tenancy (authenticated control plane)
 
 | Surface | Exposure | Protection |
 |---------|----------|------------|
-| Product API (`/tenancy/…`) | **public** + `tenancy.stawi.org` | App OAuth / product authz |
-| `/_internal/*` | Same Cloud Run service today | **App-level** authz (service identity); not IAM-private like Keto |
+| `tenancy.stawi.org` (all routes) | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token; app OAuth/Keto still enforced in-process |
+| `/_internal/sync/clients` | Same service | Hourly Scheduler OIDC as `identity-tenancy@…` (audience = `https://tenancy.stawi.org`) |
 
-Recommended follow-up: split `_internal` onto a second **authenticated** service
-(same pattern as Hydra admin).
+Invokers: identity Frame runtimes + ops/platform runtime SAs (`additional_invoker_members` in tfvars), same pattern as Keto.
+
+Callers must mint a **Google identity token** (not only a product OAuth access token) for Cloud Run IAM. Frame’s Keto client already does this; HTTP/Connect clients that call tenancy need ID-token transport (or call via a service that has invoker).
 
 ## Out of scope (this pass)
 
