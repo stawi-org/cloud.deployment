@@ -120,10 +120,13 @@ Order: independent; identity stack must already serve Hydra/Keto.
 
 ## Container images
 
-Org GHCR pulls via `cache.europe-docker.pkg.dev` often fail without cache credentials. Bootstrap images live in:
+Service images are **public** on GHCR. Cloud Run pulls them directly (no AR mirror):
 
 ```text
-europe-west9-docker.pkg.dev/stawi-platform/apps/<name>:<tag>
+ghcr.io/antinvestor/service-profile-devices:vX.Y.Z
+ghcr.io/antinvestor/service-profile-settings:vX.Y.Z
+ghcr.io/antinvestor/service-profile-geolocation:vX.Y.Z
+ghcr.io/antinvestor/service-files:vX.Y.Z
 ```
 
-Mirror new release tags into AR before Cloud Run ship, or fix GHCR remote auth org-wide.
+Bootstrap pins: each app's `envs/stawi-prod.tfvars`. Routine rolls: **cloudrun-ship** with the same GHCR tags. See [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md).

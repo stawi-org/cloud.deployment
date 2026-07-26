@@ -1,1 +1,1 @@
-image = "ghcr.io/antinvestor/service-identity:latest"
+image = "ghcr.io/antinvestor/service-fintech-identity:latest"

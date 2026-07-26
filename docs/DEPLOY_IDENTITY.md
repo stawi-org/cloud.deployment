@@ -86,25 +86,22 @@ Optional legacy `api.stawi.org/<path>` → implement in **Cloudflare**, not Clou
 Front door: **`edge-lb-identity`** (Global HTTPS LB — domain mapping unavailable in europe-west9).  
 See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
 
-## Container images (Artifact Registry)
+## Container images (public GHCR)
 
-GHCR pulls via org `cache.europe-docker.pkg.dev` often fail without cache credentials.
-Bootstrap images live in project AR:
+Service images are **public** on GHCR. Cloud Run pulls them directly — no
+Artifact Registry mirror and no dual-push:
 
 ```text
-europe-west9-docker.pkg.dev/stawi-identity/apps/<name>:<tag>
+ghcr.io/antinvestor/service-authentication:vX.Y.Z
+ghcr.io/antinvestor/service-authentication-tenancy:vX.Y.Z
+ghcr.io/antinvestor/service-profile:vX.Y.Z
+ghcr.io/antinvestor/service-fintech-identity:vX.Y.Z
 ```
 
-Mirror before first apply or when bootstrap tag changes:
+Bootstrap pins live in each app's `envs/stawi-prod.tfvars`. Routine rolls use
+decentralized **cloudrun-ship** with the same `ghcr.io/...` tags.
 
-```bash
-./scripts/mirror-ghcr-to-ar.sh \
-  --project stawi-identity --location europe-west9 --repo apps \
-  --src ghcr.io/antinvestor/service-authentication:v1.54.53 \
-  --name service-authentication --tag v1.54.53
-```
-
-Routine rolls still use decentralized **cloudrun-ship** (OpenTofu ignores image). Prefer shipping AR tags once the service repo is configured for dual push (GHCR + AR).
+See [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md).
 
 ### Keep-warm (cheap, not min instances)
 

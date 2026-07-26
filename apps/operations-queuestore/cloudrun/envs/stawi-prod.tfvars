@@ -1,4 +1,4 @@
-image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-trustage-queue:v0.4.4"
+image                    = "ghcr.io/antinvestor/service-trustage-queue:v0.4.4"
 container_port           = 8082
 resource_path            = "/queuestore"
 memory                   = "512Mi"

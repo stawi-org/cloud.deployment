@@ -65,19 +65,9 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 
    Apply **operations-audit** (and **operations-redirect** if needed) before other ops apps so
    shared secret IAM bindings succeed.
-5. **Images:** bootstrap tags are mirrored to identity Artifact Registry (ops Cloud Run
-   service agent has `roles/artifactregistry.reader` on that repo). Prefer project-local AR long term:
-   ```bash
-   ./scripts/mirror-ghcr-to-ar.sh \
-     --project stawi-operations \
-     --location europe-west9 \
-     --repo apps \
-     --src ghcr.io/antinvestor/service-authentication-audit:v1.54.52 \
-     --name service-authentication-audit \
-     --tag v1.54.52
-   # …repeat for each image, then update envs/stawi-prod.tfvars image=
-   ```
-   Current stawi-prod tfvars use `europe-west9-docker.pkg.dev/stawi-identity/apps/…`.
+5. **Images:** public GHCR — pin `ghcr.io/antinvestor/…:vX.Y.Z` in each app's
+   `envs/stawi-prod.tfvars`. No Artifact Registry mirror required. See
+   [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md).
 
 ## Extensions (OpenTofu)
 

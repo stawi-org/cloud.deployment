@@ -1,1 +1,1 @@
-image = "ghcr.io/antinvestor/service-tenancy:latest"
+image = "ghcr.io/antinvestor/service-authentication-tenancy:latest"

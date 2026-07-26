@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Mirror a GHCR (or any) container image into a GCP Artifact Registry repo.
+# EMERGENCY ONLY: mirror a GHCR image into project Artifact Registry.
 #
-# Cloud Run cannot pull private/org-cached GHCR without extra credentials.
-# Project-local AR is the reliable bootstrap + ship target.
+# Preferred path: public ghcr.io/antinvestor/* pulled directly by Cloud Run
+# (see docs/CLOUDRUN_SHIP.md). Do not use this script for routine releases —
+# it incurs AR storage/network cost and is unnecessary for public packages.
 #
 # Usage:
 #   ./scripts/mirror-ghcr-to-ar.sh \
