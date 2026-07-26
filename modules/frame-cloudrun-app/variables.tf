@@ -257,8 +257,11 @@ variable "migrate_execute" {
 
 variable "migrate_args" {
   type        = list(string)
+  # Legacy argv migrate still works via ShouldRunSetup + RunSetupForProcess
+  # (runs registered migrate/bootstrap/permissions/verify steps). Prefer
+  # ["setup","migrate","permissions",…] once apps register full plans.
   default     = ["migrate"]
-  description = "Job argv. Legacy: [\"migrate\"]. After Frame setup API + app adoption: [\"setup\",\"migrate\",\"permissions\",…]."
+  description = "Setup/migrate Job argv. Prefer [\"setup\",\"migrate\",\"permissions\"]; legacy [\"migrate\"] runs well-known registered steps."
 }
 
 variable "migrate_env" {

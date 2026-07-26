@@ -1,4 +1,4 @@
-image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-trustage:v0.4.1"
+image                    = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-trustage:v0.4.3"
 container_port           = 8080
 resource_path            = "/trustage"
 memory                   = "768Mi"

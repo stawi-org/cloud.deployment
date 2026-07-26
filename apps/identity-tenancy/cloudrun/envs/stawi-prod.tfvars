@@ -1,5 +1,5 @@
 # Bootstrap image in project AR. Routine rolls via cloudrun-ship (tofu ignores image).
-image = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication-tenancy:v1.54.60"
+image = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication-tenancy:v1.54.61"
 
 # Edge DNS (docs/PUBLIC_EDGE_DNS.md + config/public-edge.yaml).
 # Service is exposure=authenticated — DNS ≠ anonymous public.

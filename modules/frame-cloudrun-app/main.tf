@@ -139,9 +139,9 @@ locals {
     var.enable_keto && var.enable_keto_admin ? {
       KETO_SERVICE_ADMIN_URI = local.keto_write_uri
     } : {},
-    # Permission manifests: prefer setup job (Frame RunSetup "permissions").
-    # Runtime still gets the URL + default PERMISSIONS_REGISTER_ON_START=true
-    # until apps adopt `setup migrate permissions` and set register-on-start false.
+    # Permission manifests: setup Job only (Frame ≥ v2.0.17 has no runtime PreStart).
+    # Still inject URL on runtime so shared images can run setup argv; publishing
+    # does not run unless ShouldRunSetup / RunSetupForProcess is invoked.
     var.permissions_registration ? {
       PERMISSIONS_REGISTRATION_URL = local.permissions_registration_url
     } : {},

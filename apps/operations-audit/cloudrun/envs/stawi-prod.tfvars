@@ -1,4 +1,4 @@
-image           = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication-audit:v1.54.58"
+image           = "europe-west9-docker.pkg.dev/stawi-identity/apps/service-authentication-audit:v1.54.61"
 container_port  = 80
 resource_path   = "/audit"
 memory          = "512Mi"
