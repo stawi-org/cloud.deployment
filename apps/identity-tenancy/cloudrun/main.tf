@@ -1,5 +1,9 @@
 # identity-tenancy — Frame Cloud Run via modules/frame-cloudrun-app.
 # Extra: partition sync job (not part of the shared frame stack).
+#
+# Canonical public DNS: tenancy.stawi.org (edge-lb-identity + public-edge.yaml).
+# Sync / internal callers must use that host (not *.run.app) so OIDC audience and
+# product routing stay stable.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -8,6 +12,14 @@ provider "neon" {
 provider "google" {
   project = var.project_id
   region  = var.region
+}
+
+locals {
+  # Prefer explicit public_hostname (tfvars / registry); fallback run.app only when unset.
+  tenancy_public_host = trimspace(var.public_hostname) != "" ? trimspace(var.public_hostname) : ""
+  tenancy_public_url  = local.tenancy_public_host != "" ? "https://${local.tenancy_public_host}" : ""
+  # Sync endpoint path (same as K8s CronJob synchronize-partitions).
+  sync_clients_path = "/_internal/sync/clients"
 }
 
 module "frame" {
@@ -31,9 +43,26 @@ module "frame" {
   enable_keto_admin        = true
   migrate_execute          = false
 
-  app_env = {
-    SYNCHRONISE_PRIMARY_PARTITIONS = "true"
-  }
+  # Accept Google ID tokens minted for https://tenancy.stawi.org (edge LB).
+  custom_audiences = local.tenancy_public_url != "" ? [local.tenancy_public_url] : []
+
+  app_env = merge(
+    {
+      SYNCHRONISE_PRIMARY_PARTITIONS = "true"
+    },
+    local.tenancy_public_url != "" ? {
+      # Stable public base (edge DNS) for any in-process URL construction.
+      PUBLIC_BASE_URL = local.tenancy_public_url
+    } : {},
+  )
+}
+
+locals {
+  # Invoke via DNS when configured; else Cloud Run URL.
+  sync_invoke_base = local.tenancy_public_url != "" ? local.tenancy_public_url : module.frame.service_uri
+  sync_invoke_url  = "${local.sync_invoke_base}${local.sync_clients_path}"
+  # OIDC audience must match custom_audiences (DNS) or the run.app service URL.
+  sync_oidc_audience = local.tenancy_public_url != "" ? local.tenancy_public_url : module.frame.service_uri
 }
 
 # Cluster CronJob parity (deployment.manifests synchronize-partitions):
@@ -51,27 +80,26 @@ module "sync_job" {
     "-sS", "-X", "POST",
     "--retry", "8", "--retry-all-errors",
     "-o", "/dev/null", "-w", "%%{http_code}",
-    # Prefer Cloud Run URL so OIDC invoker works without relying on public edge.
-    "${module.frame.service_uri}/_internal/sync/clients",
+    local.sync_invoke_url,
   ]
   execute    = false
   depends_on = [module.frame]
 }
 
 # Hourly schedule — same cadence as K8s CronJob "0 * * * *".
-# OIDC as tenancy runtime SA (run.invoker already holds for self / public service).
+# POST https://tenancy.stawi.org/_internal/sync/clients with OIDC (audience = DNS host).
 module "sync_schedule" {
   source                     = "../../../modules/cloudrun-keep-warm"
   project_id                 = var.project_id
   name                       = "sync-partitions-${var.app_name}"
-  uri                        = "${module.frame.service_uri}/_internal/sync/clients"
+  uri                        = local.sync_invoke_url
   schedule                   = "0 * * * *"
   time_zone                  = "Etc/UTC"
   http_method                = "POST"
   attempt_deadline           = "600s"
   scheduler_region           = "europe-west1"
   oidc_service_account_email = module.frame.runtime_service_account_email
-  oidc_audience              = module.frame.service_uri
+  oidc_audience              = local.sync_oidc_audience
   depends_on                 = [module.frame]
 }
 

@@ -170,6 +170,12 @@ variable "public_invoker" {
   default = true
 }
 
+variable "custom_audiences" {
+  type        = list(string)
+  default     = []
+  description = "Extra OIDC audiences for Cloud Run (e.g. https://tenancy.stawi.org) when callers mint tokens for the edge DNS hostname"
+}
+
 variable "min_instance_count" {
   type        = number
   default     = 0

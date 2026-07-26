@@ -344,6 +344,7 @@ module "service" {
   min_instance_count    = var.min_instance_count
   max_instance_count    = var.max_instance_count
   public_invoker        = var.public_invoker
+  custom_audiences      = var.custom_audiences
   startup_probe_path    = var.startup_probe_path
   liveness_probe_path   = var.liveness_probe_path
 
