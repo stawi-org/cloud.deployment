@@ -6,6 +6,8 @@
 #   1) updates config/gcp-accounts.yaml with project/WIF/SA (non-secret registry)
 #   2) stores a SOPS-encrypted credentials/gcp/<account>/<env>/auth.yaml
 #      (same age recipient pattern as deployment.infra)
+# Always grants bwire517@gmail.com project viewer + logging roles so that
+# operator can view all resources and logs in every bootstrapped account.
 #
 # Architecture stays intact: apps still select gcp.account + neon.account in
 # app.yaml; CI resolves context via resolve-app-context.sh; runtime secrets
@@ -69,6 +71,16 @@ GITHUB_REPO="stawi-org/cloud.deployment"
 OIDC_ISSUER="https://token.actions.githubusercontent.com"
 ATTR_CONDITION="assertion.repository=='${GITHUB_REPO}'"
 ATTR_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref"
+
+# Human operator always granted read access (logs + all resources) on every project.
+# Re-applied on every bootstrap / --iam-only run (idempotent via ensure_iam_binding).
+OPERATOR_VIEWER_EMAIL="bwire517@gmail.com"
+OPERATOR_VIEWER_MEMBER="user:${OPERATOR_VIEWER_EMAIL}"
+OPERATOR_VIEWER_ROLES=(
+  roles/viewer              # view all project resources
+  roles/logging.viewer      # Cloud Logging (console + API)
+  roles/logging.privateLogViewer  # private / data-access logs when present
+)
 
 SOPS_VERSION="v3.11.0"
 CLONE_URL="https://github.com/${GITHUB_REPO}.git"
@@ -608,14 +620,24 @@ gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --quiet >/dev/null 2>&1 || true
 say "  workloadIdentityUser for ${GITHUB_REPO}"
 
+# -------------------------------------------------------------------------
+# 4. Human operator: always view resources + logs (every project bootstrap)
+# -------------------------------------------------------------------------
+say "Ensuring operator viewer access for ${OPERATOR_VIEWER_EMAIL}"
+for role in "${OPERATOR_VIEWER_ROLES[@]}"; do
+  ensure_iam_binding "$role" "$OPERATOR_VIEWER_MEMBER" || warn "could not bind $role to ${OPERATOR_VIEWER_EMAIL}"
+  say "  $role → ${OPERATOR_VIEWER_MEMBER}"
+done
+
 say ""
 say "=========================================================="
 say "GCP ready for cloud.deployment account=${ACCOUNT} env=${ENV_NAME}"
-say "  project: $PROJECT ($PROJECT_NUMBER)"
-say "  SA:      $SA_EMAIL"
-say "  WIF:     $WIF_PROVIDER_RESOURCE"
-say "  SAFETY:  no Cloud Run services deleted; IAM is additive only"
-say "  Neon:    not configured here (independent; link per app via neon.account)"
+say "  project:  $PROJECT ($PROJECT_NUMBER)"
+say "  SA:       $SA_EMAIL"
+say "  WIF:      $WIF_PROVIDER_RESOURCE"
+say "  operator: ${OPERATOR_VIEWER_EMAIL} (viewer + logging)"
+say "  SAFETY:   no Cloud Run services deleted; IAM is additive only"
+say "  Neon:     not configured here (independent; link per app via neon.account)"
 
 if [[ "$IAM_ONLY" == "true" ]]; then
   say "--iam-only: skipping git/PR"
