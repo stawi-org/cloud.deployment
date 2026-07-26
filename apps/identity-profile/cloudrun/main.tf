@@ -68,6 +68,7 @@ module "frame" {
   app_env = {
     TRACE_REQUESTS           = "false"
     DEK_OLD_ENCRYPTION_TOKEN = ""
+    # Colony: service-notification.communications.svc — not yet on Cloud Run.
     NOTIFICATION_SERVICE_URI = "${local.api_base}/notification"
   }
 }

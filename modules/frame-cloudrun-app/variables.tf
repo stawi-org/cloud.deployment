@@ -269,7 +269,7 @@ variable "migrate_env" {
 variable "permissions_registration" {
   type        = bool
   default     = true
-  description = "Set PERMISSIONS_REGISTRATION_URL on migrate when has_database"
+  description = "Set PERMISSIONS_REGISTRATION_URL on runtime + migrate (Frame PreStart manifest registration). Colony parity."
 }
 
 # ---------------------------------------------------------------------------

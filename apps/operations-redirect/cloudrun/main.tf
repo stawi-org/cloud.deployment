@@ -33,14 +33,33 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
 
-  extra_secret_ids    = local.generated_secret_ids
-  extra_secret_values = local.generated_secret_values
-  secret_env_extra = {
-    ENCRYPTION_PHRASE = { secret = "service-files-encryption" }
-  }
+  # Colony analytics credentials (optional until seeded) + encryption phrase.
+  extra_secret_ids = toset(concat(
+    tolist(local.generated_secret_ids),
+    var.analytics_username != "" ? ["${var.app_name}-analytics-username"] : [],
+    var.analytics_password != "" ? ["${var.app_name}-analytics-password"] : [],
+  ))
+  extra_secret_values = merge(
+    local.generated_secret_values,
+    var.analytics_username != "" ? { "${var.app_name}-analytics-username" = var.analytics_username } : {},
+    var.analytics_password != "" ? { "${var.app_name}-analytics-password" = var.analytics_password } : {},
+  )
+  secret_env_extra = merge(
+    {
+      ENCRYPTION_PHRASE = { secret = "service-files-encryption" }
+    },
+    var.analytics_username != "" ? {
+      ANALYTICS_USERNAME = { secret = "${var.app_name}-analytics-username" }
+    } : {},
+    var.analytics_password != "" ? {
+      ANALYTICS_PASSWORD = { secret = "${var.app_name}-analytics-password" }
+    } : {},
+  )
 
   app_env = {
     JOBS_BASE_URL      = "https://jobs.stawi.org/"
-    ANALYTICS_BASE_URL = ""
+    ANALYTICS_BASE_URL = var.analytics_base_url
+    # Colony in-cluster webhook; empty until product-opportunities is on Cloud Run.
+    LINK_EXPIRED_WEBHOOKS = var.link_expired_webhooks
   }
 }

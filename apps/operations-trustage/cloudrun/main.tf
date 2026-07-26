@@ -79,22 +79,27 @@ module "frame" {
     }
   }
 
+  # Colony operations-trustage.yaml queue/tuning envs → Pub/Sub dual-URL shape.
   service_env_extra = {
-    CACHE_REQUIRE_VALKEY         = "false"
-    QUEUE_EXEC_DISPATCH_NAME     = "exec-dispatch"
-    QUEUE_EXEC_DISPATCH_URL      = "gcppubsub://${var.project_id}/${local.exec_topic_name}"
-    QUEUE_EXEC_WORKER_NAME       = local.exec_worker_ref
-    QUEUE_EXEC_WORKER_URL        = "push://${local.exec_worker_ref}?protocol=gcppubsub"
-    QUEUE_EVENT_INGEST_NAME      = "event-ingest"
-    QUEUE_EVENT_INGEST_URL       = "gcppubsub://${var.project_id}/${local.wf_events_topic_name}"
-    QUEUE_EVENT_ROUTER_NAME      = local.event_router_ref
-    QUEUE_EVENT_ROUTER_URL       = "push://${local.event_router_ref}?protocol=gcppubsub"
-    EXEC_WORKER_MAX_ACK_PENDING  = "0"
-    EVENT_ROUTER_MAX_ACK_PENDING = "0"
-    OUTBOX_BATCH_SIZE            = "20"
-    DISPATCH_BATCH_SIZE          = "50"
-    ADAPTER_HTTP_TIMEOUT_SECONDS = "30"
-    DATABASE_POOL_MAX_CONNS      = "50"
+    CACHE_REQUIRE_VALKEY           = "false"
+    QUEUE_EXEC_DISPATCH_NAME       = "exec-dispatch"
+    QUEUE_EXEC_DISPATCH_URL        = "gcppubsub://${var.project_id}/${local.exec_topic_name}"
+    QUEUE_EXEC_WORKER_NAME         = local.exec_worker_ref
+    QUEUE_EXEC_WORKER_URL          = "push://${local.exec_worker_ref}?protocol=gcppubsub"
+    QUEUE_EVENT_INGEST_NAME        = "event-ingest"
+    QUEUE_EVENT_INGEST_URL         = "gcppubsub://${var.project_id}/${local.wf_events_topic_name}"
+    QUEUE_EVENT_ROUTER_NAME        = local.event_router_ref
+    QUEUE_EVENT_ROUTER_URL         = "push://${local.event_router_ref}?protocol=gcppubsub"
+    EXEC_WORKER_MAX_ACK_PENDING    = "0"
+    EVENT_ROUTER_MAX_ACK_PENDING   = "0"
+    EVENT_ROUTER_BINDING_LIMIT     = "200"
+    OUTBOX_BATCH_SIZE              = "20"
+    OUTBOX_MAX_BATCHES_PER_SWEEP   = "50"
+    DISPATCH_BATCH_SIZE            = "50"
+    DISPATCH_MAX_BATCHES_PER_SWEEP = "50"
+    ADAPTER_HTTP_TIMEOUT_SECONDS   = "30"
+    DATABASE_POOL_MAX_CONNS        = "50"
+    WORKFLOW_ROW_RETENTION_HOURS   = "720"
   }
 
   app_env = {}

@@ -117,3 +117,27 @@ variable "migrate_args" {
   type    = list(string)
   default = ["migrate"]
 }
+
+variable "analytics_base_url" {
+  type        = string
+  default     = ""
+  description = "Colony ANALYTICS_BASE_URL (empty disables)"
+}
+
+variable "analytics_username" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "analytics_password" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "link_expired_webhooks" {
+  type        = string
+  default     = ""
+  description = "Comma-separated link-expired webhook URLs (was stawi-jobs-candidates.product-opportunities.svc)"
+}

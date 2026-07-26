@@ -71,12 +71,21 @@ module "frame" {
   app_env = merge(
     {
       SYNCHRONISE_PRIMARY_PARTITIONS = "true"
+      DATABASE_LOG_QUERIES           = "false"
+      # Colony: PROFILE_SERVICE_URI → service-profile.identity.svc
+      PROFILE_SERVICE_URI = (
+        var.platform == "stawi-prod"
+        ? "https://profile.stawi.org"
+        : "https://profile.stawi.dev"
+      )
     },
     local.tenancy_public_url != "" ? {
       # Stable public base (edge DNS) for any in-process URL construction.
       PUBLIC_BASE_URL = local.tenancy_public_url
     } : {},
   )
+  # Tenancy is the registration target — skip self-registration loop.
+  permissions_registration = false
 }
 
 locals {

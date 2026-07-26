@@ -90,6 +90,16 @@ locals {
     !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_write[0].uri
   )
 
+  # Colony sets PERMISSIONS_REGISTRATION_URL on every runtime pod (Frame
+  # WithPermissionRegistration PreStart). Prefer tenancy edge DNS (prod) over
+  # api path alias so registration hits the authenticated control-plane host.
+  tenancy_public_host = local.is_prod ? "tenancy.stawi.org" : "tenancy.stawi.dev"
+  permissions_registration_url = (
+    local.is_prod
+    ? "https://${local.tenancy_public_host}/_internal/register/permissions"
+    : "${local.api_base}/tenancy/_internal/register/permissions"
+  )
+
   frame_oauth_env = merge(
     {
       HTTP_PORT                         = tostring(var.container_port)
@@ -129,6 +139,10 @@ locals {
     var.enable_keto && var.enable_keto_admin ? {
       KETO_SERVICE_ADMIN_URI = local.keto_write_uri
     } : {},
+    # Runtime (not only migrate): Frame registers permission manifests at PreStart.
+    var.permissions_registration ? {
+      PERMISSIONS_REGISTRATION_URL = local.permissions_registration_url
+    } : {},
     var.disable_otel_exporters ? {
       OTEL_TRACES_EXPORTER  = "none"
       OTEL_METRICS_EXPORTER = "none"
@@ -148,9 +162,6 @@ locals {
       OTEL_METRICS_EXPORTER = "none"
       OTEL_LOGS_EXPORTER    = "none"
     },
-    var.permissions_registration ? {
-      PERMISSIONS_REGISTRATION_URL = "${local.api_base}/tenancy/_internal/register/permissions"
-    } : {},
     var.migrate_env,
   )
 

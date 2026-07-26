@@ -43,6 +43,7 @@ module "frame" {
     AUDIT_SIGNING_KEY = { secret = "audit-signing-key" }
   }
 
-  app_env = {}
-
+  app_env = {
+    DATABASE_LOG_QUERIES = "true"
+  }
 }

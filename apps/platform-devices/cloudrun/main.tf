@@ -29,10 +29,37 @@ module "frame" {
 
   resource_path            = "/devices"
   requested_audience_paths = ["/profile", "/tenancy"]
+
+  # Optional Cloudflare TURN credentials (seed via secret catalog / TF vars).
+  extra_secret_ids = toset(concat(
+    var.cloudflare_turn_token_id != "" ? ["${var.app_name}-cloudflare-turn-token-id"] : [],
+    var.cloudflare_turn_api_token != "" ? ["${var.app_name}-cloudflare-turn-api-token"] : [],
+  ))
+  extra_secret_values = merge(
+    var.cloudflare_turn_token_id != "" ? {
+      "${var.app_name}-cloudflare-turn-token-id" = var.cloudflare_turn_token_id
+    } : {},
+    var.cloudflare_turn_api_token != "" ? {
+      "${var.app_name}-cloudflare-turn-api-token" = var.cloudflare_turn_api_token
+    } : {},
+  )
+  secret_env_extra = merge(
+    var.cloudflare_turn_token_id != "" ? {
+      CLOUDFLARE_TURN_TOKEN_ID = { secret = "${var.app_name}-cloudflare-turn-token-id" }
+    } : {},
+    var.cloudflare_turn_api_token != "" ? {
+      CLOUDFLARE_TURN_API_TOKEN = { secret = "${var.app_name}-cloudflare-turn-api-token" }
+    } : {},
+  )
+
   app_env = {
     TURN_PROVIDER = "cloudflare"
     TURN_TTL      = "3600"
+    # Cluster placeholders; override when real TURN infra is ready.
+    TURN_SERVER_URLS   = var.turn_server_urls
+    TURN_SHARED_SECRET = var.turn_shared_secret
+    # Colony NATS analysis queue → default events topic until a dedicated topic exists.
+    QUEUE_DEVICE_ANALYSIS_URI = "gcppubsub://${var.project_id}/${var.app_name}-events"
   }
-
 }
 

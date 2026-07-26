@@ -78,3 +78,29 @@ variable "public_hostname" {
   description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
 }
 
+# TURN / WebRTC (colony service-devices.yaml). Empty = omit Cloudflare secrets.
+variable "cloudflare_turn_token_id" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "cloudflare_turn_api_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "turn_server_urls" {
+  type        = string
+  default     = "turn:turn.example.com:3478,turns:turn.example.com:5349,stun:stun.example.com:3478"
+  description = "Comma-separated TURN/STUN URLs (cluster placeholder until production TURN)"
+}
+
+variable "turn_shared_secret" {
+  type        = string
+  sensitive   = true
+  default     = "setmecorrectly"
+  description = "TURN shared secret; prefer real value via TF_VAR / CI secret"
+}
+

@@ -33,8 +33,25 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
 
+  # Colony ANALYTICS_* secrets (optional until seeded via TF_VAR).
+  extra_secret_ids = toset(concat(
+    var.analytics_backend_url != "" ? ["${var.app_name}-analytics-backend-url"] : [],
+    var.analytics_token != "" ? ["${var.app_name}-analytics-token"] : [],
+  ))
+  extra_secret_values = merge(
+    var.analytics_backend_url != "" ? { "${var.app_name}-analytics-backend-url" = var.analytics_backend_url } : {},
+    var.analytics_token != "" ? { "${var.app_name}-analytics-token" = var.analytics_token } : {},
+  )
+  secret_env_extra = merge(
+    var.analytics_backend_url != "" ? {
+      ANALYTICS_BACKEND_URL = { secret = "${var.app_name}-analytics-backend-url" }
+    } : {},
+    var.analytics_token != "" ? {
+      ANALYTICS_TOKEN = { secret = "${var.app_name}-analytics-token" }
+    } : {},
+  )
+
   app_env = {
     ANALYTICS_BACKEND_TYPE = "uptrace"
   }
-
 }

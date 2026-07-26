@@ -117,3 +117,15 @@ variable "migrate_args" {
   type    = list(string)
   default = ["migrate"]
 }
+
+variable "analytics_backend_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "analytics_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}

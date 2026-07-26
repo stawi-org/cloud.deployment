@@ -36,6 +36,13 @@ module "frame" {
   app_env = {
     MAX_SUBMISSION_SIZE   = "10485760"
     SUBMISSION_RATE_LIMIT = "100"
+    # Colony: FILE_SERVICE_URL → service-files.platform.svc
+    FILE_SERVICE_URL = (
+      var.platform == "stawi-prod"
+      ? "https://files.stawi.org"
+      : "https://files.stawi.dev"
+    )
+    # No Valkey on Cloud Run yet — app should tolerate empty/mem if supported.
+    # Leave unset rather than broken cluster DNS: VALKEY_CACHE_URL.
   }
-
 }

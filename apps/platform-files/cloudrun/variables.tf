@@ -78,3 +78,57 @@ variable "public_hostname" {
   description = "Canonical public FQDN for this service (Cloud Run domain mapping)"
 }
 
+
+# Object storage (colony service-files.yaml). Seed secrets via TF_VAR / CI.
+variable "storage_provider" {
+  type    = string
+  default = "S3"
+}
+
+variable "s3_private_bucket" {
+  type    = string
+  default = "core-private-bucket"
+}
+
+variable "s3_public_bucket" {
+  type    = string
+  default = "core-public-bucket"
+}
+
+variable "s3_endpoint" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "s3_access_key_id" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "s3_access_key_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "gcs_private_bucket" {
+  type    = string
+  default = "gs://global_ant_private_files"
+}
+
+variable "gcs_public_bucket" {
+  type    = string
+  default = "gs://global_ant_public_files"
+}
+
+variable "local_private_bucket" {
+  type    = string
+  default = "/var/core/files/stawi-private-files"
+}
+
+variable "local_public_bucket" {
+  type    = string
+  default = "/var/core/files/stawi-public-files"
+}
