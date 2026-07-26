@@ -256,8 +256,9 @@ variable "migrate_execute" {
 }
 
 variable "migrate_args" {
-  type    = list(string)
-  default = ["migrate"]
+  type        = list(string)
+  default     = ["migrate"]
+  description = "Job argv. Legacy: [\"migrate\"]. After Frame setup API + app adoption: [\"setup\",\"migrate\",\"permissions\",…]."
 }
 
 variable "migrate_env" {

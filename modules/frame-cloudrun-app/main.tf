@@ -139,7 +139,9 @@ locals {
     var.enable_keto && var.enable_keto_admin ? {
       KETO_SERVICE_ADMIN_URI = local.keto_write_uri
     } : {},
-    # Runtime (not only migrate): Frame registers permission manifests at PreStart.
+    # Permission manifests: prefer setup job (Frame RunSetup "permissions").
+    # Runtime still gets the URL + default PERMISSIONS_REGISTER_ON_START=true
+    # until apps adopt `setup migrate permissions` and set register-on-start false.
     var.permissions_registration ? {
       PERMISSIONS_REGISTRATION_URL = local.permissions_registration_url
     } : {},
