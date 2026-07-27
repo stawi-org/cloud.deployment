@@ -59,8 +59,7 @@ Still served by per-domain host LBs (`edge-lb-*`):
 | `oauth2-w.stawi.org` | Hydra admin (authenticated) |
 | `authz.stawi.org` / `authz-w.stawi.org` | Keto (authenticated) |
 
-Optional per-service hostnames (`profile.stawi.org`, …) can remain for
-direct/debug access; clients should prefer `api.stawi.org/<path>`.
+Product per-service hostnames are **not** used. Clients use `api.stawi.org/<path>` only.
 
 ## Prerequisites
 

@@ -12,10 +12,9 @@ provider "google" {
 locals {
   is_prod  = var.platform == "stawi-prod"
   api_base = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
-  # Prefer edge DNS hosts over api path aliases (colony: *.svc.cluster.local).
-  profile_uri = local.is_prod ? "https://profile.stawi.org" : "https://profile.stawi.dev"
-  tenancy_uri = local.is_prod ? "https://tenancy.stawi.org" : "https://tenancy.stawi.dev"
-  # Notification not yet on Cloud Run — keep api path for when CF/gateway routes it.
+  # Product APIs only on the path gateway.
+  profile_uri      = "${local.api_base}/profile"
+  tenancy_uri      = "${local.api_base}/tenancy"
   notification_uri = "${local.api_base}/notification"
 }
 

@@ -13,7 +13,7 @@ provider "cloudflare" {
 
 locals {
   zone_name = "stawi.org"
-  # All identity Cloud Run services get stable DNS.
+  # Exceptions only — product APIs are api.stawi.org/<path> (Cloudflare Worker).
   # Control-plane hosts (oauth2-w, authz, authz-w) stay IAM-authenticated — DNS ≠ public.
   hosts = {
     "accounts.stawi.org" = { service = "identity-authentication" }
@@ -21,9 +21,6 @@ locals {
     "oauth2-w.stawi.org" = { service = "identity-oauth2-hydra-admin" }
     "authz.stawi.org"    = { service = "identity-authorization-keto-read" }
     "authz-w.stawi.org"  = { service = "identity-authorization-keto-write" }
-    "profile.stawi.org"  = { service = "identity-profile" }
-    "tenancy.stawi.org"  = { service = "identity-tenancy" }
-    "identity.stawi.org" = { service = "identity-identity" }
   }
   host_short = {
     for h in keys(local.hosts) : h => trimsuffix(h, ".${local.zone_name}")

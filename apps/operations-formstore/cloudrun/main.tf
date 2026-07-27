@@ -39,8 +39,8 @@ module "frame" {
     # Colony: FILE_SERVICE_URL → service-files.platform.svc
     FILE_SERVICE_URL = (
       var.platform == "stawi-prod"
-      ? "https://files.stawi.org"
-      : "https://files.stawi.dev"
+      ? "https://api.stawi.org/files"
+      : "https://api.stawi.dev/files"
     )
     # No Valkey on Cloud Run yet — app should tolerate empty/mem if supported.
     # Leave unset rather than broken cluster DNS: VALKEY_CACHE_URL.

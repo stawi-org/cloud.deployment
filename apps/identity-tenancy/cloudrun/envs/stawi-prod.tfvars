@@ -1,9 +1,9 @@
 # Bootstrap pin (public GHCR). Routine rolls via cloudrun-ship.
 image = "ghcr.io/antinvestor/service-authentication-tenancy:v1.54.62"
 
-# Edge DNS (docs/PUBLIC_EDGE_DNS.md + config/public-edge.yaml).
-# Service is exposure=authenticated — DNS ≠ anonymous public.
-public_hostname = "tenancy.stawi.org"
+# Public surface is the path gateway only (no tenancy.stawi.org host).
+# Leave empty → defaults to https://api.stawi.org/tenancy (custom_audiences + PUBLIC_BASE_URL).
+public_hostname = ""
 
 # Cross-project runtimes that call tenancy (permissions registration, product APIs).
 # Same set as keto/hydra-admin invokers.

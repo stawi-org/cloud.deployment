@@ -13,12 +13,13 @@ provider "google" {
 locals {
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
-  # Stable edge DNS (colony had in-cluster svc URLs; Cloud Run uses public hosts).
-  oauth2_public   = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
-  profile_uri     = local.is_prod ? "https://profile.stawi.org" : "https://profile.stawi.dev"
-  tenancy_uri     = local.is_prod ? "https://tenancy.stawi.org" : "https://tenancy.stawi.dev"
-  devices_uri     = local.is_prod ? "https://devices.stawi.org" : "https://devices.stawi.dev"
-  files_uri       = local.is_prod ? "https://files.stawi.org" : "https://files.stawi.dev"
+  # Product APIs only on the path gateway (no profile.stawi.org / devices.* hosts).
+  oauth2_public = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
+  api_base      = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
+  profile_uri   = "${local.api_base}/profile"
+  tenancy_uri   = "${local.api_base}/tenancy"
+  devices_uri   = "${local.api_base}/devices"
+  files_uri     = "${local.api_base}/files"
 }
 
 module "frame" {

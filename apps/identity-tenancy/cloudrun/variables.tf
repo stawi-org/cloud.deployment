@@ -63,7 +63,7 @@ variable "extra_secret_ids" {
 variable "public_hostname" {
   type        = string
   default     = ""
-  description = "Canonical FQDN for this service (edge LB DNS; IAM-authenticated, not allUsers)"
+  description = "Optional public base override (default https://api.stawi.org/tenancy). Leave empty."
 }
 
 variable "additional_invoker_members" {

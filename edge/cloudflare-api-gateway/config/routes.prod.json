@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Path map for api.stawi.org → Cloud Run. Source of truth for the Worker + Scalar hub. Extend by adding a route; run npm run validate before deploy.",
+  "description": "Path map for api.stawi.org → Cloud Run only (no product *.stawi.org hosts). Origins must be https://*.run.app. Extend via routes[]; npm run validate before deploy.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
@@ -21,21 +21,7 @@
       ".a.run.app",
       ".run.app"
     ],
-    "extra_hosts": [
-      "profile.stawi.org",
-      "tenancy.stawi.org",
-      "identity.stawi.org",
-      "devices.stawi.org",
-      "settings.stawi.org",
-      "geolocation.stawi.org",
-      "files.stawi.org",
-      "audit.stawi.org",
-      "formstore.stawi.org",
-      "queuestore.stawi.org",
-      "redirect.stawi.org",
-      "thesa.stawi.org",
-      "trustage.stawi.org"
-    ]
+    "extra_hosts": []
   },
   "routes": [
     {
@@ -67,10 +53,9 @@
       "docs": {
         "enabled": false,
         "title": "Tenancy",
-        "openapi_path": "/openapi.yaml",
-        "notes": "Not public on Cloud Run IAM; enable in hub when a public OpenAPI path exists."
+        "openapi_path": "/openapi.yaml"
       },
-      "notes": "Cloud Run IAM authenticated (no allUsers)."
+      "notes": "Cloud Run IAM authenticated. Path is api.stawi.org/tenancy only (no tenancy.stawi.org host)."
     },
     {
       "id": "identity",
@@ -152,90 +137,96 @@
       "prefix": "/audit",
       "service": "operations-audit",
       "project": "stawi-operations",
-      "origin": "https://audit.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Audit",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after: gcloud auth with stawi-operations + npm run refresh-origins (must be *.run.app)."
     },
     {
       "id": "formstore",
       "prefix": "/formstore",
       "service": "operations-formstore",
       "project": "stawi-operations",
-      "origin": "https://formstore.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Formstore",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after refresh-origins with operations project access."
     },
     {
       "id": "queuestore",
       "prefix": "/queuestore",
       "service": "operations-queuestore",
       "project": "stawi-operations",
-      "origin": "https://queuestore.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Queuestore",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after refresh-origins with operations project access."
     },
     {
       "id": "redirect",
       "prefix": "/redirect",
       "service": "operations-redirect",
       "project": "stawi-operations",
-      "origin": "https://redirect.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Redirect",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after refresh-origins with operations project access."
     },
     {
       "id": "thesa",
       "prefix": "/thesa",
       "service": "operations-thesa",
       "project": "stawi-operations",
-      "origin": "https://thesa.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Thesa",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after refresh-origins with operations project access."
     },
     {
       "id": "trustage",
       "prefix": "/trustage",
       "service": "operations-trustage",
       "project": "stawi-operations",
-      "origin": "https://trustage.stawi.org",
+      "origin": "",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Trustage",
         "openapi_path": "/openapi.yaml"
-      }
+      },
+      "notes": "Enable after refresh-origins with operations project access."
     }
   ]
 }

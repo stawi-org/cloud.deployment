@@ -2,20 +2,13 @@
 #
 # europe-west9 does NOT support classic Cloud Run domain mappings.
 #
-# Front-door patterns (cost order):
+# Product APIs: only api.stawi.org/<path> (Cloudflare Worker path proxy).
+# There are NO product per-service hosts (no profile.stawi.org, devices.*, …).
 #
-# 1) Cloudflare path proxy (DEFAULT — low cost)
-#    edge/cloudflare-api-gateway → api.stawi.org/<path> → Cloud Run
-#    Free Workers tier / ~$5 paid; no GCP Global LB.
+# Host exceptions (login / OIDC / Keto control plane only):
+#   accounts.stawi.org, oauth2.stawi.org, oauth2-w, authz, authz-w
 #
-# 2) Optional GCP path LB (premium)
-#    apps/api-gateway + modules/cloudrun-api-gateway (~$18/mo fixed)
-#
-# 3) Host-per-service LBs (exceptions + optional direct hosts)
-#    apps/edge-lb-* → accounts.stawi.org, oauth2.stawi.org, authz*, …
-#    Module: modules/cloudrun-host-lb
-#
-# DNS ≠ public: control-plane hosts can have DNS while remaining IAM-authenticated.
+# Optional GCP path LB (apps/api-gateway) exists but is not the default (cost).
 
 version: 1
 prod:
@@ -23,7 +16,7 @@ prod:
   issuer: https://stawi.org
   region: europe-west9
 
-  # Primary product API surface — Cloudflare Worker (see edge/cloudflare-api-gateway).
+  # Sole product API surface.
   api_gateway:
     implementation: cloudflare-worker
     worker: edge/cloudflare-api-gateway
@@ -48,7 +41,7 @@ prod:
       /thesa: { service: operations-thesa, project: stawi-operations }
       /trustage: { service: operations-trustage, project: stawi-operations }
 
-  # Host-based LBs — login/OIDC/control-plane + optional direct product hosts.
+  # Host LBs — exceptions only (not product APIs).
   front_doors:
     edge-lb-identity:
       gcp_project: stawi-identity
@@ -58,28 +51,16 @@ prod:
         oauth2-w.stawi.org: identity-oauth2-hydra-admin
         authz.stawi.org: identity-authorization-keto-read
         authz-w.stawi.org: identity-authorization-keto-write
-        # Optional direct hosts (clients should prefer api.stawi.org/<path>)
-        profile.stawi.org: identity-profile
-        tenancy.stawi.org: identity-tenancy
-        identity.stawi.org: identity-identity
+    # Platform / operations product hosts retired — use api.stawi.org/<path>.
     edge-lb-platform:
       gcp_project: stawi-platform
-      hosts:
-        devices.stawi.org: platform-devices
-        settings.stawi.org: platform-settings
-        geolocation.stawi.org: platform-geolocation
-        files.stawi.org: platform-files
+      hosts: {}
     edge-lb-operations:
       gcp_project: stawi-operations
-      hosts:
-        audit.stawi.org: operations-audit
-        formstore.stawi.org: operations-formstore
-        queuestore.stawi.org: operations-queuestore
-        redirect.stawi.org: operations-redirect
-        thesa.stawi.org: operations-thesa
-        trustage.stawi.org: operations-trustage
+      hosts: {}
 
-  # IAM-authenticated control plane (no allUsers). Still have DNS via edge-lb-identity.
+  # IAM-authenticated control plane (no allUsers).
+  # Tenancy is exposed only as api.stawi.org/tenancy (path gateway) + Cloud Run IAM.
   authenticated:
     - identity-authorization-keto-read
     - identity-authorization-keto-write

@@ -4,14 +4,14 @@
 
 | Stack | Implementation | Project / account | Surface |
 |-------|----------------|-------------------|---------|
-| **API gateway (default)** | Cloudflare Worker `edge/cloudflare-api-gateway` | Cloudflare zone `stawi.org` | `api.stawi.org` path routes |
+| **API gateway (only product surface)** | Cloudflare Worker `edge/cloudflare-api-gateway` | Cloudflare zone `stawi.org` | `api.stawi.org` path routes → `*.run.app` |
 | API gateway (optional GCP) | OpenTofu `api-gateway` | stawi-api | same paths via Global LB (~$18/mo) |
-| Identity hosts | `edge-lb-identity` | stawi-identity | accounts, oauth2, **oauth2-w**, **authz**, **authz-w**, optional product hosts |
-| Platform hosts | `edge-lb-platform` | stawi-platform | optional direct hosts |
-| Operations hosts | `edge-lb-operations` | stawi-operations | optional direct hosts |
+| Identity exceptions | `edge-lb-identity` | stawi-identity | accounts, oauth2, **oauth2-w**, **authz**, **authz-w** only |
+| Platform host LB | `edge-lb-platform` | stawi-platform | **retired** (`hosts = {}` — destroy leftover LB) |
+| Operations host LB | `edge-lb-operations` | stawi-operations | **retired** (`hosts = {}`) |
 
-**Prefer the Cloudflare path gateway** for product clients (`https://api.stawi.org/profile/…`).
-Host LBs remain for OIDC/login/control-plane exceptions and optional direct hosts.
+**All product clients use** `https://api.stawi.org/<path>/…` (no `profile.stawi.org` / `devices.*` / …).
+Host LBs remain only for login UI, OIDC, and Keto.
 
 **DNS ≠ public.** Control-plane hosts (`oauth2-w`, `authz`, `authz-w`) are on the
 edge LB for stable names and TLS, but Cloud Run IAM still requires

@@ -3,8 +3,8 @@ output "service_uri" {
 }
 
 output "public_url" {
-  description = "Canonical DNS base (https://tenancy.stawi.org) when public_hostname is set"
-  value       = local.tenancy_public_url != "" ? local.tenancy_public_url : module.frame.service_uri
+  description = "Canonical public base (https://api.stawi.org/tenancy)"
+  value       = local.tenancy_public_url
 }
 
 output "sync_invoke_url" {

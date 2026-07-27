@@ -108,15 +108,10 @@ locals {
     !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_write[0].uri
   )
 
-  # Colony sets PERMISSIONS_REGISTRATION_URL on every runtime pod (Frame
-  # WithPermissionRegistration PreStart). Prefer tenancy edge DNS (prod) over
-  # api path alias so registration hits the authenticated control-plane host.
-  tenancy_public_host = local.is_prod ? "tenancy.stawi.org" : "tenancy.stawi.dev"
-  permissions_registration_url = (
-    local.is_prod
-    ? "https://${local.tenancy_public_host}/_internal/register/permissions"
-    : "${local.api_base}/tenancy/_internal/register/permissions"
-  )
+  # Tenancy is only on the path gateway (no tenancy.stawi.org product host).
+  # Callers still mint Google ID tokens for Cloud Run IAM (run.app audience /
+  # dual-auth); the public registration URL is the gateway path.
+  permissions_registration_url = "${local.api_base}/tenancy/_internal/register/permissions"
 
   frame_oauth_env = merge(
     {

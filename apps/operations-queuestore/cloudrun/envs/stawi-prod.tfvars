@@ -5,4 +5,4 @@ memory                   = "512Mi"
 has_database             = true
 neon_extensions          = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "btree_gist"]
 requested_audience_paths = ["/profile", "/tenancy"]
-public_hostname          = "queuestore.stawi.org"
+public_hostname = ""  # product surface: api.stawi.org/<path> only

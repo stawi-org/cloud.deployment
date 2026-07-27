@@ -65,6 +65,10 @@ function originAllowed(originUrl, config) {
   }
   if (u.protocol !== "https:") return false;
   const host = u.hostname.toLowerCase();
+  // Product APIs: Cloud Run only — never profile/devices/… hostnames.
+  if (host.endsWith(".stawi.org") && host !== "api.stawi.org") {
+    return false;
+  }
   const suffixes = config.origin_allowlist?.host_suffixes || [".a.run.app", ".run.app"];
   if (suffixes.some((s) => host.endsWith(s))) return true;
   const extra = config.origin_allowlist?.extra_hosts || [];

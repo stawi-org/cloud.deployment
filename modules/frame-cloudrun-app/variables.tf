@@ -197,7 +197,7 @@ variable "invoker_members" {
 variable "custom_audiences" {
   type        = list(string)
   default     = []
-  description = "Extra OIDC audiences for Cloud Run (e.g. https://tenancy.stawi.org) when callers mint tokens for the edge DNS hostname"
+  description = "Extra OIDC audiences for Cloud Run (e.g. service run.app URI) when callers mint invoker tokens"
 }
 
 variable "min_instance_count" {

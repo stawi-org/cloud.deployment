@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
  * Refresh origin URLs from live Cloud Run services (gcloud).
+ * Origins MUST be https://*.run.app — product *.stawi.org hosts are not used.
+ *
  * Usage:
  *   node scripts/refresh-origins.mjs
- *   GCLOUD_PROJECTS=stawi-identity,stawi-platform node scripts/refresh-origins.mjs
+ *   GCLOUD_PROJECTS=stawi-identity,stawi-platform,stawi-operations node scripts/refresh-origins.mjs
  *
- * Updates config/routes.prod.json in place when a matching service URL is found.
- * Falls back to https://{id}.stawi.org if Cloud Run is not readable.
+ * When a live URL is found for a disabled ops route, re-enables it.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,15 @@ const projects = (
 
 /** @type {Map<string, string>} service name → url */
 const urls = new Map();
+
+function isRunApp(url) {
+  try {
+    const h = new URL(url).hostname.toLowerCase();
+    return h.endsWith(".run.app");
+  } catch {
+    return false;
+  }
+}
 
 for (const project of projects) {
   try {
@@ -59,21 +69,31 @@ let changed = 0;
 for (const r of config.routes || []) {
   if (!r.service) continue;
   const live = urls.get(r.service);
-  if (live && live !== r.origin) {
-    console.log(`update ${r.id}: ${r.origin} → ${live}`);
-    r.origin = live;
+  if (live && isRunApp(live)) {
+    if (live !== r.origin) {
+      console.log(`update ${r.id}: ${r.origin || "(empty)"} → ${live}`);
+      r.origin = live;
+      changed++;
+    } else {
+      console.log(`ok ${r.id}: ${live}`);
+    }
+    // Auto-enable when we finally have a run.app origin
+    if (r.enabled === false && r.origin) {
+      console.log(`enable ${r.id}`);
+      r.enabled = true;
+      changed++;
+    }
+  } else if (r.origin && !isRunApp(r.origin)) {
+    console.warn(
+      `reject ${r.id}: origin is not *.run.app (${r.origin}) — clear and disable`,
+    );
+    r.origin = "";
+    r.enabled = false;
     changed++;
-  } else if (!live && !r.origin) {
-    const fallback = `https://${r.id}.stawi.org`;
-    console.log(`fallback ${r.id}: ${fallback}`);
-    r.origin = fallback;
-    changed++;
-  } else if (live) {
-    console.log(`ok ${r.id}: ${live}`);
-  } else {
-    console.log(`keep ${r.id}: ${r.origin} (no live URL)`);
+  } else if (!live) {
+    console.log(`keep ${r.id}: ${r.origin || "(no origin)"} (no live URL)`);
   }
 }
 
 writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
-console.log(`Wrote ${path} (${changed} origin updates)`);
+console.log(`Wrote ${path} (${changed} changes)`);

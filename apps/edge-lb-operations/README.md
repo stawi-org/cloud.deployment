@@ -1,20 +1,20 @@
-# edge-lb-operations
+# edge-lb-operations (retired product hosts)
 
-OpenTofu-owned edge for operations hostnames:
+Operations product APIs are **only** on `api.stawi.org`:
 
-- Global HTTPS LB + serverless NEGs → Cloud Run
-- Certificate Manager (Google-managed TLS)
-- Cloudflare DNS (`A` + ACME `CNAME`) via provider token
+| Path | Service |
+|------|---------|
+| `/audit` | operations-audit |
+| `/formstore` | operations-formstore |
+| `/queuestore` | operations-queuestore |
+| `/redirect` | operations-redirect |
+| `/thesa` | operations-thesa |
+| `/trustage` | operations-trustage |
 
-Classic Cloud Run domain mapping is **not** available in `europe-west9`.
+See [`edge/cloudflare-api-gateway`](../../edge/cloudflare-api-gateway).
 
-| Host | Backend Cloud Run |
-|------|-------------------|
-| audit.stawi.org | operations-audit |
-| formstore.stawi.org | operations-formstore |
-| queuestore.stawi.org | operations-queuestore |
-| redirect.stawi.org | operations-redirect |
-| thesa.stawi.org | operations-thesa |
-| trustage.stawi.org | operations-trustage |
+This OpenTofu app keeps `hosts = {}` so re-apply **destroys** the old Global LB +
+product host DNS. Do not re-add product hosts here.
 
-Requires repo secret `CLOUDFLARE_API_TOKEN`. See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).
+Operations routes on the Worker need `*.run.app` origins — run
+`npm run refresh-origins` with access to `stawi-operations`, then enable routes.

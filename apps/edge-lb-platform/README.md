@@ -1,16 +1,15 @@
-# edge-lb-platform
+# edge-lb-platform (retired product hosts)
 
-OpenTofu-owned public edge for platform hostnames:
+Platform product APIs are **only** on `api.stawi.org`:
 
-- Global HTTPS LB + serverless NEGs → Cloud Run
-- Certificate Manager (Google-managed TLS)
-- Cloudflare DNS (`A` + ACME `CNAME`) via provider token
+| Path | Service |
+|------|---------|
+| `/devices` | platform-devices |
+| `/settings` | platform-settings |
+| `/geolocation` | platform-geolocation |
+| `/files` | platform-files |
 
-| Host | Backend Cloud Run |
-|------|-------------------|
-| devices.stawi.org | platform-devices |
-| settings.stawi.org | platform-settings |
-| geolocation.stawi.org | platform-geolocation |
-| files.stawi.org | platform-files |
+See [`edge/cloudflare-api-gateway`](../../edge/cloudflare-api-gateway).
 
-Requires repo secret `CLOUDFLARE_API_TOKEN`. See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).
+This OpenTofu app keeps `hosts = {}` so re-apply **destroys** the old Global LB +
+`devices.stawi.org` / … DNS (saves ~$18/mo). Do not re-add product hosts here.

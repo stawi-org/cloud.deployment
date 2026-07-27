@@ -11,9 +11,11 @@ and IAM reachability**, not Secret Manager placement.
 
 | Front door | Implementation | Hostname(s) | Routing | Cost |
 |------------|----------------|-------------|---------|------|
-| **API gateway** (default for product APIs) | [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) Worker | `api.stawi.org` | Path prefix → Cloud Run | Free / ~$5 Workers |
+| **API gateway** (only product surface) | [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) Worker | `api.stawi.org` | Path prefix → Cloud Run `*.run.app` | Free / ~$5 Workers |
 | **Optional GCP path LB** | `apps/api-gateway` | `api.stawi.org` | Same paths via Global LB | ~$18/mo — not default |
-| **Host edge LBs** | `edge-lb-*` | `accounts.*`, `oauth2.*`, `authz*`, optional `profile.*`… | One host rule per service | ~$18/mo each |
+| **Host edge LBs (exceptions only)** | `edge-lb-identity` | `accounts.*`, `oauth2.*`, `oauth2-w`, `authz*` | Login / OIDC / Keto | ~$18/mo one stack |
+
+There are **no** product hosts (`profile.stawi.org`, `devices.stawi.org`, …).
 
 Path convention matches the K8s Gateway HTTPRoutes: clients call
 `https://api.stawi.org/profile/…`; the gateway **strips** `/profile` before the
@@ -93,7 +95,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Hydra admin (`serve admin`) |
 | `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Keto read API |
 | `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Keto write API |
-| `profile.stawi.org` … | product services | (varies) | Optional direct host; prefer path gateway |
+| *(removed)* | product services | — | Use `api.stawi.org/<path>` only |
 
 Registry: [`config/public-edge.yaml`](../config/public-edge.yaml).
 
@@ -196,8 +198,8 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 | Surface | Exposure | Protection |
 |---------|----------|------------|
-| `tenancy.stawi.org` (all routes) | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token; app OAuth/Keto still enforced in-process |
-| `/_internal/sync/clients` | Same service | Hourly Scheduler OIDC as `identity-tenancy@…` (audience = `https://tenancy.stawi.org`) |
+| `api.stawi.org/tenancy` | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token (audience = service `*.run.app`); app OAuth/Keto in-process |
+| `/_internal/sync/clients` | Same service via path gateway or direct CR | Scheduler OIDC as `identity-tenancy@…` (audience = Cloud Run service URI) |
 
 Invokers: identity Frame runtimes + ops/platform runtime SAs (`additional_invoker_members` in tfvars), same pattern as Keto.
 

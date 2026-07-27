@@ -88,7 +88,7 @@ curl -sS https://api.stawi.org/payment/openapi.yaml | head
 | Rule | Why |
 |------|-----|
 | `prefix` starts with `/`, not bare `/` | Prevents catch-all open routing |
-| `origin` must be `https` and allowlisted (`*.run.app` or known `*.stawi.org` hosts) | Blocks open-proxy footguns |
+| `origin` must be `https://*.run.app` only | No product `*.stawi.org` hosts — path gateway only |
 | Longest prefix wins | Safe nested paths later |
 | `strip_prefix: true` (default) | Service keeps handlers at `/` (Connect: `/profile.v1…`) |
 | `docs.openapi_path` on the service root | After strip, gateway fetches that path from Cloud Run |

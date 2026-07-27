@@ -17,8 +17,8 @@ if (!config.hostname || !config.hostname.includes(".")) {
   errors.push("hostname required");
 }
 
-const suffixes = config.origin_allowlist?.host_suffixes || [];
-const extra = new Set((config.origin_allowlist?.extra_hosts || []).map((h) => h.toLowerCase()));
+const suffixes = config.origin_allowlist?.host_suffixes || [".a.run.app", ".run.app"];
+const extra = (config.origin_allowlist?.extra_hosts || []).map((h) => h.toLowerCase());
 
 function originOk(origin) {
   let u;
@@ -29,8 +29,18 @@ function originOk(origin) {
   }
   if (u.protocol !== "https:") return false;
   const host = u.hostname.toLowerCase();
+  // Product APIs: Cloud Run only — never product *.stawi.org hosts.
+  if (host.endsWith(".stawi.org") && host !== "api.stawi.org") {
+    return false;
+  }
   if (suffixes.some((s) => host.endsWith(s))) return true;
-  return extra.has(host);
+  return extra.includes(host);
+}
+
+if (extra.length) {
+  warnings.push(
+    `origin_allowlist.extra_hosts is non-empty (${extra.join(", ")}); product hosts should not be used — prefer *.run.app only`,
+  );
 }
 
 const prefixes = new Map();

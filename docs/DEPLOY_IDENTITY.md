@@ -79,9 +79,9 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 |------|---------|
 | `accounts.stawi.org` | `identity-authentication` |
 | `oauth2.stawi.org` | `identity-oauth2-hydra` |
-| `profile.stawi.org` | `identity-profile` |
-| `tenancy.stawi.org` | `identity-tenancy` |
-| `identity.stawi.org` | `identity-identity` |
+| `api.stawi.org/profile` | `identity-profile` (path gateway) |
+| `api.stawi.org/tenancy` | `identity-tenancy` (path gateway; IAM) |
+| `api.stawi.org/identity` | `identity-identity` (path gateway) |
 
 Product APIs under **`api.stawi.org/<path>`** → **`api-gateway`** (path LB in stawi-api).
 
