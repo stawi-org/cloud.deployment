@@ -115,8 +115,11 @@ sync_one "$P" "identity-authentication-cookie-hash-key" identity service-authent
 sync_one "$P" "identity-authentication-cookie-block-key" identity service-authentication-secrets secure-cookie-block-key
 # Prefer plain psk (not bearer-psk) for consumers that add Bearer themselves.
 sync_one "$P" "hydra-webhook-psk" identity hydra-webhook-psk psk
-sync_one "$P" "identity-oauth2-hydra-secrets-system" identity service-authentication-oauth2-hydra secretsSystem
-sync_one "$P" "identity-oauth2-hydra-secrets-cookie" identity service-authentication-oauth2-hydra secretsCookie
+# DO NOT sync identity-oauth2-hydra-secrets-system / secrets-cookie from k8s.
+# Hydra encrypts JWKs in Neon with SECRETS_SYSTEM (AEAD). Overwriting that secret
+# with a different cluster value causes: cipher: message authentication failed
+# on /admin/keys/hydra.openid.id-token and breaks private_key_jwt login.
+# Those secrets are owned by OpenTofu (apps/identity-oauth2-hydra generated_secrets.tf).
 sync_one "$P" "identity-profile-dek-aes-key" identity service-profile-dek aes-key
 sync_one "$P" "identity-profile-dek-hmac-key" identity service-profile-dek hmac-key
 sync_one "$P" "identity-profile-dek-key-id" identity service-profile-dek key-id
