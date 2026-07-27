@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Worker path proxy for api.stawi.org only. accounts/oauth2 use Google LB (edge-lb-identity). Origins always *.run.app. See docs/SSL_EDGE_POLICY.md.",
+  "description": "Worker path proxy for api.stawi.org only. accounts/oauth2: CF orange CNAME → *.run.app (no Worker, no Google LB). See docs/SSL_EDGE_POLICY.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
@@ -24,6 +24,20 @@
     "extra_hosts": []
   },
   "host_routes": [],
+  "direct_cnames": [
+    {
+      "id": "accounts",
+      "hostname": "accounts.stawi.org",
+      "origin": "https://identity-authentication-akpnezytka-od.a.run.app",
+      "notes": "CF orange CNAME → Cloud Run. Origin Host rewrite to run.app (ensure-cf-origin-rules)."
+    },
+    {
+      "id": "oauth2",
+      "hostname": "oauth2.stawi.org",
+      "origin": "https://identity-oauth2-hydra-akpnezytka-od.a.run.app",
+      "notes": "CF orange CNAME → Cloud Run. Origin Host rewrite to run.app (ensure-cf-origin-rules)."
+    }
+  ],
   "routes": [
     {
       "id": "profile",

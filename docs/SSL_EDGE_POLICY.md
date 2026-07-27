@@ -8,8 +8,8 @@
 | Hostname / surface | Client TLS | Edge | Origin | Cloudflare proxy |
 |--------------------|------------|------|--------|------------------|
 | **`api.stawi.org`** (product APIs + Scalar) | Cloudflare Universal SSL | **Worker path proxy only** | Cloud Run `*.run.app` | **Orange** |
-| **`accounts.stawi.org`** (login UI) | Google Certificate Manager | Global HTTPS LB + NEG | `identity-authentication` | **Grey** |
-| **`oauth2.stawi.org`** (OIDC public) | Google Certificate Manager | Global HTTPS LB + NEG | `identity-oauth2-hydra` | **Grey** |
+| **`accounts.stawi.org`** (login UI) | Cloudflare Universal SSL | **DNS CNAME → run.app** (no Worker, no Google LB) | `identity-authentication` | **Orange** |
+| **`oauth2.stawi.org`** (OIDC public) | Cloudflare Universal SSL | **DNS CNAME → run.app** (no Worker, no Google LB) | `identity-oauth2-hydra` | **Orange** |
 | **`oauth2-w.stawi.org`** (Hydra admin) | Google Certificate Manager | Global HTTPS LB + NEG | Cloud Run (IAM) | **Grey** |
 | **`authz.stawi.org` / `authz-w`** (Keto) | Google Certificate Manager | Global HTTPS LB + NEG | Cloud Run (IAM) | **Grey** |
 
@@ -17,101 +17,53 @@ There are **no** product hosts (`profile.stawi.org`, `devices.*`, …).
 
 ## Why this split
 
-### Cloudflare Worker (orange) — **api.stawi.org only**
+### Cloudflare Worker — **api.stawi.org only**
 
-- Path routing + Scalar multi-API hub without a second GCP Global LB  
-- Does **not** front `oauth2` / `accounts` (those stay on Google TLS end-to-end)  
-- Origin is always HTTPS `*.run.app` with Google-managed certs  
+- Path routing + Scalar multi-API hub  
+- Does **not** front `oauth2` / `accounts`  
 
-**Zone SSL/TLS mode must be Full (strict)** — never Flexible.
+### Cloudflare DNS CNAME (orange) — login + OIDC public
 
-### Google Certificate Manager (grey) — OIDC, login, control plane
+- `accounts` / `oauth2` are **CNAME** to the Cloud Run `*.run.app` hostname  
+- TLS for the public name terminates at Cloudflare (**Full (strict)**)  
+- **Origin Rule** rewrites `Host` (and origin host) to the `*.run.app` name Cloud Run expects  
+  (domain mapping is 501 in this region; without Host rewrite, Cloud Run rejects the custom Host)  
+- Managed by `edge/cloudflare-api-gateway/scripts/ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`  
 
-- Client TLS terminates on Google GFEs only (no Cloudflare MITM)  
-- `accounts` + `oauth2` public apps (`allUsers` invoker)  
+### Google Certificate Manager (grey) — control plane only
+
 - `oauth2-w` + `authz*` remain IAM-authenticated  
-- OpenTofu owns A + `_acme-challenge` CNAMEs via `edge-lb-identity`  
-- Keep **proxied = false** on these DNS records  
+- OpenTofu `edge-lb-identity` owns A + ACME CNAMEs  
+- **proxied = false**  
 
 ## Implementation map
 
 | Component | Role |
 |-----------|------|
-| [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) | Worker: **`api.stawi.org` only** — path routes + Scalar |
-| [`apps/edge-lb-identity`](../apps/edge-lb-identity) | Google LB + Cert Manager for **accounts, oauth2, oauth2-w, authz, authz-w** |
-| [`apps/edge-lb-platform`](../apps/edge-lb-platform) / [`operations`](../apps/edge-lb-operations) | **Retired** (`hosts = {}`) |
-| [`config/public-edge.yaml`](../config/public-edge.yaml) | Registry of this policy |
+| [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) | Worker **api only** + DNS ensure for api + direct CNAMEs + origin Host rules |
+| [`apps/edge-lb-identity`](../apps/edge-lb-identity) | Google LB for **oauth2-w, authz, authz-w only** |
+| [`config/public-edge.yaml`](../config/public-edge.yaml) | Registry |
 
-## Operator cutover order
-
-1. **Expand** `CLOUDFLARE_API_TOKEN` (Workers Scripts:Edit + Workers Routes:Edit + DNS Edit).  
-2. **Deploy Worker** (api only): `gh workflow run edge-api-gateway.yml`  
-3. Confirm orange-cloud DNS for **`api` only**.  
-4. **Apply** `edge-lb-identity` (accounts + oauth2 + control plane, grey).  
-5. Confirm grey A records for `accounts`, `oauth2`, `oauth2-w`, `authz*`.  
-6. Cloudflare dashboard → SSL/TLS → **Full (strict)** for zone `stawi.org`.  
-7. Smoke:
+## Operator cutover
 
 ```bash
-curl -sS https://api.stawi.org/_gateway/health
-curl -sSI https://api.stawi.org/docs
-curl -sSI https://accounts.stawi.org/readyz
-curl -sSI https://oauth2.stawi.org/health/ready
-# Control plane — expect 403 without Google identity token
-curl -sSI https://oauth2-w.stawi.org/health/ready
-curl -sSI https://authz.stawi.org/health/ready
+gh workflow run edge-api-gateway.yml
+gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 ```
 
-## Security checklist
+Smoke:
 
-- [ ] Zone SSL mode **Full (strict)**  
-- [ ] No Flexible SSL  
-- [ ] Worker routes **only** `api.stawi.org/*`  
-- [ ] `accounts` / `oauth2` / control-plane hosts **grey-cloud** only  
-- [ ] Product origins only `https://*.run.app` (validated in Worker + `npm run validate`)  
-- [ ] ACME / traffic DNS for Google LB owned by OpenTofu (no hand edits)  
-- [ ] Tokens: Workers scopes for gateway deploy; DNS Edit for edge-lb ACME  
+```bash
+# Worker
+curl -sS https://api.stawi.org/_gateway/health
+# Must NOT include x-stawi-gateway
+curl -sSI https://accounts.stawi.org/readyz
+curl -sSI https://oauth2.stawi.org/health/ready
+# Control plane grey — 403 without Google identity token
+curl -sSI https://oauth2-w.stawi.org/health/ready
+```
 
-## Server-side (Cloud Run → APIs)
+## Notes
 
-Apps call **stable public hostnames**, not `*.run.app` (run.app is edge origin only).
-
-### Product APIs — path gateway
-
-| Env | Value |
-|-----|--------|
-| `PROFILE_SERVICE_URI` | `https://api.stawi.org/profile` |
-| `TENANCY_SERVICE_URI` | `https://api.stawi.org/tenancy` |
-| `DEVICE_SERVICE_URI` | `https://api.stawi.org/devices` |
-| `FILES_SERVICE_URI` | `https://api.stawi.org/files` |
-| `PERMISSIONS_REGISTRATION_URL` | `https://api.stawi.org/tenancy/_internal/register/permissions` |
-| `OAUTH2_RESOURCE_AUDIENCE` / requested audiences | `https://api.stawi.org/<path>` |
-
-### Hydra / Keto — dedicated hosts
-
-| Env | Value |
-|-----|--------|
-| `OAUTH2_SERVICE_URI` / Hydra public internal | `https://oauth2.stawi.org` |
-| `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
-| `OAUTH2_CLIENT_ASSERTION_AUDIENCE` | `https://oauth2.stawi.org/oauth2/token` |
-| `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
-| `AUTHORIZATION_SERVICE_WRITE_URI` / `KETO_SERVICE_ADMIN_URI` | `https://authz-w.stawi.org` |
-
-Wired in `modules/frame-cloudrun-app`.
-
-**Do not** use retired product hosts (`profile.stawi.org`, …) or app-level
-`*.run.app` URLs for product HTTP.
-
-## Cost
-
-| Piece | Approx. |
-|-------|---------|
-| Cloudflare Universal SSL + Worker (free tier / ~$5 paid) | `api.stawi.org` path hub only |
-| One Global LB (`edge-lb-identity`) | ~$18/mo (accounts + oauth2 + control plane) |
-| Retired platform/ops host LBs | $0 after destroy |
-
-## Out of scope
-
-- Cloud Run domain mapping (unavailable in region)  
-- Hand-managed Let’s Encrypt on VMs  
-- Orange-cloud on Keto / Hydra admin / accounts / oauth2  
+- **Origin Host rewrite** may require a Cloudflare plan that includes Origin Rule *Host header* override. If `ensure-cf-origin-rules.mjs` fails, expand the API token / plan (see CF Origin Rules docs) — do not put accounts/oauth2 back on the api Worker or Google LB unless product decides otherwise.  
+- Zone SSL mode: **Full (strict)**.  

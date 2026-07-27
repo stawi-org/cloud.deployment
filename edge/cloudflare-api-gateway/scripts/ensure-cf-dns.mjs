@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Ensure Cloudflare DNS exists for Worker hostnames (orange / proxied).
- * Worker routes only fire when a zone DNS record exists.
+ * Cloudflare DNS for the public edge (no Google LB for accounts/oauth2).
  *
- * Creates/updates A records → 192.0.2.1 (TEST-NET, never reached; CF terminates
- * at the Worker). SSL: zone must be Full (strict).
+ * - api.stawi.org: proxied A → 192.0.2.1 (Worker terminates; dummy origin)
+ * - direct_cnames (accounts, oauth2): proxied CNAME → Cloud Run *.run.app host
+ *   (TLS at Cloudflare; origin is run.app — pair with ensure-cf-origin-rules.mjs
+ *   so Host header is the run.app hostname Cloud Run expects)
  *
  * Env:
  *   CLOUDFLARE_API_TOKEN  (required)
@@ -17,6 +18,7 @@ import { dirname, join } from "node:path";
 const ZONE = process.env.CLOUDFLARE_ZONE_ID || "706bf604a333d866bb38c03bf643e79a";
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const DUMMY_A = "192.0.2.1"; // RFC 5737 — Worker handles request before origin
+const ZONE_SUFFIX = ".stawi.org";
 
 if (!TOKEN) {
   console.error("CLOUDFLARE_API_TOKEN required");
@@ -26,12 +28,14 @@ if (!TOKEN) {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(readFileSync(join(root, "config/routes.prod.json"), "utf8"));
 
-const names = new Set([config.hostname, ...(config.host_routes || []).map((h) => h.hostname)]);
-// short labels under zone
-const shorts = [...names].map((fqdn) => {
+function shortName(fqdn) {
   const f = String(fqdn).toLowerCase().replace(/\.$/, "");
-  return f.endsWith(".stawi.org") ? f.slice(0, -".stawi.org".length) : f;
-});
+  return f.endsWith(ZONE_SUFFIX) ? f.slice(0, -ZONE_SUFFIX.length) : f;
+}
+
+function originHost(originUrl) {
+  return new URL(originUrl).hostname;
+}
 
 async function cf(path, opts = {}) {
   const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
@@ -50,16 +54,22 @@ async function cf(path, opts = {}) {
   return body.result;
 }
 
-for (const name of shorts) {
+async function listTrafficRecords(fqdn) {
   const list = await cf(
-    `/zones/${ZONE}/dns_records?name=${encodeURIComponent(name + ".stawi.org")}&per_page=50`,
+    `/zones/${ZONE}/dns_records?name=${encodeURIComponent(fqdn)}&per_page=50`,
   );
-  const existing = (list || []).filter((r) =>
+  return (list || []).filter((r) =>
     ["A", "AAAA", "CNAME"].includes(String(r.type).toUpperCase()),
   );
+}
+
+async function ensureWorkerA(name) {
+  const fqdn = `${name}${ZONE_SUFFIX}`;
+  const existing = await listTrafficRecords(fqdn);
+  const comment = "stawi Worker edge api.stawi.org only (docs/SSL_EDGE_POLICY.md)";
 
   if (existing.length === 0) {
-    console.log(`create A ${name}.stawi.org → ${DUMMY_A} (proxied)`);
+    console.log(`create A ${fqdn} → ${DUMMY_A} (proxied, Worker)`);
     await cf(`/zones/${ZONE}/dns_records`, {
       method: "POST",
       body: JSON.stringify({
@@ -68,61 +78,104 @@ for (const name of shorts) {
         content: DUMMY_A,
         proxied: true,
         ttl: 1,
-        comment: "stawi-api-gateway Worker public edge (docs/SSL_EDGE_POLICY.md)",
+        comment,
       }),
     });
-    continue;
+    return;
   }
 
-  // Prefer a single A record, proxied
   const primary = existing.find((r) => r.type === "A") || existing[0];
   if (primary.type === "A" && primary.proxied && primary.content === DUMMY_A) {
-    console.log(`ok ${name}.stawi.org (proxied A ${DUMMY_A})`);
-    continue;
+    console.log(`ok ${fqdn} (proxied Worker A)`);
+    return;
   }
 
-  // If already proxied to Cloudflare anycast (previous setup), leave it —
-  // Worker routes still attach.
-  if (primary.proxied) {
-    console.log(
-      `ok ${name}.stawi.org (existing proxied ${primary.type} ${primary.content})`,
-    );
-    continue;
+  // Replace any grey LB / CNAME with Worker dummy A
+  for (const r of existing) {
+    if (r.id !== primary.id) {
+      await cf(`/zones/${ZONE}/dns_records/${r.id}`, { method: "DELETE" });
+    }
   }
-
-  // Grey A pointing at Google LB — flip to orange + dummy so Worker owns TLS.
-  if (primary.type === "A") {
-    console.log(
-      `update ${name}.stawi.org ${primary.content} → ${DUMMY_A} proxied=true`,
-    );
-    await cf(`/zones/${ZONE}/dns_records/${primary.id}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        type: "A",
-        name,
-        content: DUMMY_A,
-        proxied: true,
-        ttl: 1,
-        comment: "stawi-api-gateway Worker public edge (docs/SSL_EDGE_POLICY.md)",
-      }),
-    });
-    continue;
-  }
-
-  // CNAME grey → replace with proxied A
-  console.log(`replace ${name}.stawi.org ${primary.type} with proxied A`);
-  await cf(`/zones/${ZONE}/dns_records/${primary.id}`, { method: "DELETE" });
-  await cf(`/zones/${ZONE}/dns_records`, {
-    method: "POST",
+  console.log(`upsert A ${fqdn} → ${DUMMY_A} proxied (was ${primary.type} ${primary.content})`);
+  await cf(`/zones/${ZONE}/dns_records/${primary.id}`, {
+    method: "PUT",
     body: JSON.stringify({
       type: "A",
       name,
       content: DUMMY_A,
       proxied: true,
       ttl: 1,
-      comment: "stawi-api-gateway Worker public edge (docs/SSL_EDGE_POLICY.md)",
+      comment,
     }),
   });
 }
+
+async function ensureDirectCname(hostname, origin) {
+  const name = shortName(hostname);
+  const fqdn = `${name}${ZONE_SUFFIX}`;
+  const target = originHost(origin);
+  const comment = "stawi direct CNAME → Cloud Run (no Worker, no Google LB)";
+
+  const existing = await listTrafficRecords(fqdn);
+
+  if (existing.length === 0) {
+    console.log(`create CNAME ${fqdn} → ${target} (proxied)`);
+    await cf(`/zones/${ZONE}/dns_records`, {
+      method: "POST",
+      body: JSON.stringify({
+        type: "CNAME",
+        name,
+        content: target,
+        proxied: true,
+        ttl: 1,
+        comment,
+      }),
+    });
+    return;
+  }
+
+  // Prefer one CNAME to run.app
+  const primary = existing.find((r) => r.type === "CNAME") || existing[0];
+  if (
+    primary.type === "CNAME" &&
+    primary.proxied &&
+    String(primary.content).replace(/\.$/, "") === target
+  ) {
+    console.log(`ok ${fqdn} (proxied CNAME → ${target})`);
+    return;
+  }
+
+  for (const r of existing) {
+    if (r.id !== primary.id) {
+      await cf(`/zones/${ZONE}/dns_records/${r.id}`, { method: "DELETE" });
+    }
+  }
+  console.log(
+    `upsert CNAME ${fqdn} → ${target} proxied (was ${primary.type} ${primary.content})`,
+  );
+  await cf(`/zones/${ZONE}/dns_records/${primary.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      type: "CNAME",
+      name,
+      content: target,
+      proxied: true,
+      ttl: 1,
+      comment,
+    }),
+  });
+}
+
+// --- api Worker host ---
+await ensureWorkerA(shortName(config.hostname || "api.stawi.org"));
+
+// --- direct CNAME hosts (accounts, oauth2) ---
+for (const h of config.direct_cnames || []) {
+  if (!h?.hostname || !h?.origin) continue;
+  await ensureDirectCname(h.hostname, h.origin);
+}
+
+// Do not leave Worker dummy A for direct_cname hostnames if they still exist
+// under host_routes (legacy) — already handled by CNAME upsert.
 
 console.log("DNS ensure complete.");

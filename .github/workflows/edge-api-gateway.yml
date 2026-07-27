@@ -69,13 +69,28 @@ jobs:
             exit 1
           fi
           npx wrangler deploy
-          # Orange-cloud DNS for api/accounts/oauth2 so Worker routes receive traffic
+          # api → Worker dummy A; accounts/oauth2 → CNAME to *.run.app (no LB)
           node scripts/ensure-cf-dns.mjs
+          # Host header rewrite so Cloud Run accepts CNAME custom hostnames
+          node scripts/ensure-cf-origin-rules.mjs
 
-      - name: Smoke api.stawi.org
+      - name: Smoke api.stawi.org + direct hosts
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
         run: |
           set -euo pipefail
-          # Allow route + DNS propagation
-          sleep 8
+          # Allow route + DNS + origin-rule propagation
+          sleep 12
           GATEWAY_BASE=https://api.stawi.org npm run smoke
+          echo "---- direct CNAME hosts (not Worker) ----"
+          for u in \
+            https://accounts.stawi.org/readyz \
+            https://oauth2.stawi.org/health/ready; do
+            code=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 25 "$u" || echo ERR)
+            gw=$(curl -sS -D- -o /dev/null --max-time 15 "$u" 2>/dev/null | grep -i x-stawi-gateway || true)
+            if [[ -n "$gw" ]]; then
+              echo "::error::$u still hit Worker ($gw)"
+              exit 1
+            fi
+            echo "$code $u"
+            [[ "$code" == "200" ]] || { echo "::error::expected 200 from $u"; exit 1; }
+          done

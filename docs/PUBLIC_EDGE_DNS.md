@@ -7,8 +7,8 @@
 | Surface | Implementation | SSL | Hosts |
 |---------|----------------|-----|-------|
 | Product + docs | Cloudflare Worker | CF Universal (orange) | **`api.stawi.org` only** |
-| Login UI | `edge-lb-identity` | Google Cert Manager (grey) | `accounts.stawi.org` |
-| OIDC public | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2.stawi.org` |
+| Login UI | CF DNS CNAME → `*.run.app` | CF Universal (orange) | `accounts.stawi.org` |
+| OIDC public | CF DNS CNAME → `*.run.app` | CF Universal (orange) | `oauth2.stawi.org` |
 | Control plane | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2-w`, `authz`, `authz-w` |
 | Platform/ops host LBs | retired | — | `hosts = {}` |
 
@@ -51,10 +51,10 @@ CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` and `api-gateway`
 ## Apply (after secret is set)
 
 ```bash
-# Product path gateway (api.stawi.org only)
+# Product path gateway (api) + direct CNAME DNS for accounts/oauth2
 gh workflow run edge-api-gateway.yml
 
-# accounts + oauth2 + control plane (grey Google LB)
+# Control plane grey LB only (oauth2-w, authz*)
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 
 # Destroy retired product host LBs
@@ -99,12 +99,17 @@ No per-service product hosts (`profile.stawi.org`, `devices.*`, …). Paths:
 Full route table: `edge/cloudflare-api-gateway/config/routes.prod.json` and
 `config/public-edge.yaml`.
 
-### Browser + control plane (`edge-lb-identity`, grey-cloud Google LB)
+### Login + OIDC (CF CNAME → Cloud Run, not Worker / not Google LB)
 
 | Hostname | Service | Exposure |
 |----------|---------|----------|
-| accounts.stawi.org | identity-authentication | public (login UI) |
-| oauth2.stawi.org | identity-oauth2-hydra | public (OIDC) |
+| accounts.stawi.org | identity-authentication | public |
+| oauth2.stawi.org | identity-oauth2-hydra | public |
+
+### Control plane (`edge-lb-identity`, grey-cloud Google LB)
+
+| Hostname | Service | Exposure |
+|----------|---------|----------|
 | oauth2-w.stawi.org | identity-oauth2-hydra-admin | **authenticated** |
 | authz.stawi.org | identity-authorization-keto-read | **authenticated** |
 | authz-w.stawi.org | identity-authorization-keto-write | **authenticated** |

@@ -102,11 +102,19 @@ describe("routing semantics", () => {
   });
 });
 
-describe("host_routes", () => {
-  it("is empty — Worker is api.stawi.org only (accounts/oauth2 on edge-lb-identity)", () => {
+describe("host_routes + direct_cnames", () => {
+  it("Worker is api-only; accounts/oauth2 are direct CNAMEs to run.app", () => {
     const hosts = config.host_routes || [];
     assert.equal(hosts.length, 0);
     assert.equal(config.hostname, "api.stawi.org");
+    const directs = config.direct_cnames || [];
+    const byId = Object.fromEntries(directs.map((h) => [h.id, h]));
+    assert.ok(byId.accounts);
+    assert.ok(byId.oauth2);
+    assert.equal(byId.accounts.hostname, "accounts.stawi.org");
+    assert.equal(byId.oauth2.hostname, "oauth2.stawi.org");
+    assert.match(byId.accounts.origin, /\.run\.app$/);
+    assert.match(byId.oauth2.origin, /\.run\.app$/);
   });
 });
 

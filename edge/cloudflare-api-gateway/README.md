@@ -1,15 +1,16 @@
 # Cloudflare public edge (`stawi-api-gateway`)
 
 Implements [docs/SSL_EDGE_POLICY.md](../../docs/SSL_EDGE_POLICY.md): **Cloudflare Universal SSL**
-for **`api.stawi.org` only**; origins are always Cloud Run `*.run.app`.
+for **`api.stawi.org` only** (Worker). Origins are always Cloud Run `*.run.app`.
 
 ```
 https://api.stawi.org/            →  Scalar hub
 https://api.stawi.org/profile/…   →  path proxy → identity-profile
 ```
 
-`accounts.stawi.org` and `oauth2.stawi.org` are **not** on this Worker — they use
-Google LB + Cert Manager via `apps/edge-lb-identity` (grey DNS).
+`accounts.stawi.org` / `oauth2.stawi.org` are **not** on this Worker and **not** on
+the Google LB. Deploy also ensures orange **CNAME → `*.run.app`** plus Origin Rule
+Host rewrite (`scripts/ensure-cf-dns.mjs`, `ensure-cf-origin-rules.mjs`).
 
 ## Scalar hub
 
