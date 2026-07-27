@@ -30,11 +30,12 @@ module "frame" {
   resource_path            = "/devices"
   requested_audience_paths = ["/profile", "/tenancy"]
 
-  # Optional Cloudflare TURN credentials (seed via secret catalog / TF vars).
-  extra_secret_ids = toset(concat(
-    var.cloudflare_turn_token_id != "" ? ["${var.app_name}-cloudflare-turn-token-id"] : [],
-    var.cloudflare_turn_api_token != "" ? ["${var.app_name}-cloudflare-turn-api-token"] : [],
-  ))
+  # Cloudflare TURN secrets always declared; values from Vault/k8s via
+  # scripts/sync-cluster-secrets-to-gcp.sh (not git). Optional TF_VAR bootstrap.
+  extra_secret_ids = toset([
+    "${var.app_name}-cloudflare-turn-token-id",
+    "${var.app_name}-cloudflare-turn-api-token",
+  ])
   extra_secret_values = merge(
     var.cloudflare_turn_token_id != "" ? {
       "${var.app_name}-cloudflare-turn-token-id" = var.cloudflare_turn_token_id
@@ -43,14 +44,10 @@ module "frame" {
       "${var.app_name}-cloudflare-turn-api-token" = var.cloudflare_turn_api_token
     } : {},
   )
-  secret_env_extra = merge(
-    var.cloudflare_turn_token_id != "" ? {
-      CLOUDFLARE_TURN_TOKEN_ID = { secret = "${var.app_name}-cloudflare-turn-token-id" }
-    } : {},
-    var.cloudflare_turn_api_token != "" ? {
-      CLOUDFLARE_TURN_API_TOKEN = { secret = "${var.app_name}-cloudflare-turn-api-token" }
-    } : {},
-  )
+  secret_env_extra = {
+    CLOUDFLARE_TURN_TOKEN_ID  = { secret = "${var.app_name}-cloudflare-turn-token-id" }
+    CLOUDFLARE_TURN_API_TOKEN = { secret = "${var.app_name}-cloudflare-turn-api-token" }
+  }
 
   app_env = {
     TURN_PROVIDER = "cloudflare"

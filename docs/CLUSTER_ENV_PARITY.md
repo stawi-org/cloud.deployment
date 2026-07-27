@@ -47,17 +47,40 @@ Audit of Colony HelmRelease env (deployment.manifests) against
 | **operations-thesa** | ANALYTICS_BACKEND_TYPE; backend URL/token optional secrets |
 | **operations-trustage** | Full queue dual-URL map + batch/retention knobs from colony |
 
-## Operator secrets still required (not in git)
+## Operator secrets (never in git — repo stays public)
 
-Seed with `scripts/seed-gcp-secrets.sh` or CI `TF_VAR_*`:
+### Preferred: cluster → GCP Secret Manager
 
-| Secret / var | Apps |
-|--------------|------|
-| `TF_VAR_google_oauth_client_id` / `_secret` | identity-authentication (Google login) |
-| `TF_VAR_s3_endpoint` / `s3_access_key_*` | platform-files |
-| `TF_VAR_cloudflare_turn_*` | platform-devices |
-| `TF_VAR_analytics_*` | redirect, thesa |
-| `hydra-webhook-psk` | all Frame apps (signer) |
+Vault/OpenBao is the cluster source of truth via ExternalSecrets. When Vault is
+healthy, ESO materialises k8s Secrets. Sync those into GCP SM with:
+
+```bash
+# Requires kubectl (stawi context) + gcloud secretmanager.admin
+./scripts/sync-cluster-secrets-to-gcp.sh
+# Optional: ./scripts/sync-cluster-secrets-to-gcp.sh --dry-run
+```
+
+This copies Vault-originated material (Google OAuth, CSRF/cookies, DEK, TURN,
+R2/S3, hydra PSK, audit signing key, analytics, …) into project SM **without
+writing values into the repository**.
+
+Catalogs (metadata only): `config/secret-catalog/{identity,platform,operations}.yaml`
+
+### Alternatives
+
+| Method | Use when |
+|--------|----------|
+| `scripts/seed-gcp-secrets.sh --from-env-file …` | Operator has a local KEY=value file (chmod 600) |
+| `TF_VAR_*` at apply | One-off bootstrap; prefer sync script |
+| Generate random | Hydra secrets already generated in cluster / tofu |
+
+### Env parity audit (no secret values)
+
+```bash
+./scripts/audit-env-parity.sh
+```
+
+Compares Colony HelmRelease `values.env` + oauth2 chart settings to live Cloud Run.
 
 ## Intentionally not copied
 

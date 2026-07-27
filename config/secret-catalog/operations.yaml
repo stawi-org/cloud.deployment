@@ -1,0 +1,74 @@
+# Required GCP Secret Manager secrets for operations domain.
+# Prefer project stawi-operations; if unavailable, values may live on stawi-identity
+# until the operations GCP account is fully bootstrapped.
+# Values NEVER in git — scripts/sync-cluster-secrets-to-gcp.sh
+
+project_hint: stawi-operations
+gcp_account: operations
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    required: true
+  - id: service-files-encryption
+    description: Shared encryption phrase for redirect (cluster ops secret)
+    required: true
+
+apps:
+  operations-audit:
+    runtime_secrets:
+      - id: operations-audit-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: audit-signing-key
+        env: AUDIT_SIGNING_KEY
+        required: true
+        source_hints:
+          - "k8s: operations/audit-signing-key private_key"
+      - id: hydra-webhook-psk
+        shared: true
+
+  operations-redirect:
+    runtime_secrets:
+      - id: service-files-encryption
+        env: ENCRYPTION_PHRASE
+        shared: true
+      - id: operations-redirect-analytics-username
+        env: ANALYTICS_USERNAME
+        required: false
+      - id: operations-redirect-analytics-password
+        env: ANALYTICS_PASSWORD
+        required: false
+
+  operations-thesa:
+    runtime_secrets:
+      - id: operations-thesa-analytics-backend-url
+        env: ANALYTICS_BACKEND_URL
+        required: false
+      - id: operations-thesa-analytics-token
+        env: ANALYTICS_TOKEN
+        required: false
+
+  operations-formstore:
+    runtime_secrets:
+      - id: operations-formstore-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        shared: true
+
+  operations-queuestore:
+    runtime_secrets:
+      - id: operations-queuestore-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        shared: true
+
+  operations-trustage:
+    runtime_secrets:
+      - id: operations-trustage-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        shared: true

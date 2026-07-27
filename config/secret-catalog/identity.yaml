@@ -35,11 +35,19 @@ apps:
         managed_by_tofu: true
         env: DATABASE_URL
       - id: identity-authentication-google-oauth-client-id
-        env: GOOGLE_OAUTH_CLIENT_ID
+        env: AUTH_PROVIDER_GOOGLE_CLIENT_ID
         required: true
+        source_hints:
+          - "vault: stawi/identity/authentication/service-secrets google_client_id"
+          - "k8s: identity/google-oauth-credentials client-id"
+          - "scripts/sync-cluster-secrets-to-gcp.sh"
       - id: identity-authentication-google-oauth-client-secret
-        env: GOOGLE_OAUTH_CLIENT_SECRET
+        env: AUTH_PROVIDER_GOOGLE_SECRET
         required: true
+        source_hints:
+          - "vault: stawi/identity/authentication/service-secrets google_secret"
+          - "k8s: identity/google-oauth-credentials client-secret"
+          - "scripts/sync-cluster-secrets-to-gcp.sh"
       - id: identity-authentication-csrf-secret
         env: CSRF_SECRET
         required: true

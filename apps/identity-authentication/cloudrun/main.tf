@@ -48,15 +48,18 @@ module "frame" {
   liveness_probe_path = "/healthz"
 
   # Literal ids only (never keys() of sensitive maps — OpenTofu for_each panic).
+  # Google OAuth secret IDs always exist; values seeded out-of-band (Vault/k8s → SM)
+  # so the public git repo never holds credentials.
   extra_secret_ids = toset(concat(
     [
       "identity-authentication-csrf-secret",
       "identity-authentication-cookie-hash-key",
       "identity-authentication-cookie-block-key",
+      "identity-authentication-google-oauth-client-id",
+      "identity-authentication-google-oauth-client-secret",
     ],
-    var.google_oauth_client_id != "" ? ["identity-authentication-google-oauth-client-id"] : [],
-    var.google_oauth_client_secret != "" ? ["identity-authentication-google-oauth-client-secret"] : [],
   ))
+  # Optional bootstrap from TF_VAR (CI/local); prefer scripts/sync-cluster-secrets-to-gcp.sh
   extra_secret_values = merge(
     local.generated_secret_values,
     var.google_oauth_client_id != "" ? {
@@ -66,20 +69,14 @@ module "frame" {
       "identity-authentication-google-oauth-client-secret" = var.google_oauth_client_secret
     } : {},
   )
-  secret_env_extra = merge(
-    {
-      CSRF_SECRET             = { secret = "identity-authentication-csrf-secret" }
-      SECURE_COOKIE_HASH_KEY  = { secret = "identity-authentication-cookie-hash-key" }
-      SECURE_COOKIE_BLOCK_KEY = { secret = "identity-authentication-cookie-block-key" }
-      HYDRA_WEBHOOK_API_PSK   = { secret = "hydra-webhook-psk" }
-    },
-    var.google_oauth_client_id != "" ? {
-      AUTH_PROVIDER_GOOGLE_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
-    } : {},
-    var.google_oauth_client_secret != "" ? {
-      AUTH_PROVIDER_GOOGLE_SECRET = { secret = "identity-authentication-google-oauth-client-secret" }
-    } : {},
-  )
+  secret_env_extra = {
+    CSRF_SECRET                    = { secret = "identity-authentication-csrf-secret" }
+    SECURE_COOKIE_HASH_KEY         = { secret = "identity-authentication-cookie-hash-key" }
+    SECURE_COOKIE_BLOCK_KEY        = { secret = "identity-authentication-cookie-block-key" }
+    HYDRA_WEBHOOK_API_PSK          = { secret = "hydra-webhook-psk" }
+    AUTH_PROVIDER_GOOGLE_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
+    AUTH_PROVIDER_GOOGLE_SECRET    = { secret = "identity-authentication-google-oauth-client-secret" }
+  }
 
   # Colony service-authentication.yaml env parity (rewritten for Cloud Run DNS).
   app_env = {

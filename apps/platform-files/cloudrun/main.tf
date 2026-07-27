@@ -35,12 +35,14 @@ module "frame" {
   resource_path            = "/files"
   requested_audience_paths = ["/profile", "/tenancy"]
 
-  extra_secret_ids = toset(concat(
-    ["${var.app_name}-encryption-phrase"],
-    var.s3_endpoint != "" ? ["${var.app_name}-s3-endpoint"] : [],
-    var.s3_access_key_id != "" ? ["${var.app_name}-s3-access-key-id"] : [],
-    var.s3_access_key_secret != "" ? ["${var.app_name}-s3-access-key-secret"] : [],
-  ))
+  # Encryption + S3 secret IDs always declared. Prefer cluster/Vault values via
+  # scripts/sync-cluster-secrets-to-gcp.sh; random_password is bootstrap-only if SM empty.
+  extra_secret_ids = toset([
+    "${var.app_name}-encryption-phrase",
+    "${var.app_name}-s3-endpoint",
+    "${var.app_name}-s3-access-key-id",
+    "${var.app_name}-s3-access-key-secret",
+  ])
   extra_secret_values = merge(
     {
       "${var.app_name}-encryption-phrase" = random_password.encryption_phrase.result
@@ -49,20 +51,12 @@ module "frame" {
     var.s3_access_key_id != "" ? { "${var.app_name}-s3-access-key-id" = var.s3_access_key_id } : {},
     var.s3_access_key_secret != "" ? { "${var.app_name}-s3-access-key-secret" = var.s3_access_key_secret } : {},
   )
-  secret_env_extra = merge(
-    {
-      ENCRYPTION_PHRASE = { secret = "${var.app_name}-encryption-phrase" }
-    },
-    var.s3_endpoint != "" ? {
-      S3_ENDPOINT = { secret = "${var.app_name}-s3-endpoint" }
-    } : {},
-    var.s3_access_key_id != "" ? {
-      S3_ACCESS_KEY_ID = { secret = "${var.app_name}-s3-access-key-id" }
-    } : {},
-    var.s3_access_key_secret != "" ? {
-      S3_ACCESS_KEY_SECRET = { secret = "${var.app_name}-s3-access-key-secret" }
-    } : {},
-  )
+  secret_env_extra = {
+    ENCRYPTION_PHRASE    = { secret = "${var.app_name}-encryption-phrase" }
+    S3_ENDPOINT          = { secret = "${var.app_name}-s3-endpoint" }
+    S3_ACCESS_KEY_ID     = { secret = "${var.app_name}-s3-access-key-id" }
+    S3_ACCESS_KEY_SECRET = { secret = "${var.app_name}-s3-access-key-secret" }
+  }
 
   # Colony service-files.yaml storage env (S3 primary; GCS/local kept for dual-path code).
   app_env = {

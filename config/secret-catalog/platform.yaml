@@ -1,0 +1,75 @@
+# Required GCP Secret Manager secrets for platform domain (stawi-prod → stawi-platform).
+# Values are NEVER in git. Populate with:
+#   scripts/sync-cluster-secrets-to-gcp.sh
+#   scripts/seed-gcp-secrets.sh
+
+project_hint: stawi-platform
+gcp_account: platform
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    description: OAuth private_key_jwt signer PSK (same value as identity)
+    required: true
+    used_by: [platform-devices, platform-settings, platform-geolocation, platform-files]
+
+apps:
+  platform-files:
+    runtime_secrets:
+      - id: platform-files-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: platform-files-encryption-phrase
+        env: ENCRYPTION_PHRASE
+        required: true
+        source_hints:
+          - "k8s: platform/service-files-encryption ENCRYPTION_PHRASE"
+          - "vault: (ESO target service-files-encryption)"
+      - id: platform-files-s3-endpoint
+        env: S3_ENDPOINT
+        required: true
+        source_hints:
+          - "k8s: platform/cloudflare-r2-storage-creds ENDPOINT_URL"
+      - id: platform-files-s3-access-key-id
+        env: S3_ACCESS_KEY_ID
+        required: true
+      - id: platform-files-s3-access-key-secret
+        env: S3_ACCESS_KEY_SECRET
+        required: true
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
+
+  platform-devices:
+    runtime_secrets:
+      - id: platform-devices-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: platform-devices-cloudflare-turn-token-id
+        env: CLOUDFLARE_TURN_TOKEN_ID
+        required: true
+        source_hints:
+          - "vault: stawi/platform/devices/cloudflare-turn cf_turn_id"
+      - id: platform-devices-cloudflare-turn-api-token
+        env: CLOUDFLARE_TURN_API_TOKEN
+        required: true
+        source_hints:
+          - "vault: stawi/platform/devices/cloudflare-turn cf_turn_api_key"
+      - id: hydra-webhook-psk
+        shared: true
+
+  platform-settings:
+    runtime_secrets:
+      - id: platform-settings-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        shared: true
+
+  platform-geolocation:
+    runtime_secrets:
+      - id: platform-geolocation-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        shared: true
