@@ -1,4 +1,4 @@
-# One-shot: verify all operations Cloud Run services are Ready and answer health probes.
+# Verify all operations Cloud Run services are Ready (WIF).
 name: ops-verify
 
 on:
@@ -23,6 +23,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
+
       - name: Install sops + yq
         run: |
           set -euo pipefail
@@ -30,6 +31,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           sudo wget -qO /usr/local/bin/sops https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64
           sudo chmod +x /usr/local/bin/sops
+
       - name: Decrypt WIF
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
@@ -38,12 +40,15 @@ jobs:
           sops -d credentials/gcp/operations/stawi-prod/auth.yaml > /tmp/ops-auth.yaml
           echo "WIF_PROVIDER=$(yq -r '.auth.workload_identity_provider' /tmp/ops-auth.yaml)" >> "$GITHUB_ENV"
           echo "DEPLOY_SA=$(yq -r '.auth.deploy_service_account' /tmp/ops-auth.yaml)" >> "$GITHUB_ENV"
+
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOY_SA }}
+
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Grant operator IAM (idempotent)
+
+      - name: Grant operator IAM
         run: |
           set -euo pipefail
           PROJ="${{ inputs.project }}"
@@ -53,64 +58,45 @@ jobs:
                 --member="$member" --role="$role" --condition=None --quiet || true
             done
           done
-      - name: Verify services Ready + health
+
+      - name: Verify services
         env:
           PROJ: ${{ inputs.project }}
           REG: ${{ inputs.region }}
         run: |
           set -euo pipefail
-          SVCS=(
-            operations-audit
-            operations-formstore
-            operations-queuestore
-            operations-redirect
-            operations-thesa
-            operations-trustage
-          )
           FAIL=0
-          for SVC in "${SVCS[@]}"; do
+          for SVC in operations-audit operations-formstore operations-queuestore operations-redirect operations-thesa operations-trustage; do
             echo "======== $SVC ========"
             READY=$(gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
               --format='value(status.conditions[0].status)' 2>/dev/null || echo MISSING)
             URL=$(gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
               --format='value(status.url)' 2>/dev/null || echo "")
             echo "ready=$READY url=$URL"
-            # Secret env names (no values)
-            gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
-              --format='json' | python3 -c '
-import json,sys
-d=json.load(sys.stdin)
-envs=d["spec"]["template"]["spec"]["containers"][0].get("env") or []
-secs=[e["name"] for e in envs if "valueFrom" in e]
-print("secret_envs:", ",".join(sorted(secs)))
-print("literal_count:", sum(1 for e in envs if "value" in e))
-'
-            # Authenticated health probe (Cloud Run IAM)
-            TOKEN=$(gcloud auth print-identity-token --audiences="$URL" 2>/dev/null || true)
-            CODE="000"
-            for path in /readyz /healthz /health /; do
-              if [[ -n "$TOKEN" && -n "$URL" ]]; then
-                CODE=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 \
-                  -H "Authorization: Bearer $TOKEN" "${URL}${path}" || echo 000)
-              else
-                CODE=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "${URL}${path}" || echo 000)
-              fi
-              echo "probe ${path} -> HTTP $CODE"
-              if [[ "$CODE" =~ ^2 ]]; then
-                break
-              fi
-            done
-            if [[ "$READY" != "True" ]]; then
+            gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" --format=json \
+              | python3 -c "import json,sys; d=json.load(sys.stdin); envs=d['spec']['template']['spec']['containers'][0].get('env') or []; secs=sorted(e['name'] for e in envs if 'valueFrom' in e); print('secret_envs:', ','.join(secs)); print('literal_count:', sum(1 for e in envs if 'value' in e))"
+            if [ -n "$URL" ]; then
+              TOKEN=$(gcloud auth print-identity-token --audiences="$URL" 2>/dev/null || true)
+              for path in /readyz /healthz /health; do
+                if [ -n "$TOKEN" ]; then
+                  CODE=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 -H "Authorization: Bearer $TOKEN" "${URL}${path}" || echo 000)
+                else
+                  CODE=$(curl -sS -o /tmp/body -w '%{http_code}' --max-time 20 "${URL}${path}" || echo 000)
+                fi
+                echo "probe ${path} -> HTTP $CODE"
+                case "$CODE" in
+                  2*) break ;;
+                esac
+              done
+            fi
+            if [ "$READY" != "True" ]; then
               echo "::error::$SVC not Ready"
               FAIL=1
-            elif [[ ! "$CODE" =~ ^2 ]]; then
-              echo "::warning::$SVC Ready but no 2xx health path (code=$CODE) — check app probe paths"
-              # Still accept Ready=True as deploy success; apps may only expose internal health
             else
               echo "OK $SVC"
             fi
           done
-          if [[ $FAIL -ne 0 ]]; then
+          if [ "$FAIL" -ne 0 ]; then
             exit 1
           fi
           echo "All operations services Ready on $PROJ"
