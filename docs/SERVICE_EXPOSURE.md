@@ -174,14 +174,14 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 ## Operational checklist
 
-1. Bootstrap **`stawi-api`** + cross-project LB IAM (see [`apps/api-gateway/README.md`](../apps/api-gateway/README.md)).
-2. Apply **api-gateway** (path routes on `api.stawi.org`).
-3. Apply **edge-lb-identity** (hosts including `oauth2-w`, `authz`, `authz-w`, accounts, oauth2).
-4. Wait for Certificate Manager certs **ACTIVE** on new hostnames.
+1. Ensure **CLOUDFLARE_API_TOKEN** has Workers Scripts:Edit + Workers Routes:Edit (see [`edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md`](../edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md)).
+2. Deploy path gateway: `gh workflow run edge-api-gateway.yml` → confirm `https://api.stawi.org/_gateway/health` → **200**.
+3. Apply **edge-lb-identity** for host exceptions (accounts, oauth2, `oauth2-w`, `authz`, `authz-w`).
+4. Wait for Certificate Manager certs **ACTIVE** on host LB hostnames (if applying edge-lb).
 5. Apply **Keto** with identity + ops/platform invokers.
 6. Apply **Hydra** (public + admin) with admin invokers + `advertise_admin_hostname`.
 7. Apply **Frame** apps (identity, then ops/platform) so they use DNS control-plane URLs.
-8. Confirm `https://api.stawi.org/profile/healthz` → **200**; anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
+8. Confirm path proxy: `curl -sSI https://api.stawi.org/profile/` reaches Cloud Run (not CF 521); anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
 9. Later: Shared VPC → flip Keto/admin to `exposure=private`.
 
 ## Tenancy (authenticated control plane)
