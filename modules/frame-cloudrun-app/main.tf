@@ -84,22 +84,17 @@ locals {
     var.extra_secret_values,
   )
 
-  # Stable public hosts. Product APIs: api.stawi.org/<path>. See docs/SSL_EDGE_POLICY.md.
-  # Hydra public OIDC: oauth2.stawi.org (browser + token URL).
-  # Hydra admin S2S: Cloud Run URL — oauth2-w grey LB TLS can drop during cert
-  # reprovision (EOF); login/consent need admin reliably. hydraadmin mints Google
-  # ID tokens for https://host audience (roles/run.invoker).
+  # Stable DNS we control (docs/STABLE_DNS.md). Product APIs: api.stawi.org/<path>.
+  # Control plane: oauth2-w / authz* via CF CNAME (or Worker host fallback).
+  # hydraadmin mints Google ID tokens for https://host (roles/run.invoker).
   oauth2_public_host = local.is_prod ? "oauth2.stawi.org" : "oauth2.stawi.dev"
   oauth2_public_url  = "https://${local.oauth2_public_host}"
+  oauth2_admin_host  = local.is_prod ? "oauth2-w.stawi.org" : "oauth2-w.stawi.dev"
   authz_read_host    = local.is_prod ? "authz.stawi.org" : "authz.stawi.dev"
   authz_write_host   = local.is_prod ? "authz-w.stawi.org" : "authz-w.stawi.dev"
 
-  oauth2_origin = local.oauth2_public_url
-  oauth2_admin_origin = (
-    var.use_hydra_admin_service
-    ? data.google_cloud_run_v2_service.hydra_admin[0].uri
-    : local.oauth2_public_url
-  )
+  oauth2_origin       = local.oauth2_public_url
+  oauth2_admin_origin = "https://${local.oauth2_admin_host}"
   # Assertion audience must match Hydra's advertised public token endpoint.
   token_url = "${local.oauth2_public_url}/oauth2/token"
 
@@ -206,17 +201,6 @@ locals {
     var.secret_env_extra,
     var.migrate_secret_env_extra,
   )
-}
-
-# ---------------------------------------------------------------------------
-# Hydra admin Cloud Run (S2S only — not browser-facing)
-# ---------------------------------------------------------------------------
-
-data "google_cloud_run_v2_service" "hydra_admin" {
-  count    = var.use_hydra_admin_service ? 1 : 0
-  name     = "identity-oauth2-hydra-admin"
-  location = local.identity_region
-  project  = local.identity_project
 }
 
 # ---------------------------------------------------------------------------

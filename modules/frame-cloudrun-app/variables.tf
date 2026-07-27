@@ -54,7 +54,7 @@ variable "identity_region" {
 variable "use_hydra_admin_service" {
   type        = bool
   default     = true
-  description = "Wire OAUTH2_SERVICE_ADMIN_URI to identity-oauth2-hydra-admin Cloud Run URL (Google ID-token S2S)."
+  description = "Legacy no-op. Admin URI is always https://oauth2-w.stawi.org (stable DNS via CF CNAME)."
 }
 
 variable "enable_keto" {

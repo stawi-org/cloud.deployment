@@ -89,19 +89,41 @@ async function checkWithRetry(name, url, expectOk, attempts = 4) {
   failures.push(last);
 }
 
+// Prefer health paths; IAM hosts (oauth2-w / authz*) may 403 without a Google ID token.
 const hostHealth = {
-  accounts: "/healthz",
+  accounts: "/readyz",
   oauth2: "/health/ready",
+  "oauth2-w": "/health/ready",
+  authz: "/",
+  "authz-w": "/",
 };
-const hostRoutes = config.host_routes || [];
-for (const h of hostRoutes) {
-  if (h.enabled === false) continue;
+// host_routes may be empty in git; direct_cnames are the stable public hosts.
+const smokeHosts = [
+  ...(config.host_routes || []),
+  ...(config.direct_cnames || []).map((h) => ({
+    id: h.id,
+    hostname: h.hostname,
+    enabled: true,
+  })),
+];
+const seenHosts = new Set();
+for (const h of smokeHosts) {
+  if (h.enabled === false || !h.hostname) continue;
+  const key = String(h.hostname).toLowerCase();
+  if (seenHosts.has(key)) continue;
+  seenHosts.add(key);
   const path = hostHealth[h.id] || "/";
   const url = `https://${h.hostname}${path}`;
+  // 403 = Cloud Run IAM (edge + Host rewrite work). Reject edge/origin down.
   await checkWithRetry(
     `host ${h.id}`,
     url,
-    (res) => res.status !== 502 && res.status !== 521 && res.status !== 0,
+    (res) =>
+      res.status !== 502 &&
+      res.status !== 521 &&
+      res.status !== 522 &&
+      res.status !== 523 &&
+      res.status !== 0,
   );
 }
 // Public routes: any status except gateway 502/521/connection is progress.
