@@ -63,21 +63,21 @@ resource "google_cloud_run_v2_job" "this" {
         }
 
         dynamic "env" {
-          for_each = var.env
+          for_each = length(var.env) == 0 ? toset([]) : toset(nonsensitive([for k, _ in var.env : k]))
           content {
-            name  = env.key
-            value = env.value
+            name  = env.value
+            value = var.env[env.value]
           }
         }
 
         dynamic "env" {
-          for_each = var.secret_env
+          for_each = length(var.secret_env) == 0 ? toset([]) : toset(nonsensitive([for k, _ in var.secret_env : k]))
           content {
-            name = env.key
+            name = env.value
             value_source {
               secret_key_ref {
-                secret  = env.value.secret
-                version = env.value.version
+                secret  = var.secret_env[env.value].secret
+                version = var.secret_env[env.value].version
               }
             }
           }

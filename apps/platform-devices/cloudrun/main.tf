@@ -30,24 +30,15 @@ module "frame" {
   resource_path            = "/devices"
   requested_audience_paths = ["/profile", "/tenancy"]
 
-  # Cloudflare TURN secrets always declared; values from Vault/k8s via
-  # scripts/sync-cluster-secrets-to-gcp.sh (not git). Optional TF_VAR bootstrap.
-  extra_secret_ids = toset([
+  # Cloudflare TURN secrets: SM shells only. Values seeded out-of-band
+  # (scripts/sync-cluster-secrets-to-gcp.sh). Never derive version_ids from
+  # sensitive TF_VARs — OpenTofu 1.10 panics for_each on marked sets.
+  extra_secret_ids  = toset([
     "${var.app_name}-cloudflare-turn-token-id",
     "${var.app_name}-cloudflare-turn-api-token",
   ])
-  extra_version_ids = toset(concat(
-    var.cloudflare_turn_token_id != "" ? ["${var.app_name}-cloudflare-turn-token-id"] : [],
-    var.cloudflare_turn_api_token != "" ? ["${var.app_name}-cloudflare-turn-api-token"] : [],
-  ))
-  extra_secret_values = merge(
-    var.cloudflare_turn_token_id != "" ? {
-      "${var.app_name}-cloudflare-turn-token-id" = var.cloudflare_turn_token_id
-    } : {},
-    var.cloudflare_turn_api_token != "" ? {
-      "${var.app_name}-cloudflare-turn-api-token" = var.cloudflare_turn_api_token
-    } : {},
-  )
+  extra_version_ids   = toset([])
+  extra_secret_values = {}
   secret_env_extra = {
     CLOUDFLARE_TURN_TOKEN_ID  = { secret = "${var.app_name}-cloudflare-turn-token-id" }
     CLOUDFLARE_TURN_API_TOKEN = { secret = "${var.app_name}-cloudflare-turn-api-token" }
