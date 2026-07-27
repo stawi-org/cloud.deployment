@@ -71,20 +71,12 @@ jobs:
           npx wrangler deploy
           # Drop stale Worker routes for accounts/oauth2 (wrangler won't remove them)
           node scripts/ensure-cf-delete-worker-routes.mjs
-          # api → Worker dummy A; accounts/oauth2 → CNAME to *.run.app (no Google LB)
+          # api.stawi.org → Worker dummy A only (ensure-cf-dns still manages api host)
           node scripts/ensure-cf-dns.mjs
-          # Host rewrite so Cloud Run accepts custom Host (needs Rulesets token scope)
-          set +e
-          node scripts/ensure-cf-origin-rules.mjs
-          OR_RC=$?
-          set -e
-          if [[ "$OR_RC" -eq 2 ]]; then
-            echo "::warning::Origin Host rules not applied (auth/plan). Enabling free Worker host fallback for accounts/oauth2."
-            # Re-attach Worker routes so Host is rewritten at the edge (no Google LB).
-            node scripts/ensure-cf-worker-host-fallback.mjs
-          elif [[ "$OR_RC" -ne 0 ]]; then
-            exit "$OR_RC"
-          fi
+          # Preferred: Cloud Run domain mappings (europe-west1) → grey CNAME ghs.googlehosted.com
+          # Overwrites direct_cnames run.app CNAMEs / Worker fallback for those hosts.
+          node scripts/ensure-cf-domain-mapping-dns.mjs
+
 
       - name: Smoke api.stawi.org + public hosts
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
