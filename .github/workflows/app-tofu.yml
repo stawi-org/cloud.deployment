@@ -390,8 +390,17 @@ jobs:
           # LB-only / infra-only apps (e.g. edge-lb-*) have no Neon — full apply only.
           if [[ "$USE_FRAME" == "false" ]] && ! grep -qE 'module\s+"db"' main.tf 2>/dev/null; then
             echo "::group::Apply full stack (no Neon/migrate phases)"
-            # parallelism=1: URL map must drop host backends before BES destroy (GCP 400 otherwise)
             if [[ "$APP" == edge-lb-* ]]; then
+              # Phase 1: update URL map so removed hosts no longer reference backends.
+              # Phase 2: destroy orphaned BES/NEG/DNS (GCP 400 if concurrent with map update).
+              echo "edge-lb: phase 1 — URL maps"
+              tofu apply -auto-approve -parallelism=1 \
+                -target='module.lb.google_compute_url_map.https' \
+                -target='module.lb.google_compute_url_map.http_redirect' \
+                -target='module.lb[0].google_compute_url_map.https' \
+                -target='module.lb[0].google_compute_url_map.http_redirect' \
+                "${TF_COMMON[@]}" || true
+              echo "edge-lb: phase 2 — full apply (serial)"
               tofu apply -auto-approve -parallelism=1 "${TF_COMMON[@]}"
             else
               tofu apply -auto-approve "${TF_COMMON[@]}"
