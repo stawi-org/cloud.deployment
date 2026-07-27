@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Cloudflare Origin Rules: rewrite Host (and origin host) for direct CNAME
- * hosts so Cloud Run receives the *.run.app Host it expects.
+ * Cloudflare Origin Rules: Host header = Cloud Run *.run.app for direct_cnames.
  *
- * Requires a plan that allows Origin Rule "Host header" override (often
- * Enterprise; if the API rejects the rule, deploy fails with a clear error).
+ * Needs Zone permission for Rulesets (Zone.Zone Settings / Origin Rules edit).
+ * Host-header override may also require a higher Cloudflare plan.
  *
- * Env:
- *   CLOUDFLARE_API_TOKEN  (required) — Zone Rulesets / Origin Rules edit
- *   CLOUDFLARE_ZONE_ID
+ * Exit codes:
+ *   0 — rules applied or nothing to do
+ *   2 — auth/plan insufficient (caller may enable Worker host fallback)
+ *   1 — unexpected error
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -44,8 +44,11 @@ async function cf(path, opts = {}) {
   });
   const body = await res.json();
   if (!body.success) {
-    const err = JSON.stringify(body.errors || body, null, 2);
-    throw new Error(`CF ${path} → ${res.status}\n${err}`);
+    const err = body.errors || body;
+    const e = new Error(`CF ${path} → ${res.status} ${JSON.stringify(err)}`);
+    e.status = res.status;
+    e.cf = err;
+    throw e;
   }
   return body.result;
 }
@@ -64,51 +67,54 @@ const rules = directs.map((h) => {
     enabled: true,
     action_parameters: {
       host_header: host,
-      origin: {
-        host,
-      },
+      origin: { host },
     },
   };
 });
 
-// List zone rulesets for this phase
-const existing = await cf(`/zones/${ZONE}/rulesets`);
-const phaseSet = (existing || []).find(
-  (r) => r.phase === PHASE && r.kind === "zone",
-);
+try {
+  const existing = await cf(`/zones/${ZONE}/rulesets`);
+  const phaseSet = (existing || []).find((r) => r.phase === PHASE && r.kind === "zone");
 
-const payload = {
-  name: RULESET_NAME,
-  description:
-    "Send Host header = Cloud Run *.run.app for accounts/oauth2 CNAME origins",
-  kind: "zone",
-  phase: PHASE,
-  rules,
-};
-
-if (phaseSet?.id) {
-  console.log(`update zone ruleset ${phaseSet.id} (${PHASE})`);
-  // GET full ruleset then replace our rules carefully — merge by description prefix
-  const full = await cf(`/zones/${ZONE}/rulesets/${phaseSet.id}`);
-  const keep = (full.rules || []).filter(
-    (r) => !String(r.description || "").startsWith("Cloud Run Host for "),
-  );
-  await cf(`/zones/${ZONE}/rulesets/${phaseSet.id}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      name: full.name || RULESET_NAME,
-      description: full.description || payload.description,
-      kind: "zone",
-      phase: PHASE,
-      rules: [...keep, ...rules],
-    }),
-  });
-} else {
-  console.log(`create zone ruleset ${PHASE}`);
-  await cf(`/zones/${ZONE}/rulesets`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  if (phaseSet?.id) {
+    console.log(`update zone ruleset ${phaseSet.id} (${PHASE})`);
+    const full = await cf(`/zones/${ZONE}/rulesets/${phaseSet.id}`);
+    const keep = (full.rules || []).filter(
+      (r) => !String(r.description || "").startsWith("Cloud Run Host for "),
+    );
+    await cf(`/zones/${ZONE}/rulesets/${phaseSet.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: full.name || RULESET_NAME,
+        description: full.description || RULESET_NAME,
+        kind: "zone",
+        phase: PHASE,
+        rules: [...keep, ...rules],
+      }),
+    });
+  } else {
+    console.log(`create zone ruleset ${PHASE}`);
+    await cf(`/zones/${ZONE}/rulesets`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: RULESET_NAME,
+        description: "Host header = Cloud Run *.run.app for accounts/oauth2 CNAMEs",
+        kind: "zone",
+        phase: PHASE,
+        rules,
+      }),
+    });
+  }
+  console.log("Origin rules OK:", directs.map((h) => h.hostname).join(", "));
+  process.exit(0);
+} catch (e) {
+  const msg = String(e && e.message ? e.message : e);
+  console.error(msg);
+  if (e.status === 403 || msg.includes("10000") || msg.includes("Authentication") || msg.includes("permission") || msg.includes("plan")) {
+    console.error(
+      "::warning::Origin Host rewrite unavailable (token needs Zone Rulesets/Origin Rules edit; Host header override may need a higher CF plan). DNS CNAME alone is not enough for Cloud Run without Host rewrite.",
+    );
+    process.exit(2);
+  }
+  process.exit(1);
 }
-
-console.log("Origin rules ensure complete:", directs.map((h) => h.hostname).join(", "));

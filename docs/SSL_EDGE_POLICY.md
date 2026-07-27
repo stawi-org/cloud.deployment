@@ -22,13 +22,18 @@ There are **no** product hosts (`profile.stawi.org`, `devices.*`, …).
 - Path routing + Scalar multi-API hub  
 - Does **not** front `oauth2` / `accounts`  
 
-### Cloudflare DNS CNAME (orange) — login + OIDC public
+### Cloudflare DNS (orange) — login + OIDC public (**no Google LB**)
 
-- `accounts` / `oauth2` are **CNAME** to the Cloud Run `*.run.app` hostname  
-- TLS for the public name terminates at Cloudflare (**Full (strict)**)  
-- **Origin Rule** rewrites `Host` (and origin host) to the `*.run.app` name Cloud Run expects  
-  (domain mapping is 501 in this region; without Host rewrite, Cloud Run rejects the custom Host)  
-- Managed by `edge/cloudflare-api-gateway/scripts/ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`  
+Preferred (needs CF Rulesets permission + Host-header Origin Rule capability):
+
+- Orange **CNAME** `accounts` / `oauth2` → Cloud Run `*.run.app`  
+- **Origin Rule** sets `Host` to that run.app hostname  
+- Managed by `ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`  
+
+Free fallback when Origin Rules are unavailable (token/plan):
+
+- Same public hostnames; **Worker host proxy** rewrites to run.app (not path API routing)  
+- `ensure-cf-worker-host-fallback.mjs` — still **no Google LB**  
 
 ### Google Certificate Manager (grey) — control plane only
 

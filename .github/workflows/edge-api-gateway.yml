@@ -69,28 +69,34 @@ jobs:
             exit 1
           fi
           npx wrangler deploy
-          # api → Worker dummy A; accounts/oauth2 → CNAME to *.run.app (no LB)
+          # Drop stale Worker routes for accounts/oauth2 (wrangler won't remove them)
+          node scripts/ensure-cf-delete-worker-routes.mjs
+          # api → Worker dummy A; accounts/oauth2 → CNAME to *.run.app (no Google LB)
           node scripts/ensure-cf-dns.mjs
-          # Host header rewrite so Cloud Run accepts CNAME custom hostnames
+          # Host rewrite so Cloud Run accepts custom Host (needs Rulesets token scope)
+          set +e
           node scripts/ensure-cf-origin-rules.mjs
+          OR_RC=$?
+          set -e
+          if [[ "$OR_RC" -eq 2 ]]; then
+            echo "::warning::Origin Host rules not applied (auth/plan). Enabling free Worker host fallback for accounts/oauth2."
+            # Re-attach Worker routes so Host is rewritten at the edge (no Google LB).
+            node scripts/ensure-cf-worker-host-fallback.mjs
+          elif [[ "$OR_RC" -ne 0 ]]; then
+            exit "$OR_RC"
+          fi
 
-      - name: Smoke api.stawi.org + direct hosts
+      - name: Smoke api.stawi.org + public hosts
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
         run: |
           set -euo pipefail
-          # Allow route + DNS + origin-rule propagation
           sleep 12
           GATEWAY_BASE=https://api.stawi.org npm run smoke
-          echo "---- direct CNAME hosts (not Worker) ----"
+          echo "---- accounts / oauth2 ----"
           for u in \
             https://accounts.stawi.org/readyz \
             https://oauth2.stawi.org/health/ready; do
             code=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 25 "$u" || echo ERR)
-            gw=$(curl -sS -D- -o /dev/null --max-time 15 "$u" 2>/dev/null | grep -i x-stawi-gateway || true)
-            if [[ -n "$gw" ]]; then
-              echo "::error::$u still hit Worker ($gw)"
-              exit 1
-            fi
             echo "$code $u"
-            [[ "$code" == "200" ]] || { echo "::error::expected 200 from $u"; exit 1; }
+            [[ "$code" == "200" ]] || { head -c 200 /tmp/body; echo; exit 1; }
           done
