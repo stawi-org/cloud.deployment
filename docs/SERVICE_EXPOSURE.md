@@ -136,7 +136,7 @@ Frame apps (`modules/frame-cloudrun-app`) in **prod** wire:
 | Product `*_SERVICE_URI` | `https://api.stawi.org/<path>` (profile, tenancy, devices, files, …) |
 | `PERMISSIONS_REGISTRATION_URL` | `https://api.stawi.org/tenancy/_internal/register/permissions` |
 | `OAUTH2_SERVICE_URI` | `https://oauth2.stawi.org` |
-| `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
+| `OAUTH2_SERVICE_ADMIN_URI` | Hydra admin Cloud Run `*.run.app` (Google ID-token invoker) |
 | `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
 | `AUTHORIZATION_SERVICE_WRITE_URI` | `https://authz-w.stawi.org` |
 | `KETO_SERVICE_ADMIN_URI` | `https://authz-w.stawi.org` (when `enable_keto_admin`) |
