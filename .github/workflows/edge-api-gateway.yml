@@ -71,14 +71,13 @@ jobs:
           npx wrangler deploy
           # Drop stale Worker routes for accounts/oauth2 (wrangler won't remove them)
           node scripts/ensure-cf-delete-worker-routes.mjs
-          # api → Worker; accounts/oauth2*/authz* → orange CNAME → *.run.app
+          # api → Worker A record (ensure-cf-dns); control-plane hosts use domain mapping.
           node scripts/ensure-cf-dns.mjs
-          # Optional: grey CNAME → ghs.googlehosted.com when domain-mapping certs are ACTIVE
-          # (TLS often EOF while CertificatePending; leave USE_DOMAIN_MAPPING_DNS unset until ready)
-          if [[ "${USE_DOMAIN_MAPPING_DNS:-}" == "true" ]]; then
+          # europe-west1 Cloud Run domain mappings (ghs.googlehosted.com, grey).
+          # Set USE_DOMAIN_MAPPING_DNS=false to fall back to orange CNAME + Host rewrite.
+          if [[ "${USE_DOMAIN_MAPPING_DNS:-true}" == "true" ]]; then
             node scripts/ensure-cf-domain-mapping-dns.mjs
           else
-            # Host rewrite so Cloud Run accepts custom Host
             set +e
             node scripts/ensure-cf-origin-rules.mjs
             OR_RC=$?
@@ -90,6 +89,7 @@ jobs:
               exit "$OR_RC"
             fi
           fi
+
 
 
 
