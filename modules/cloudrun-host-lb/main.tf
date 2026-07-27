@@ -104,8 +104,14 @@ resource "google_compute_url_map" "https" {
   project = var.project_id
   name    = "${var.name}-https"
 
-  # Unused default — every real host has a host_rule
-  default_service = google_compute_backend_service.run[local.hostnames[0]].id
+  # Stable default that does not pin a host backend (avoids destroy races when
+  # hosts shrink — backends were still referenced while default_service moved).
+  default_url_redirect {
+    https_redirect         = true
+    host_redirect          = "stawi.org"
+    redirect_response_code = "TEMPORARY_REDIRECT"
+    strip_query            = false
+  }
 
   dynamic "host_rule" {
     for_each = var.hosts

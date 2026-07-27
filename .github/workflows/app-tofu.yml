@@ -390,7 +390,12 @@ jobs:
           # LB-only / infra-only apps (e.g. edge-lb-*) have no Neon — full apply only.
           if [[ "$USE_FRAME" == "false" ]] && ! grep -qE 'module\s+"db"' main.tf 2>/dev/null; then
             echo "::group::Apply full stack (no Neon/migrate phases)"
-            tofu apply -auto-approve "${TF_COMMON[@]}"
+            # parallelism=1: URL map must drop host backends before BES destroy (GCP 400 otherwise)
+            if [[ "$APP" == edge-lb-* ]]; then
+              tofu apply -auto-approve -parallelism=1 "${TF_COMMON[@]}"
+            else
+              tofu apply -auto-approve "${TF_COMMON[@]}"
+            fi
             echo "::endgroup::"
             exit 0
           fi
