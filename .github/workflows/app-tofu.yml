@@ -280,15 +280,6 @@ jobs:
             echo "::endgroup::"
           fi
 
-          # Frame stacks: skip Pub/Sub import. Import walks the whole graph and panics
-          # OpenTofu 1.10 on sensitive for_each (exit 11), leaving a stale R2 lock.
-          # State mv above relocates module.messaging → module.frame.module.messaging[0];
-          # full apply owns any remaining create/update.
-          if [[ "$USE_FRAME" == "true" ]]; then
-            echo "module.frame present — skip Pub/Sub import (full apply owns messaging)"
-            exit 0
-          fi
-
           import_if_missing() {
             local addr="$1" id="$2"
             if grep -qxF "$addr" /tmp/tofu-state-list.txt 2>/dev/null; then
@@ -307,6 +298,26 @@ jobs:
               cat /tmp/tofu-import.log || true
             fi
           }
+
+          # Frame stacks: skip Pub/Sub import (full apply owns messaging after state mv).
+          # Still import orphaned SM secret *shells* that exist in GCP but not in state
+          # (otherwise apply 409s on google_secret_manager_secret).
+          if [[ "$USE_FRAME" == "true" ]]; then
+            echo "module.frame present — skip Pub/Sub import; import orphaned SM shells if any"
+            # Auth Google OAuth shells are seeded out-of-band; ensure state ownership.
+            if [[ "$APP" == "identity-authentication" ]]; then
+              for sid in \
+                identity-authentication-google-oauth-client-id \
+                identity-authentication-google-oauth-client-secret; do
+                if gcloud secrets describe "$sid" --project="$PROJECT_ID" >/dev/null 2>&1; then
+                  import_if_missing \
+                    "module.frame.module.secrets.google_secret_manager_secret.this[\"${sid}\"]" \
+                    "projects/${PROJECT_ID}/secrets/${sid}"
+                fi
+              done
+            fi
+            exit 0
+          fi
 
           # Default Frame/Ory events topic + optional push sub + DLQ (non-frame only).
           MSG_PREFIX='module.messaging'
