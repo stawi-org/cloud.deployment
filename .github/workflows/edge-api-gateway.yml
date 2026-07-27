@@ -69,7 +69,8 @@ jobs:
             exit 1
           fi
           npx wrangler deploy
-      - name: Smoke api.stawi.org
+          # Orange-cloud DNS for api/accounts/oauth2 so Worker routes receive traffic
+          node scripts/ensure-cf-dns.mjs      - name: Smoke api.stawi.org
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
         run: |
           set -euo pipefail

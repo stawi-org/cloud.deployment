@@ -63,6 +63,13 @@ await check("profile openapi via gateway", `${base}/profile/openapi.yaml`, (r, b
   return b.includes("openapi") || b.includes("paths:") || b.includes('"paths"');
 });
 
+// Public host routes (accounts / oauth2) — resolve + non-502
+const hostRoutes = config.host_routes || [];
+for (const h of hostRoutes) {
+  if (h.enabled === false) continue;
+  const url = `https://${h.hostname}/`;
+  await check(`host ${h.id}`, url, (res) => res.status !== 502 && res.status !== 521 && res.status !== 0);
+}
 // Public routes: any status except gateway 502/521/connection is progress.
 // App 404 means proxy + Cloud Run IAM path works.
 for (const r of config.routes || []) {
