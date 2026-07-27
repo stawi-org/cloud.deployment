@@ -63,12 +63,46 @@ await check("profile openapi via gateway", `${base}/profile/openapi.yaml`, (r, b
   return b.includes("openapi") || b.includes("paths:") || b.includes('"paths"');
 });
 
-// Public host routes (accounts / oauth2) — resolve + non-502
+// Public host routes (accounts / oauth2) — prefer health paths; retry for DNS.
+async function checkWithRetry(name, url, expectOk, attempts = 4) {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        redirect: "manual",
+        headers: { accept: "application/json,*/*" },
+        signal: AbortSignal.timeout(20000),
+      });
+      const body = await res.text();
+      if (expectOk(res, body)) {
+        console.log(`OK  ${name} → ${res.status} ${url}`);
+        return;
+      }
+      last = { name, url, status: res.status, body: body.slice(0, 200) };
+    } catch (e) {
+      last = { name, url, error: String(e) };
+    }
+    await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+  }
+  console.log(`FAIL ${name} → ${JSON.stringify(last)}`);
+  failures.push(last);
+}
+
+const hostHealth = {
+  accounts: "/healthz",
+  oauth2: "/health/ready",
+};
 const hostRoutes = config.host_routes || [];
 for (const h of hostRoutes) {
   if (h.enabled === false) continue;
-  const url = `https://${h.hostname}/`;
-  await check(`host ${h.id}`, url, (res) => res.status !== 502 && res.status !== 521 && res.status !== 0);
+  const path = hostHealth[h.id] || "/";
+  const url = `https://${h.hostname}${path}`;
+  await checkWithRetry(
+    `host ${h.id}`,
+    url,
+    (res) => res.status !== 502 && res.status !== 521 && res.status !== 0,
+  );
 }
 // Public routes: any status except gateway 502/521/connection is progress.
 // App 404 means proxy + Cloud Run IAM path works.
