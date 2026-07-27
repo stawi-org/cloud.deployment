@@ -88,7 +88,7 @@ No per-service product hosts (`profile.stawi.org`, `devices.*`, …). Paths:
 | Path | Service | Exposure |
 |------|---------|----------|
 | `/profile` | identity-profile | public |
-| `/tenancy` | identity-tenancy | authenticated (IAM) |
+| `/tenancy` | identity-tenancy | public edge (app OAuth) |
 | `/identity` | identity-identity | public |
 | `/devices` | platform-devices | public |
 | `/settings` | platform-settings | public |

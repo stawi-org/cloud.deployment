@@ -77,7 +77,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | Path | Cloud Run service | Project | Mode |
 |------|-------------------|---------|------|
 | `/profile` | identity-profile | stawi-identity | public |
-| `/tenancy` | identity-tenancy | stawi-identity | **authenticated** (app OAuth + invoker) |
+| `/tenancy` | identity-tenancy | stawi-identity | **public edge** (app OAuth; allUsers invoker) |
 | `/identity` | identity-identity | stawi-identity | public |
 | `/devices` | platform-devices | stawi-platform | public |
 | `/settings` | platform-settings | stawi-platform | public |
