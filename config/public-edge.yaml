@@ -61,4 +61,3 @@ prod:
     - identity-authorization-keto-read
     - identity-authorization-keto-write
     - identity-oauth2-hydra-admin
-    - identity-tenancy

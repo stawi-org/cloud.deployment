@@ -73,13 +73,13 @@
       "origin": "https://identity-tenancy-akpnezytka-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": false,
+      "public": true,
       "docs": {
         "enabled": false,
         "title": "Tenancy",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Cloud Run IAM authenticated. Path is api.stawi.org/tenancy only (no tenancy.stawi.org host)."
+      "notes": "Path only (api.stawi.org/tenancy). allUsers invoker + app OAuth; Connect S2S cannot dual-auth."
     },
     {
       "id": "identity",

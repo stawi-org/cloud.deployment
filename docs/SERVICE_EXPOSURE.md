@@ -195,12 +195,12 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 | Surface | Exposure | Protection |
 |---------|----------|------------|
-| `api.stawi.org/tenancy` | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token; app OAuth/Keto in-process |
-| `/_internal/sync/clients` | Same service via path gateway or direct CR | Scheduler OIDC as `identity-tenancy@…` (audience = Cloud Run service URI) |
+| `api.stawi.org/tenancy` | **public edge** (app OAuth) | Cloud Run `allUsers` invoker + in-process OAuth/Keto |
+| `/_internal/sync/clients` | Same service | Scheduler OIDC as `identity-tenancy@…` (audience = Cloud Run service URI) |
 
-Invokers: identity Frame runtimes + ops/platform runtime SAs (`additional_invoker_members` in tfvars), same pattern as Keto.
+**Why allUsers (not IAM-only like Keto):** Connect S2S clients (`common/connection`) send **product OAuth** only. Frame dual-auth (`X-Serverless-Authorization`) is not wired on Connect yet. IAM-only tenancy made login fail: no `access_id` → token enrichment reject → browser **403** on `oauth2.stawi.org/oauth2/token`.
 
-Callers must mint a **Google identity token** (not only a product OAuth access token) for Cloud Run IAM. Frame dual-auth attaches that token as `X-Serverless-Authorization` with audience **`https://api.stawi.org`** (host only — no path). Tenancy `custom_audiences` must include both `https://api.stawi.org/tenancy` and **`https://api.stawi.org`** so S2S via `TENANCY_SERVICE_URI=https://api.stawi.org/tenancy` succeeds.
+RPCs still require OAuth (no anonymous business data). Optional `custom_audiences` (`https://api.stawi.org`, `…/tenancy`) remain for dual-auth callers.
 
 ## Out of scope (this pass)
 

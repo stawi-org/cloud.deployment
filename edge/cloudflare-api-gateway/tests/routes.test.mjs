@@ -127,10 +127,10 @@ describe("Scalar docs catalog", () => {
     assert.equal(profile.docs.default, true);
   });
 
-  it("excludes non-public tenancy from hub by default", () => {
+  it("tenancy is public edge (OAuth-protected app) but docs disabled", () => {
     const tenancy = (config.routes || []).find((r) => r.id === "tenancy");
     assert.ok(tenancy);
-    assert.equal(tenancy.public, false);
+    assert.equal(tenancy.public, true);
     assert.equal(tenancy.docs?.enabled, false);
   });
 

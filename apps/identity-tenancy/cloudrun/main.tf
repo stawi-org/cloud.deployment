@@ -1,10 +1,11 @@
 # identity-tenancy — Frame Cloud Run via modules/frame-cloudrun-app.
 # Extra: partition sync job (not part of the shared frame stack).
 #
-# Exposure: authenticated (no allUsers) — same model as Keto / Hydra admin.
-# Public path: https://api.stawi.org/tenancy only (no tenancy.stawi.org host).
-# Callers need run.invoker + Google ID token (audience = path gateway URL or run.app).
-# Sync scheduler uses OIDC as the tenancy runtime SA.
+# Exposure: path-gateway only (https://api.stawi.org/tenancy). App OAuth/Keto protect
+# RPCs. allUsers invoker is required because Connect S2S clients send product OAuth
+# only (not X-Serverless-Authorization dual-auth). Without allUsers, login cannot
+# resolve access_id and token exchange fails (browser 403 on /oauth2/token).
+# Sync scheduler still uses OIDC as the tenancy runtime SA.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -68,13 +69,11 @@ module "frame" {
   enable_keto_admin        = true
   migrate_execute          = false
 
-  # Control plane: IAM required (no allUsers). Public path = api.stawi.org/tenancy.
-  exposure         = "authenticated"
-  public_invoker   = false
-  invoker_members  = local.tenancy_invoker_members
-  # Frame dual-auth mints Google ID tokens with audience = https://host only
-  # (no path). Accept both the path-gateway URL and the api host so S2S via
-  # TENANCY_SERVICE_URI=https://api.stawi.org/tenancy works (X-Serverless-Authorization).
+  # Public path only via gateway; network open (allUsers) so OAuth S2S works.
+  exposure        = "public"
+  public_invoker  = true
+  invoker_members = local.tenancy_invoker_members
+  # Keep path + host audiences for dual-auth callers (Frame REST / future Connect).
   custom_audiences = distinct(concat(
     [local.tenancy_public_url],
     [local.api_base],
