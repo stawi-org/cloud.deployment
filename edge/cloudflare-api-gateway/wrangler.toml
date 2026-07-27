@@ -10,7 +10,7 @@ compatibility_date = "2026-07-01"
 workers_dev = true
 account_id = "c358ea38bde6fd03d13bf87068635230"
 
-# Product path API + Scalar hub only (accounts / oauth2 use edge-lb-identity).
+# Product path API + Scalar hub only (accounts / oauth2* / authz* = CF CNAME).
 [[routes]]
 pattern = "api.stawi.org/*"
 zone_name = "stawi.org"

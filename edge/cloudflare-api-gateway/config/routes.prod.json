@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "api.stawi.org path Worker. accounts/oauth2: orange CNAME → *.run.app (no Google LB). See docs/SSL_EDGE_POLICY.md.",
+  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME → Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
@@ -29,13 +29,36 @@
       "id": "accounts",
       "hostname": "accounts.stawi.org",
       "origin": "https://identity-authentication-akpnezytka-od.a.run.app",
-      "notes": "DNS CNAME → Cloud Run. Host rewrite via Origin Rules (or free Worker fallback)."
+      "protocol": "http",
+      "notes": "Login UI. CF CNAME → Cloud Run."
     },
     {
       "id": "oauth2",
       "hostname": "oauth2.stawi.org",
       "origin": "https://identity-oauth2-hydra-akpnezytka-od.a.run.app",
-      "notes": "DNS CNAME → Cloud Run. Host rewrite via Origin Rules (or free Worker fallback)."
+      "protocol": "http",
+      "notes": "OIDC public. CF CNAME → Cloud Run."
+    },
+    {
+      "id": "oauth2-w",
+      "hostname": "oauth2-w.stawi.org",
+      "origin": "https://identity-oauth2-hydra-admin-akpnezytka-od.a.run.app",
+      "protocol": "http",
+      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token."
+    },
+    {
+      "id": "authz",
+      "hostname": "authz.stawi.org",
+      "origin": "https://identity-authorization-keto-read-akpnezytka-od.a.run.app",
+      "protocol": "grpc",
+      "notes": "Keto read gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable."
+    },
+    {
+      "id": "authz-w",
+      "hostname": "authz-w.stawi.org",
+      "origin": "https://identity-authorization-keto-write-akpnezytka-od.a.run.app",
+      "protocol": "grpc",
+      "notes": "Keto write gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable."
     }
   ],
   "routes": [

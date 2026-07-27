@@ -3,7 +3,7 @@
  * See docs/SSL_EDGE_POLICY.md.
  *
  *  - api.stawi.org → path proxy + Scalar hub (this Worker)
- *  - accounts / oauth2 / oauth2-w / authz* → Google LB (edge-lb-identity), not Worker
+ *  - accounts / oauth2* / authz* → CF orange CNAME → Cloud Run (not this Worker)
  *
  * Safety: origins only *.run.app; not an open proxy.
  * Extend: config/routes.prod.json → validate → deploy.
