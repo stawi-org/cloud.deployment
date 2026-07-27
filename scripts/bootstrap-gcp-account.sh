@@ -6,8 +6,10 @@
 #   1) updates config/gcp-accounts.yaml with project/WIF/SA (non-secret registry)
 #   2) stores a SOPS-encrypted credentials/gcp/<account>/<env>/auth.yaml
 #      (same age recipient pattern as deployment.infra)
-# Always grants bwire517@gmail.com full project Owner so that one human
-# account can manage every bootstrapped domain project (console + gcloud).
+# Always grants bwire517@gmail.com full project control so one human account
+# can manage every bootstrapped domain project (console + gcloud). Prefers
+# roles/owner; if the org blocks external Owners (ORG_MUST_INVITE_EXTERNAL_OWNERS),
+# falls back to Editor + project IAM admin + domain admin roles.
 #
 # Architecture stays intact: apps still select gcp.account + neon.account in
 # app.yaml; CI resolves context via resolve-app-context.sh; runtime secrets
@@ -74,12 +76,28 @@ ATTR_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.reposi
 
 # Human operator always granted full project control on every bootstrap.
 # Re-applied on every bootstrap / --iam-only run (idempotent via ensure_iam_binding).
-# Owner covers console, gcloud, IAM, APIs, logs, secrets, Run — one account can
-# manage any domain project without per-project permission chasing.
 OPERATOR_EMAIL="bwire517@gmail.com"
 OPERATOR_MEMBER="user:${OPERATOR_EMAIL}"
-OPERATOR_ROLES=(
-  roles/owner   # full project control
+# Preferred: true Owner. Some orgs require inviting external users as owners.
+OPERATOR_PREFERRED_ROLE="roles/owner"
+# Fallback when ORG_MUST_INVITE_EXTERNAL_OWNERS (or similar) blocks Owner for Gmail.
+# Editor manages resources; projectIamAdmin manages IAM; the rest cover common gaps.
+OPERATOR_FALLBACK_ROLES=(
+  roles/editor
+  roles/resourcemanager.projectIamAdmin
+  roles/iam.serviceAccountAdmin
+  roles/iam.serviceAccountUser
+  roles/secretmanager.admin
+  roles/run.admin
+  roles/pubsub.admin
+  roles/cloudscheduler.admin
+  roles/compute.admin
+  roles/certificatemanager.owner
+  roles/artifactregistry.admin
+  roles/logging.admin
+  roles/serviceusage.serviceUsageAdmin
+  roles/cloudfunctions.admin
+  roles/eventarc.admin
 )
 
 SOPS_VERSION="v3.11.0"
@@ -469,17 +487,47 @@ compare_pr_url() {
 
 ensure_iam_binding() {
   # ensure_iam_binding ROLE MEMBER
+  # Returns 0 if already present or successfully added; 1 on failure.
+  # Prints gcloud stderr to /tmp/bootstrap-iam-err for caller inspection.
   local role="$1" member="$2"
   if gcloud projects get-iam-policy "$PROJECT" --format=json 2>/dev/null \
       | jq -e --arg r "$role" --arg m "$member" \
         '.bindings[]? | select(.role==$r) | .members[]? | select(.==$m)' >/dev/null 2>&1; then
     return 0
   fi
-  gcloud projects add-iam-policy-binding "$PROJECT" \
+  if gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="$member" \
     --role="$role" \
     --condition=None \
-    --quiet >/dev/null
+    --quiet >/dev/null 2>/tmp/bootstrap-iam-err.$$; then
+    rm -f /tmp/bootstrap-iam-err.$$
+    return 0
+  fi
+  cat /tmp/bootstrap-iam-err.$$ >&2 || true
+  rm -f /tmp/bootstrap-iam-err.$$
+  return 1
+}
+
+ensure_operator_full_access() {
+  # Prefer Owner; if the org forbids external Owners, bind the fallback admin suite.
+  say "Ensuring operator full access for ${OPERATOR_EMAIL}"
+  if ensure_iam_binding "$OPERATOR_PREFERRED_ROLE" "$OPERATOR_MEMBER"; then
+    say "  ${OPERATOR_PREFERRED_ROLE} → ${OPERATOR_MEMBER}"
+    OPERATOR_ACCESS_SUMMARY="${OPERATOR_PREFERRED_ROLE}"
+    return 0
+  fi
+  warn "could not bind ${OPERATOR_PREFERRED_ROLE} to ${OPERATOR_EMAIL}"
+  warn "(org policy ORG_MUST_INVITE_EXTERNAL_OWNERS often blocks Owner for non-org Gmail)"
+  warn "falling back to Editor + project IAM admin + domain admin roles"
+  local role
+  for role in "${OPERATOR_FALLBACK_ROLES[@]}"; do
+    if ensure_iam_binding "$role" "$OPERATOR_MEMBER"; then
+      say "  $role → ${OPERATOR_MEMBER}"
+    else
+      warn "could not bind $role to ${OPERATOR_EMAIL}"
+    fi
+  done
+  OPERATOR_ACCESS_SUMMARY="editor+projectIamAdmin+admin suite (owner blocked by org policy)"
 }
 
 # -------- prereqs --------
@@ -623,11 +671,8 @@ say "  workloadIdentityUser for ${GITHUB_REPO}"
 # -------------------------------------------------------------------------
 # 4. Human operator: full project access (every project bootstrap)
 # -------------------------------------------------------------------------
-say "Ensuring operator full access for ${OPERATOR_EMAIL}"
-for role in "${OPERATOR_ROLES[@]}"; do
-  ensure_iam_binding "$role" "$OPERATOR_MEMBER" || warn "could not bind $role to ${OPERATOR_EMAIL}"
-  say "  $role → ${OPERATOR_MEMBER}"
-done
+OPERATOR_ACCESS_SUMMARY="unknown"
+ensure_operator_full_access
 
 say ""
 say "=========================================================="
@@ -635,7 +680,7 @@ say "GCP ready for cloud.deployment account=${ACCOUNT} env=${ENV_NAME}"
 say "  project:  $PROJECT ($PROJECT_NUMBER)"
 say "  SA:       $SA_EMAIL"
 say "  WIF:      $WIF_PROVIDER_RESOURCE"
-say "  operator: ${OPERATOR_EMAIL} (roles/owner — full project access)"
+say "  operator: ${OPERATOR_EMAIL} (${OPERATOR_ACCESS_SUMMARY})"
 say "  SAFETY:   no Cloud Run services deleted; IAM is additive only"
 say "  Neon:     not configured here (independent; link per app via neon.account)"
 
