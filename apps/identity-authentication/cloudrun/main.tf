@@ -63,22 +63,24 @@ module "frame" {
     ],
   ))
   # Tofu-managed versions only for secrets with values this apply (generated + optional TF_VAR).
+  # Conditions use nonsensitive(): sensitive TF_VAR comparison marks the whole set and
+  # panics OpenTofu 1.10 for_each ("value is marked").
   extra_version_ids = toset(concat(
     [
       "identity-authentication-csrf-secret",
       "identity-authentication-cookie-hash-key",
       "identity-authentication-cookie-block-key",
     ],
-    var.google_oauth_client_id != "" ? ["identity-authentication-google-oauth-client-id"] : [],
-    var.google_oauth_client_secret != "" ? ["identity-authentication-google-oauth-client-secret"] : [],
+    try(nonsensitive(var.google_oauth_client_id) != "", false) ? ["identity-authentication-google-oauth-client-id"] : [],
+    try(nonsensitive(var.google_oauth_client_secret) != "", false) ? ["identity-authentication-google-oauth-client-secret"] : [],
   ))
   # Optional bootstrap from TF_VAR (CI/local); prefer scripts/sync-cluster-secrets-to-gcp.sh
   extra_secret_values = merge(
     local.generated_secret_values,
-    var.google_oauth_client_id != "" ? {
+    try(nonsensitive(var.google_oauth_client_id) != "", false) ? {
       "identity-authentication-google-oauth-client-id" = var.google_oauth_client_id
     } : {},
-    var.google_oauth_client_secret != "" ? {
+    try(nonsensitive(var.google_oauth_client_secret) != "", false) ? {
       "identity-authentication-google-oauth-client-secret" = var.google_oauth_client_secret
     } : {},
   )
