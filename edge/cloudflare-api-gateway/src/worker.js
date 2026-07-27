@@ -1,11 +1,14 @@
 /**
- * stawi-api-gateway — path proxy + Scalar multi-API docs hub for api.stawi.org.
+ * stawi-api-gateway — Cloudflare public edge (see docs/SSL_EDGE_POLICY.md).
  *
- * Safety:
- *  - Only configured path prefixes (longest match).
- *  - Origins allowlisted at config + runtime (not an open proxy).
- *  - Host forced to origin; OpenAPI servers rewritten to gateway path bases.
+ * Hosts (Cloudflare SSL / orange):
+ *  - api.stawi.org     → path proxy + Scalar hub
+ *  - accounts.stawi.org → login UI (host proxy, no strip)
+ *  - oauth2.stawi.org  → OIDC public (host proxy, no strip)
  *
+ * Control plane (oauth2-w, authz*) stays on Google Cert Manager + grey DNS.
+ *
+ * Safety: origins only *.run.app; not an open proxy.
  * Extend: config/routes.prod.json → validate → deploy.
  */
 
@@ -48,6 +51,15 @@ function buildRouteTable(config) {
 }
 
 const ROUTES = buildRouteTable(routesConfig);
+const HOST_ROUTES = (() => {
+  /** @type {Map<string, object>} */
+  const m = new Map();
+  for (const r of routesConfig.host_routes || []) {
+    if (r.enabled === false || !r.hostname || !r.origin) continue;
+    m.set(String(r.hostname).toLowerCase(), r);
+  }
+  return m;
+})();
 const HOSTNAME = routesConfig.hostname || "api.stawi.org";
 const HEALTH = routesConfig.gateway?.health_path || "/_gateway/health";
 const ROUTES_PATH = routesConfig.gateway?.routes_path || "/_gateway/routes";
@@ -55,6 +67,10 @@ const DOCS_META = routesConfig.gateway?.docs_path || "/_gateway/docs";
 const HUB_PATHS = new Set(routesConfig.gateway?.hub_paths || ["/", "/docs"]);
 const EXPOSE_ROUTES = routesConfig.gateway?.expose_route_list !== false;
 const SCALAR = routesConfig.gateway?.scalar || {};
+const ALLOWED_REQUEST_HOSTS = new Set([
+  HOSTNAME.toLowerCase(),
+  ...HOST_ROUTES.keys(),
+]);
 
 function originAllowed(originUrl, config) {
   let u;
@@ -65,8 +81,8 @@ function originAllowed(originUrl, config) {
   }
   if (u.protocol !== "https:") return false;
   const host = u.hostname.toLowerCase();
-  // Product APIs: Cloud Run only — never profile/devices/… hostnames.
-  if (host.endsWith(".stawi.org") && host !== "api.stawi.org") {
+  // Origins must be Cloud Run — never product *.stawi.org hostnames.
+  if (host.endsWith(".stawi.org")) {
     return false;
   }
   const suffixes = config.origin_allowlist?.host_suffixes || [".a.run.app", ".run.app"];
@@ -189,9 +205,11 @@ function gatewayHealth() {
     ok: true,
     gateway: "cloudflare-api-gateway",
     hostname: HOSTNAME,
-    routes: ROUTES.length,
+    path_routes: ROUTES.length,
+    host_routes: [...HOST_ROUTES.keys()],
     docs: docsCatalog().length,
     hub: Array.from(HUB_PATHS),
+    ssl_policy: "docs/SSL_EDGE_POLICY.md",
     ts: new Date().toISOString(),
   });
 }
@@ -200,13 +218,20 @@ function gatewayRoutes() {
   if (!EXPOSE_ROUTES) return jsonResponse({ error: "not_found" }, 404);
   return jsonResponse({
     hostname: HOSTNAME,
-    routes: ROUTES.map((r) => ({
+    path_routes: ROUTES.map((r) => ({
       id: r.id,
       prefix: r.prefix,
       service: r.service,
       public: r.public !== false,
       origin_host: safeOriginHost(r.origin),
       docs: r.docs?.enabled !== false,
+    })),
+    host_routes: [...HOST_ROUTES.values()].map((r) => ({
+      id: r.id,
+      hostname: r.hostname,
+      service: r.service,
+      origin_host: safeOriginHost(r.origin),
+      public: r.public !== false,
     })),
   });
 }
@@ -329,7 +354,14 @@ function wantsHtml(request) {
   return false;
 }
 
-async function proxyToRoute(request, route, url) {
+/**
+ * @param {Request} request
+ * @param {{ id: string, origin: string, strip_prefix?: boolean, prefix?: string }} route
+ * @param {URL} url
+ * @param {string} publicHost  hostname clients used (for X-Forwarded-Host)
+ * @param {{ rewriteOpenAPI?: boolean, openapiServerUrl?: string }} [opts]
+ */
+async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
   if (!originAllowed(route.origin, routesConfig)) {
     return jsonResponse(
       {
@@ -341,11 +373,11 @@ async function proxyToRoute(request, route, url) {
     );
   }
 
-  const stripped = stripPrefix(
-    url.pathname,
-    route.prefix,
-    route.strip_prefix !== false,
-  );
+  const doStrip = route.strip_prefix === true;
+  const prefix = route.prefix || "";
+  const stripped = doStrip
+    ? stripPrefix(url.pathname, prefix, true)
+    : url.pathname || "/";
   if (stripped == null) {
     return jsonResponse({ error: "invalid_path" }, 400);
   }
@@ -362,7 +394,7 @@ async function proxyToRoute(request, route, url) {
     return jsonResponse({ error: "origin_escape_blocked" }, 500);
   }
 
-  const headers = copyRequestHeaders(request, originBase.host, HOSTNAME);
+  const headers = copyRequestHeaders(request, originBase.host, publicHost);
   /** @type {RequestInit} */
   const init = {
     method: request.method,
@@ -392,24 +424,21 @@ async function proxyToRoute(request, route, url) {
   respHeaders.set("x-stawi-gateway", "cloudflare-api-gateway");
   respHeaders.set("x-stawi-route", route.id);
 
-  // Rewrite OpenAPI servers so clients and Scalar Try-it hit the gateway path.
   if (
+    opts.rewriteOpenAPI &&
     request.method === "GET" &&
     upstream.ok &&
     isOpenAPIPath(stripped)
   ) {
     const raw = await upstream.text();
-    const serverUrl = `https://${HOSTNAME}${route.prefix}`;
+    const serverUrl = opts.openapiServerUrl || `https://${publicHost}${prefix}`;
     const rewritten = rewriteOpenAPIServers(
       raw,
       upstream.headers.get("content-type"),
       serverUrl,
     );
     respHeaders.set("content-type", rewritten.contentType);
-    // Avoid double content-length
     respHeaders.delete("content-length");
-    // CORS for browser Scalar loading specs from same origin is fine;
-    // still allow * for tools that hit gateway openapi URLs cross-origin.
     if (!respHeaders.has("access-control-allow-origin")) {
       respHeaders.set("access-control-allow-origin", "*");
     }
@@ -434,13 +463,22 @@ async function handle(request) {
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
   const allowedHost =
-    host === HOSTNAME.toLowerCase() ||
+    ALLOWED_REQUEST_HOSTS.has(host) ||
     host.endsWith(".workers.dev") ||
     host === "localhost";
   if (!allowedHost) {
     return jsonResponse({ error: "host_not_allowed", host }, 421);
   }
 
+  // --- Host routes: accounts / oauth2 (full path passthrough) ---
+  const hostRoute = HOST_ROUTES.get(host);
+  if (hostRoute) {
+    return proxyToOrigin(request, hostRoute, url, host, {
+      rewriteOpenAPI: false,
+    });
+  }
+
+  // --- api.stawi.org path gateway + hub ---
   if (url.pathname === HEALTH || url.pathname === "/_gateway/healthz") {
     return gatewayHealth();
   }
@@ -451,12 +489,10 @@ async function handle(request) {
     return gatewayDocsMeta();
   }
 
-  // Scalar hub: / and /docs
   if (HUB_PATHS.has(url.pathname) || url.pathname === "/docs/") {
     if (wantsHtml(request) || url.pathname.startsWith("/docs")) {
       return htmlResponse(renderHubHtml());
     }
-    // Non-HTML clients on / get machine-readable index
     return gatewayDocsMeta();
   }
 
@@ -473,7 +509,10 @@ async function handle(request) {
     );
   }
 
-  return proxyToRoute(request, route, url);
+  return proxyToOrigin(request, route, url, HOSTNAME, {
+    rewriteOpenAPI: true,
+    openapiServerUrl: `https://${HOSTNAME}${route.prefix}`,
+  });
 }
 
 export default {

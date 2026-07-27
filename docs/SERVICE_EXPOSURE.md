@@ -11,11 +11,10 @@ and IAM reachability**, not Secret Manager placement.
 
 | Front door | Implementation | Hostname(s) | Routing | Cost |
 |------------|----------------|-------------|---------|------|
-| **API gateway** (only product surface) | [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) Worker | `api.stawi.org` | Path prefix → Cloud Run `*.run.app` | Free / ~$5 Workers |
-| **Optional GCP path LB** | `apps/api-gateway` | `api.stawi.org` | Same paths via Global LB | ~$18/mo — not default |
-| **Host edge LBs (exceptions only)** | `edge-lb-identity` | `accounts.*`, `oauth2.*`, `oauth2-w`, `authz*` | Login / OIDC / Keto | ~$18/mo one stack |
+| **Public edge** | [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) | `api` / `accounts` / `oauth2` | CF Universal SSL (orange) → `*.run.app` | Free / ~$5 |
+| **Control plane LB** | `edge-lb-identity` | `oauth2-w`, `authz`, `authz-w` | Google Cert Manager (grey) | ~$18/mo |
 
-There are **no** product hosts (`profile.stawi.org`, `devices.stawi.org`, …).
+Policy: [SSL_EDGE_POLICY.md](./SSL_EDGE_POLICY.md). No product hosts (`profile.stawi.org`, …).
 
 Path convention matches the K8s Gateway HTTPRoutes: clients call
 `https://api.stawi.org/profile/…`; the gateway **strips** `/profile` before the
@@ -90,12 +89,12 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 
 | Hostname | Cloud Run service | Mode | Notes |
 |----------|-------------------|------|--------|
-| `accounts.stawi.org` | identity-authentication | public | Login UI |
-| `oauth2.stawi.org` | identity-oauth2-hydra | **public** | OIDC authorize/token/JWKS (`serve public`) |
-| `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Hydra admin (`serve admin`) |
-| `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Keto read API |
-| `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Keto write API |
-| *(removed)* | product services | — | Use `api.stawi.org/<path>` only |
+| `api.stawi.org/*` | product Cloud Run | public (path) | CF Worker |
+| `accounts.stawi.org` | identity-authentication | public | CF Worker |
+| `oauth2.stawi.org` | identity-oauth2-hydra | public OIDC | CF Worker |
+| `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Google LB grey |
+| `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Google LB grey |
+| `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Google LB grey |
 
 Registry: [`config/public-edge.yaml`](../config/public-edge.yaml).
 
@@ -184,15 +183,10 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 ## Operational checklist
 
-1. Ensure **CLOUDFLARE_API_TOKEN** has Workers Scripts:Edit + Workers Routes:Edit (see [`edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md`](../edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md)).
-2. Deploy path gateway: `gh workflow run edge-api-gateway.yml` → confirm `https://api.stawi.org/_gateway/health` → **200**.
-3. Apply **edge-lb-identity** for host exceptions (accounts, oauth2, `oauth2-w`, `authz`, `authz-w`).
-4. Wait for Certificate Manager certs **ACTIVE** on host LB hostnames (if applying edge-lb).
-5. Apply **Keto** with identity + ops/platform invokers.
-6. Apply **Hydra** (public + admin) with admin invokers + `advertise_admin_hostname`.
-7. Apply **Frame** apps (identity, then ops/platform) so they use DNS control-plane URLs.
-8. Confirm path proxy: `curl -sSI https://api.stawi.org/profile/` reaches Cloud Run (not CF 521); anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
-9. Later: Shared VPC → flip Keto/admin to `exposure=private`.
+1. Follow cutover in [SSL_EDGE_POLICY.md](./SSL_EDGE_POLICY.md) (token scopes → Worker → edge-lb-identity → retire platform/ops LBs).
+2. Zone SSL **Full (strict)**.
+3. Apply **Keto** / **Hydra** invokers; Frame apps use `api.stawi.org` path bases.
+4. Smoke: api health/docs, accounts, oauth2 ready; `authz*` / `oauth2-w` → **403** without identity token.
 
 ## Tenancy (authenticated control plane)
 

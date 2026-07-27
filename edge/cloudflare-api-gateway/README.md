@@ -1,19 +1,17 @@
-# Cloudflare API gateway (`api.stawi.org`)
+# Cloudflare public edge (`stawi-api-gateway`)
 
-Low-cost **path proxy** + **[Scalar](https://github.com/scalar/scalar) multi-API docs hub**
-in front of multi-project Cloud Run services.
+Implements [docs/SSL_EDGE_POLICY.md](../../docs/SSL_EDGE_POLICY.md): **Cloudflare Universal SSL**
+for public hosts; origins are always Cloud Run `*.run.app`.
 
 ```
-https://api.stawi.org/            →  Scalar hub (all documented APIs)
-https://api.stawi.org/docs        →  same hub
-https://api.stawi.org/profile/…   →  identity-profile (Cloud Run)
-https://api.stawi.org/profile/openapi.yaml  →  OpenAPI (servers rewritten to gateway)
-https://api.stawi.org/devices/…   →  platform-devices
-…
+https://api.stawi.org/            →  Scalar hub
+https://api.stawi.org/profile/…   →  path proxy → identity-profile
+https://accounts.stawi.org/…      →  host proxy → identity-authentication
+https://oauth2.stawi.org/…        →  host proxy → identity-oauth2-hydra
 ```
 
-No GCP Global Load Balancer. Cloudflare terminates TLS and routes by path prefix
-(same product convention as the K8s Gateway HTTPRoutes).
+Control plane (`oauth2-w`, `authz*`) is **not** here — Google Cert Manager + grey DNS
+via `apps/edge-lb-identity`.
 
 ## Scalar hub
 

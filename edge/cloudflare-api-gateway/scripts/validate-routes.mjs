@@ -46,6 +46,34 @@ if (extra.length) {
 const prefixes = new Map();
 const ids = new Set();
 
+// --- Host routes (accounts, oauth2) ---
+const hostnames = new Set();
+for (const r of config.host_routes || []) {
+  if (!r.id) errors.push("host_route missing id");
+  if (ids.has(r.id)) errors.push(`duplicate id: ${r.id}`);
+  ids.add(r.id);
+  if (!r.hostname || !r.hostname.includes(".")) {
+    errors.push(`${r.id}: hostname required`);
+  }
+  const hn = String(r.hostname || "").toLowerCase();
+  if (hostnames.has(hn)) errors.push(`duplicate hostname: ${hn}`);
+  hostnames.add(hn);
+  if (r.enabled === false) {
+    warnings.push(`host_route ${r.id}: disabled`);
+    continue;
+  }
+  if (!r.origin) {
+    errors.push(`host_route ${r.id}: origin required when enabled`);
+    continue;
+  }
+  if (!originOk(r.origin)) {
+    errors.push(`host_route ${r.id}: origin not allowlisted: ${r.origin}`);
+  }
+  if (r.strip_prefix === true) {
+    warnings.push(`host_route ${r.id}: strip_prefix true is unusual for host proxies`);
+  }
+}
+
 for (const r of config.routes || []) {
   if (!r.id) errors.push("route missing id");
   if (ids.has(r.id)) errors.push(`duplicate id: ${r.id}`);

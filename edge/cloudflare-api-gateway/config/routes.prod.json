@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Path map for api.stawi.org → Cloud Run only (no product *.stawi.org hosts). Origins must be https://*.run.app. Extend via routes[]; npm run validate before deploy.",
+  "description": "SSL policy: CF orange for api + accounts + oauth2; origins always *.run.app. See docs/SSL_EDGE_POLICY.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
@@ -23,6 +23,30 @@
     ],
     "extra_hosts": []
   },
+  "host_routes": [
+    {
+      "id": "accounts",
+      "hostname": "accounts.stawi.org",
+      "service": "identity-authentication",
+      "project": "stawi-identity",
+      "origin": "https://identity-authentication-akpnezytka-od.a.run.app",
+      "strip_prefix": false,
+      "enabled": true,
+      "public": true,
+      "notes": "Login UI — Cloudflare SSL (orange). Not a product API path."
+    },
+    {
+      "id": "oauth2",
+      "hostname": "oauth2.stawi.org",
+      "service": "identity-oauth2-hydra",
+      "project": "stawi-identity",
+      "origin": "https://identity-oauth2-hydra-akpnezytka-od.a.run.app",
+      "strip_prefix": false,
+      "enabled": true,
+      "public": true,
+      "notes": "OIDC public — Cloudflare SSL (orange)."
+    }
+  ],
   "routes": [
     {
       "id": "profile",

@@ -4,14 +4,15 @@
 
 | Stack | Implementation | Project / account | Surface |
 |-------|----------------|-------------------|---------|
-| **API gateway (only product surface)** | Cloudflare Worker `edge/cloudflare-api-gateway` | Cloudflare zone `stawi.org` | `api.stawi.org` path routes → `*.run.app` |
-| API gateway (optional GCP) | OpenTofu `api-gateway` | stawi-api | same paths via Global LB (~$18/mo) |
-| Identity exceptions | `edge-lb-identity` | stawi-identity | accounts, oauth2, **oauth2-w**, **authz**, **authz-w** only |
-| Platform host LB | `edge-lb-platform` | stawi-platform | **retired** (`hosts = {}` — destroy leftover LB) |
-| Operations host LB | `edge-lb-operations` | stawi-operations | **retired** (`hosts = {}`) |
+| Surface | Implementation | SSL | Hosts |
+|---------|----------------|-----|-------|
+| Product + docs | Cloudflare Worker | CF Universal (orange) | `api.stawi.org` |
+| Login UI | Cloudflare Worker | CF Universal (orange) | `accounts.stawi.org` |
+| OIDC public | Cloudflare Worker | CF Universal (orange) | `oauth2.stawi.org` |
+| Control plane | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2-w`, `authz`, `authz-w` |
+| Platform/ops host LBs | retired | — | `hosts = {}` |
 
-**All product clients use** `https://api.stawi.org/<path>/…` (no `profile.stawi.org` / `devices.*` / …).
-Host LBs remain only for login UI, OIDC, and Keto.
+Canonical policy: [SSL_EDGE_POLICY.md](./SSL_EDGE_POLICY.md).
 
 **DNS ≠ public.** Control-plane hosts (`oauth2-w`, `authz`, `authz-w`) are on the
 edge LB for stable names and TLS, but Cloud Run IAM still requires
@@ -50,17 +51,18 @@ CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` and `api-gateway`
 ## Apply (after secret is set)
 
 ```bash
-# Unified product API (default — Cloudflare Worker, low cost)
+# Public edge: api + accounts + oauth2 (Cloudflare SSL)
 gh workflow run edge-api-gateway.yml
 
-# Optional GCP path LB (not default)
-# gh workflow run app-apply.yml -f app=api-gateway -f env=stawi-prod
-
-# Host exceptions / optional direct hosts
+# Control plane grey LB (oauth2-w, authz*) — after Worker is live
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
+
+# Destroy retired product host LBs
 gh workflow run app-apply.yml -f app=edge-lb-platform -f env=stawi-prod
 gh workflow run app-apply.yml -f app=edge-lb-operations -f env=stawi-prod
 ```
+
+Zone SSL mode: **Full (strict)** in the Cloudflare dashboard.
 
 OpenTofu will:
 

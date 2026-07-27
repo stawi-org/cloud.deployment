@@ -13,11 +13,10 @@ provider "cloudflare" {
 
 locals {
   zone_name = "stawi.org"
-  # Exceptions only — product APIs are api.stawi.org/<path> (Cloudflare Worker).
-  # Control-plane hosts (oauth2-w, authz, authz-w) stay IAM-authenticated — DNS ≠ public.
+  # Control plane only — Google Cert Manager + grey-cloud DNS (docs/SSL_EDGE_POLICY.md).
+  # Public browser hosts (accounts, oauth2) and product APIs use Cloudflare Worker SSL.
+  # These hosts stay IAM-authenticated — DNS ≠ anonymous public.
   hosts = {
-    "accounts.stawi.org" = { service = "identity-authentication" }
-    "oauth2.stawi.org"   = { service = "identity-oauth2-hydra" }
     "oauth2-w.stawi.org" = { service = "identity-oauth2-hydra-admin" }
     "authz.stawi.org"    = { service = "identity-authorization-keto-read" }
     "authz-w.stawi.org"  = { service = "identity-authorization-keto-write" }
@@ -98,5 +97,6 @@ module "lb" {
   hosts = local.hosts
 
   cloudflare_zone_id = var.cloudflare_zone_id
-  cloudflare_proxied = var.cloudflare_proxied
+  # Always grey-cloud for control plane — Cloudflare must not MITM Keto/Hydra admin.
+  cloudflare_proxied = false
 }

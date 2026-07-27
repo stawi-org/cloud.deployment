@@ -46,4 +46,7 @@ app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF /
 | [docs/GCP_BOOTSTRAP.md](docs/GCP_BOOTSTRAP.md) | Cloud Shell GCP account bootstrap (WIF + SOPS PR) |
 | [docs/NEON_BOOTSTRAP.md](docs/NEON_BOOTSTRAP.md) | Independent Neon org onboard (SOPS + optional GH Env) |
 | [docs/MODULES.md](docs/MODULES.md) | Modules |
+| [docs/SSL_EDGE_POLICY.md](docs/SSL_EDGE_POLICY.md) | **SSL + edge** (CF public / Google control plane) |
+| [docs/SERVICE_EXPOSURE.md](docs/SERVICE_EXPOSURE.md) | Public vs authenticated exposure |
+| [edge/cloudflare-api-gateway](edge/cloudflare-api-gateway) | Path hub + accounts/oauth2 Worker |
 | [docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md](docs/superpowers/specs/2026-07-24-multi-account-platform-identity-greenfield.md) | Platform design |

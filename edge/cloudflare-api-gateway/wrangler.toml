@@ -1,18 +1,25 @@
-# Cloudflare Worker — unified path API gateway for api.stawi.org
+# Cloudflare Worker — public edge (SSL on Cloudflare / orange cloud)
+# See docs/SSL_EDGE_POLICY.md
+#
 # Deploy: CLOUDFLARE_API_TOKEN=… npm run deploy
-# Token needs: Account.Workers Scripts:Edit, Zone.Workers Routes:Edit, Zone.DNS:Read (zone_name lookup)
+# Token: Account.Workers Scripts:Edit, Zone.Workers Routes:Edit, Zone.DNS:Edit
 
 name = "stawi-api-gateway"
 main = "src/worker.js"
 compatibility_date = "2026-07-01"
 workers_dev = true
-# Ant Investor Account (from wrangler whoami with CLOUDFLARE_API_TOKEN)
 account_id = "c358ea38bde6fd03d13bf87068635230"
 
-# Route all product API traffic through this Worker (edge handles TLS; no GCP LB).
-# zone_name resolves zone_id at deploy time.
+# Product path API + Scalar hub
 [[routes]]
 pattern = "api.stawi.org/*"
 zone_name = "stawi.org"
 
-# Thin proxy only — stays within Workers free CPU budget under normal load.
+# Public browser hosts (CF Universal SSL)
+[[routes]]
+pattern = "accounts.stawi.org/*"
+zone_name = "stawi.org"
+
+[[routes]]
+pattern = "oauth2.stawi.org/*"
+zone_name = "stawi.org"

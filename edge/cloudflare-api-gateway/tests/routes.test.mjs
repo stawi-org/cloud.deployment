@@ -102,6 +102,20 @@ describe("routing semantics", () => {
   });
 });
 
+describe("host_routes (accounts / oauth2)", () => {
+  it("defines accounts and oauth2 with run.app origins", () => {
+    const hosts = config.host_routes || [];
+    const byId = Object.fromEntries(hosts.map((h) => [h.id, h]));
+    assert.ok(byId.accounts);
+    assert.ok(byId.oauth2);
+    assert.equal(byId.accounts.hostname, "accounts.stawi.org");
+    assert.equal(byId.oauth2.hostname, "oauth2.stawi.org");
+    assert.match(byId.accounts.origin, /\.run\.app$/);
+    assert.match(byId.oauth2.origin, /\.run\.app$/);
+    assert.equal(byId.accounts.strip_prefix, false);
+  });
+});
+
 describe("Scalar docs catalog", () => {
   it("includes profile with openapi via gateway path", () => {
     const docsRoutes = (config.routes || []).filter(

@@ -1,20 +1,22 @@
 # edge-lb-identity
 
-OpenTofu-owned HTTPS edge for **identity host exceptions** only:
+Google **Certificate Manager** + Global HTTPS LB for **control-plane hosts only**
+(grey-cloud DNS). See [docs/SSL_EDGE_POLICY.md](../../docs/SSL_EDGE_POLICY.md).
 
-| Host | Backend Cloud Run | Exposure |
-|------|-------------------|----------|
-| accounts.stawi.org | identity-authentication | public (login UI) |
-| oauth2.stawi.org | identity-oauth2-hydra | public (OIDC) |
+| Host | Backend | Exposure |
+|------|---------|----------|
 | oauth2-w.stawi.org | identity-oauth2-hydra-admin | authenticated (IAM) |
 | authz.stawi.org | identity-authorization-keto-read | authenticated (IAM) |
 | authz-w.stawi.org | identity-authorization-keto-write | authenticated (IAM) |
 
-**Product APIs are not here.** Use the path gateway:
+**Not on this LB** (Cloudflare Worker + Universal SSL instead):
 
-- `https://api.stawi.org/profile`, `/tenancy`, `/identity`, …
-- Worker: [`edge/cloudflare-api-gateway`](../../edge/cloudflare-api-gateway)
+| Host | Via |
+|------|-----|
+| api.stawi.org | Worker path gateway + Scalar |
+| accounts.stawi.org | Worker host proxy |
+| oauth2.stawi.org | Worker host proxy |
 
-DNS does **not** make a service anonymous-public. Keto and Hydra admin still require `roles/run.invoker`. See [docs/SERVICE_EXPOSURE.md](../../docs/SERVICE_EXPOSURE.md).
+`cloudflare_proxied` is **forced false** in OpenTofu so Cloudflare never MITMs Keto/Hydra admin.
 
-Requires repo secret `CLOUDFLARE_API_TOKEN`. See [docs/PUBLIC_EDGE_DNS.md](../../docs/PUBLIC_EDGE_DNS.md).
+Requires `CLOUDFLARE_API_TOKEN` (Zone DNS Edit for A + ACME CNAMEs).

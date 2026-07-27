@@ -1,39 +1,39 @@
-# Edge contract for Cloud Run.
+# Edge contract for Cloud Run — see docs/SSL_EDGE_POLICY.md
 #
-# europe-west9 does NOT support classic Cloud Run domain mappings.
+# SSL split:
+#   Cloudflare Universal SSL (orange) + Worker:
+#     api.stawi.org, accounts.stawi.org, oauth2.stawi.org
+#   Google Certificate Manager (grey DNS) + Global LB:
+#     oauth2-w.stawi.org, authz.stawi.org, authz-w.stawi.org
 #
-# Product APIs: only api.stawi.org/<path> (Cloudflare Worker path proxy).
-# There are NO product per-service hosts (no profile.stawi.org, devices.*, …).
-#
-# Host exceptions (login / OIDC / Keto control plane only):
-#   accounts.stawi.org, oauth2.stawi.org, oauth2-w, authz, authz-w
-#
-# Optional GCP path LB (apps/api-gateway) exists but is not the default (cost).
+# Product APIs: only api.stawi.org/<path> (no profile.stawi.org, devices.*, …).
+# Zone SSL mode: Full (strict).
 
 version: 1
 prod:
   zone: stawi.org
   issuer: https://stawi.org
   region: europe-west9
+  ssl:
+    zone_mode: full_strict
+    policy_doc: docs/SSL_EDGE_POLICY.md
 
-  # Sole product API surface.
-  api_gateway:
-    implementation: cloudflare-worker
-    worker: edge/cloudflare-api-gateway
+  # Cloudflare Worker public edge (Universal SSL).
+  cloudflare_worker:
+    app: edge/cloudflare-api-gateway
     routes_config: edge/cloudflare-api-gateway/config/routes.prod.json
-    hostname: api.stawi.org
-    optional_gcp_lb_app: api-gateway
+    hostnames:
+      - api.stawi.org        # path APIs + Scalar hub
+      - accounts.stawi.org   # login UI
+      - oauth2.stawi.org     # OIDC public
     paths:
-      # identity
       /profile: { service: identity-profile, project: stawi-identity }
       /tenancy: { service: identity-tenancy, project: stawi-identity }
       /identity: { service: identity-identity, project: stawi-identity }
-      # platform
       /devices: { service: platform-devices, project: stawi-platform }
       /settings: { service: platform-settings, project: stawi-platform }
       /geolocation: { service: platform-geolocation, project: stawi-platform }
       /files: { service: platform-files, project: stawi-platform }
-      # operations
       /audit: { service: operations-audit, project: stawi-operations }
       /formstore: { service: operations-formstore, project: stawi-operations }
       /queuestore: { service: operations-queuestore, project: stawi-operations }
@@ -41,17 +41,15 @@ prod:
       /thesa: { service: operations-thesa, project: stawi-operations }
       /trustage: { service: operations-trustage, project: stawi-operations }
 
-  # Host LBs — exceptions only (not product APIs).
+  # Google LB + Certificate Manager (grey-cloud only).
   front_doors:
     edge-lb-identity:
       gcp_project: stawi-identity
+      cloudflare_proxied: false
       hosts:
-        accounts.stawi.org: identity-authentication
-        oauth2.stawi.org: identity-oauth2-hydra
         oauth2-w.stawi.org: identity-oauth2-hydra-admin
         authz.stawi.org: identity-authorization-keto-read
         authz-w.stawi.org: identity-authorization-keto-write
-    # Platform / operations product hosts retired — use api.stawi.org/<path>.
     edge-lb-platform:
       gcp_project: stawi-platform
       hosts: {}
@@ -59,8 +57,6 @@ prod:
       gcp_project: stawi-operations
       hosts: {}
 
-  # IAM-authenticated control plane (no allUsers).
-  # Tenancy is exposed only as api.stawi.org/tenancy (path gateway) + Cloud Run IAM.
   authenticated:
     - identity-authorization-keto-read
     - identity-authorization-keto-write
