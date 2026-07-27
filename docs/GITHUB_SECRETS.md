@@ -10,9 +10,12 @@ Canonical credential model for this repo.
 | `R2_ACCESS_KEY_ID` | OpenTofu state |
 | `R2_SECRET_ACCESS_KEY` | OpenTofu state |
 | `SOPS_AGE_KEY` | Private age key matching `.sops.yaml` — decrypts `credentials/{gcp,neon}/**` |
-| `CLOUDFLARE_API_TOKEN` | **Required for `edge-lb-*` apps** — Zone:DNS:Edit on `stawi.org` so OpenTofu manages public host A + cert ACME CNAMEs |
+| `CLOUDFLARE_API_TOKEN` | **DNS:** Zone:DNS:Edit on `stawi.org` for `edge-lb-*` OpenTofu. **API gateway Worker:** also Account Workers Scripts:Edit + Zone Workers Routes:Edit (same token or a broader one). |
+| `CLOUDFLARE_ACCOUNT_ID` | Optional — only if `wrangler deploy` for `edge/cloudflare-api-gateway` cannot auto-detect the account |
 
-Core deploy (services only) works without `CLOUDFLARE_API_TOKEN`. Public edge DNS cutover (`edge-lb-identity` / `edge-lb-platform`) requires it.
+Core deploy (services only) works without `CLOUDFLARE_API_TOKEN`.  
+Public product API (`api.stawi.org`) uses the **Cloudflare Worker** in `edge/cloudflare-api-gateway` (workflow `edge-api-gateway.yml`).  
+Host LBs (`edge-lb-*`) still need DNS:Edit when applied.
 
 ## How credentials are selected (no GitHub Environments)
 

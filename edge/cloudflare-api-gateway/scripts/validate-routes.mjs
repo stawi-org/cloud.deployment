@@ -1,0 +1,95 @@
+#!/usr/bin/env node
+/**
+ * Fail deploy if routes.prod.json is unsafe or inconsistent.
+ */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const config = JSON.parse(readFileSync(join(root, "config/routes.prod.json"), "utf8"));
+
+const errors = [];
+const warnings = [];
+
+if (config.version !== 1) errors.push("version must be 1");
+if (!config.hostname || !config.hostname.includes(".")) {
+  errors.push("hostname required");
+}
+
+const suffixes = config.origin_allowlist?.host_suffixes || [];
+const extra = new Set((config.origin_allowlist?.extra_hosts || []).map((h) => h.toLowerCase()));
+
+function originOk(origin) {
+  let u;
+  try {
+    u = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase();
+  if (suffixes.some((s) => host.endsWith(s))) return true;
+  return extra.has(host);
+}
+
+const prefixes = new Map();
+const ids = new Set();
+
+for (const r of config.routes || []) {
+  if (!r.id) errors.push("route missing id");
+  if (ids.has(r.id)) errors.push(`duplicate id: ${r.id}`);
+  ids.add(r.id);
+
+  if (!r.prefix || r.prefix[0] !== "/") {
+    errors.push(`${r.id}: prefix must start with /`);
+  }
+  if (r.prefix === "/") {
+    errors.push(`${r.id}: prefix must not be bare /`);
+  }
+  if (r.prefix?.length > 1 && r.prefix.endsWith("/")) {
+    errors.push(`${r.id}: prefix must not end with / (use /profile not /profile/)`);
+  }
+  if (prefixes.has(r.prefix)) {
+    errors.push(`duplicate prefix ${r.prefix}: ${prefixes.get(r.prefix)} and ${r.id}`);
+  }
+  prefixes.set(r.prefix, r.id);
+
+  if (r.enabled === false) {
+    warnings.push(`${r.id}: disabled`);
+    continue;
+  }
+  if (!r.origin) {
+    errors.push(`${r.id}: origin required when enabled`);
+    continue;
+  }
+  if (!originOk(r.origin)) {
+    errors.push(`${r.id}: origin not allowlisted: ${r.origin}`);
+  }
+  if (!r.service || !r.project) {
+    warnings.push(`${r.id}: missing service/project metadata`);
+  }
+}
+
+// Nested prefix ambiguity check (warn only — longest match handles it)
+for (const a of prefixes.keys()) {
+  for (const b of prefixes.keys()) {
+    if (a !== b && b.startsWith(a + "/")) {
+      warnings.push(`nested prefixes ${a} and ${b} — longest match wins at runtime`);
+    }
+  }
+}
+
+if (warnings.length) {
+  console.log("Warnings:");
+  for (const w of warnings) console.log("  -", w);
+}
+
+if (errors.length) {
+  console.error("Validation FAILED:");
+  for (const e of errors) console.error("  -", e);
+  process.exit(1);
+}
+
+const enabled = (config.routes || []).filter((r) => r.enabled !== false).length;
+console.log(`OK: ${enabled} enabled routes for ${config.hostname}`);

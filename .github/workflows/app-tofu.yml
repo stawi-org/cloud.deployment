@@ -5,7 +5,7 @@
 #   - SOPS_AGE_KEY: repository secret → decrypt credentials/{gcp,neon}/…
 #   - GCP: WIF from decrypted SOPS (or registry metadata already mirrored there)
 #   - Neon API key: only if app.yaml has neon.account → credentials/neon/<account>/auth.yaml
-#   - CLOUDFLARE_API_TOKEN: required for edge-lb-* (Cloudflare DNS A + ACME CNAMEs)
+#   - CLOUDFLARE_API_TOKEN: required for edge-lb-* and api-gateway (Cloudflare DNS A + ACME CNAMEs)
 #   - Runtime secrets: Secret Manager in the selected GCP project (OpenTofu)
 name: app-tofu
 
@@ -123,9 +123,9 @@ jobs:
           echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
           echo "AWS_REGION=auto" >> "$GITHUB_ENV"
 
-      # edge-lb-* manage Cloudflare DNS (A + ACME CNAMEs) entirely in OpenTofu.
-      - name: Cloudflare API token for edge-lb DNS
-        if: startsWith(inputs.app, 'edge-lb-')
+      # edge-lb-* and api-gateway manage Cloudflare DNS (A + ACME CNAMEs) in OpenTofu.
+      - name: Cloudflare API token for edge / API gateway DNS
+        if: startsWith(inputs.app, 'edge-lb-') || inputs.app == 'api-gateway'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
@@ -140,7 +140,7 @@ jobs:
             echo "CF_TOKEN_EOF"
           } >> "$GITHUB_ENV"
           echo "::add-mask::${CLOUDFLARE_API_TOKEN}"
-          echo "::notice::CLOUDFLARE_API_TOKEN loaded for edge DNS management"
+          echo "::notice::CLOUDFLARE_API_TOKEN loaded for edge / API gateway DNS management"
 
       # Neon extension enablement (modules/neon-database null_resource) needs psql.
       - name: Install postgresql-client (Neon CREATE EXTENSION)

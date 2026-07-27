@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "description": "Path map for api.stawi.org → Cloud Run. Source of truth for the Worker. Extend by adding a route object; run scripts/validate-routes.mjs before deploy.",
+  "hostname": "api.stawi.org",
+  "region": "europe-west9",
+  "gateway": {
+    "health_path": "/_gateway/health",
+    "routes_path": "/_gateway/routes",
+    "expose_route_list": true
+  },
+  "origin_allowlist": {
+    "host_suffixes": [
+      ".a.run.app",
+      ".run.app"
+    ],
+    "extra_hosts": [
+      "profile.stawi.org",
+      "tenancy.stawi.org",
+      "identity.stawi.org",
+      "devices.stawi.org",
+      "settings.stawi.org",
+      "geolocation.stawi.org",
+      "files.stawi.org",
+      "audit.stawi.org",
+      "formstore.stawi.org",
+      "queuestore.stawi.org",
+      "redirect.stawi.org",
+      "thesa.stawi.org",
+      "trustage.stawi.org"
+    ]
+  },
+  "routes": [
+    {
+      "id": "profile",
+      "prefix": "/profile",
+      "service": "identity-profile",
+      "project": "stawi-identity",
+      "origin": "https://identity-profile-akpnezytka-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "tenancy",
+      "prefix": "/tenancy",
+      "service": "identity-tenancy",
+      "project": "stawi-identity",
+      "origin": "https://identity-tenancy-akpnezytka-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": false,
+      "notes": "Cloud Run IAM authenticated (no allUsers). Callers need a Google ID token as invoker plus app OAuth."
+    },
+    {
+      "id": "identity",
+      "prefix": "/identity",
+      "service": "identity-identity",
+      "project": "stawi-identity",
+      "origin": "https://identity-identity-akpnezytka-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "devices",
+      "prefix": "/devices",
+      "service": "platform-devices",
+      "project": "stawi-platform",
+      "origin": "https://platform-devices-diujdvkz4a-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "settings",
+      "prefix": "/settings",
+      "service": "platform-settings",
+      "project": "stawi-platform",
+      "origin": "https://platform-settings-diujdvkz4a-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "geolocation",
+      "prefix": "/geolocation",
+      "service": "platform-geolocation",
+      "project": "stawi-platform",
+      "origin": "https://platform-geolocation-diujdvkz4a-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "files",
+      "prefix": "/files",
+      "service": "platform-files",
+      "project": "stawi-platform",
+      "origin": "https://platform-files-diujdvkz4a-od.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "audit",
+      "prefix": "/audit",
+      "service": "operations-audit",
+      "project": "stawi-operations",
+      "origin": "https://audit.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true,
+      "notes": "Origin falls back to host LB until refresh-origins can read stawi-operations."
+    },
+    {
+      "id": "formstore",
+      "prefix": "/formstore",
+      "service": "operations-formstore",
+      "project": "stawi-operations",
+      "origin": "https://formstore.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true,
+      "notes": "Host LB origin until run.app URL is known."
+    },
+    {
+      "id": "queuestore",
+      "prefix": "/queuestore",
+      "service": "operations-queuestore",
+      "project": "stawi-operations",
+      "origin": "https://queuestore.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "redirect",
+      "prefix": "/redirect",
+      "service": "operations-redirect",
+      "project": "stawi-operations",
+      "origin": "https://redirect.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "thesa",
+      "prefix": "/thesa",
+      "service": "operations-thesa",
+      "project": "stawi-operations",
+      "origin": "https://thesa.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    },
+    {
+      "id": "trustage",
+      "prefix": "/trustage",
+      "service": "operations-trustage",
+      "project": "stawi-operations",
+      "origin": "https://trustage.stawi.org",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true
+    }
+  ]
+}

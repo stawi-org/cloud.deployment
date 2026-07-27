@@ -1,0 +1,21 @@
+{
+  "name": "stawi-cloudflare-api-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Low-cost path proxy: api.stawi.org → Cloud Run (Cloudflare Worker)",
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-routes.mjs",
+    "refresh-origins": "node scripts/refresh-origins.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "deploy": "npm run validate && npm run test && wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.114.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

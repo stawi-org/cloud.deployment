@@ -1,12 +1,17 @@
 # Edge DNS → Cloud Run (fully OpenTofu-managed)
 
-Every service gets a stable hostname. Front doors:
+## Front doors
 
-| Stack | OpenTofu app | GCP project | Hosts |
-|-------|--------------|-------------|-------|
-| Identity | `edge-lb-identity` | stawi-identity | accounts, oauth2, **oauth2-w**, **authz**, **authz-w**, profile, tenancy, identity |
-| Platform | `edge-lb-platform` | stawi-platform | devices, settings, geolocation, files |
-| Operations | `edge-lb-operations` | stawi-operations | audit, formstore, queuestore, redirect, thesa, trustage |
+| Stack | Implementation | Project / account | Surface |
+|-------|----------------|-------------------|---------|
+| **API gateway (default)** | Cloudflare Worker `edge/cloudflare-api-gateway` | Cloudflare zone `stawi.org` | `api.stawi.org` path routes |
+| API gateway (optional GCP) | OpenTofu `api-gateway` | stawi-api | same paths via Global LB (~$18/mo) |
+| Identity hosts | `edge-lb-identity` | stawi-identity | accounts, oauth2, **oauth2-w**, **authz**, **authz-w**, optional product hosts |
+| Platform hosts | `edge-lb-platform` | stawi-platform | optional direct hosts |
+| Operations hosts | `edge-lb-operations` | stawi-operations | optional direct hosts |
+
+**Prefer the Cloudflare path gateway** for product clients (`https://api.stawi.org/profile/…`).
+Host LBs remain for OIDC/login/control-plane exceptions and optional direct hosts.
 
 **DNS ≠ public.** Control-plane hosts (`oauth2-w`, `authz`, `authz-w`) are on the
 edge LB for stable names and TLS, but Cloud Run IAM still requires
@@ -17,8 +22,8 @@ edge LB for stable names and TLS, but Cloud Run IAM still requires
 | Layer | Resource |
 |-------|----------|
 | Global anycast IP | `google_compute_global_address` |
-| Serverless NEGs → Cloud Run | `google_compute_region_network_endpoint_group` |
-| HTTPS URL map (host rules) | `google_compute_url_map` |
+| Serverless NEGs → Cloud Run | `google_compute_region_network_endpoint_group` (in **service** project for the gateway) |
+| HTTPS URL map (host or path rules) | `google_compute_url_map` |
 | Managed TLS | Certificate Manager cert + map |
 | Cert DNS validation | Cloudflare `CNAME` `_acme-challenge.<host>` |
 | Traffic DNS | Cloudflare `A` `<host>` → LB IP |
@@ -27,7 +32,7 @@ edge LB for stable names and TLS, but Cloud Run IAM still requires
 **Why not Cloud Run domain mapping?** Not available in `europe-west9` (API returns 501).
 
 **Registry:** [`config/public-edge.yaml`](../config/public-edge.yaml)  
-**Module:** [`modules/cloudrun-host-lb`](../modules/cloudrun-host-lb)
+**Modules:** [`modules/cloudrun-api-gateway`](../modules/cloudrun-api-gateway), [`modules/cloudrun-host-lb`](../modules/cloudrun-host-lb)
 
 ## One-time secret
 
@@ -40,11 +45,18 @@ Repository secret **`CLOUDFLARE_API_TOKEN`** with **Zone → DNS → Edit** on z
 # Value: <token>
 ```
 
-CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` only.
+CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` and `api-gateway`.
 
 ## Apply (after secret is set)
 
 ```bash
+# Unified product API (default — Cloudflare Worker, low cost)
+gh workflow run edge-api-gateway.yml
+
+# Optional GCP path LB (not default)
+# gh workflow run app-apply.yml -f app=api-gateway -f env=stawi-prod
+
+# Host exceptions / optional direct hosts
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 gh workflow run app-apply.yml -f app=edge-lb-platform -f env=stawi-prod
 gh workflow run app-apply.yml -f app=edge-lb-operations -f env=stawi-prod
@@ -59,6 +71,7 @@ OpenTofu will:
 Watch certs become ACTIVE:
 
 ```bash
+gcloud certificate-manager certificates list --project=stawi-api --location=global
 gcloud certificate-manager certificates list --project=stawi-identity --location=global
 gcloud certificate-manager certificates list --project=stawi-platform --location=global
 gcloud certificate-manager certificates list --project=stawi-operations --location=global
@@ -104,11 +117,14 @@ gcloud certificate-manager certificates list --project=stawi-operations --locati
 1. Smoke:
 
 ```bash
-# Public
+# Path gateway (product APIs)
+curl -sSI https://api.stawi.org/profile/healthz
+curl -sSI https://api.stawi.org/devices/healthz
+curl -sSI https://api.stawi.org/audit/healthz
+
+# Host exceptions
 curl -sSI https://oauth2.stawi.org/health/ready
-curl -sSI https://profile.stawi.org/healthz
-curl -sSI https://devices.stawi.org/healthz
-curl -sSI https://audit.stawi.org/healthz
+curl -sSI https://accounts.stawi.org/healthz
 
 # Authenticated control plane — expect 403 without identity token
 curl -sSI https://oauth2-w.stawi.org/health/ready
@@ -119,9 +135,9 @@ curl -sSI https://authz-w.stawi.org/health/ready
 2. Hydra: `advertise_public_hostname` / `advertise_admin_hostname` in  
    `apps/identity-oauth2-hydra/cloudrun/envs/stawi-prod.tfvars`.
 
-3. Optional: set `cloudflare_proxied = true` in edge-lb tfvars for orange-cloud (SSL Full strict).
+3. Optional: set `cloudflare_proxied = true` in edge-lb / api-gateway tfvars for orange-cloud (SSL Full strict).
 
-4. Optional: Cloudflare path aliases for legacy `api.stawi.org/*` (see `public-edge.yaml`).
+4. Path aliases for `api.stawi.org/*` are owned by **`api-gateway`**, not Cloudflare Workers.
 
 ## Drift / existing records
 
@@ -134,6 +150,9 @@ Re-apply after legacy cluster CNAMEs (orange-cloud) without hand-editing Cloudfl
 
 ## Cost
 
-Global external Application Load Balancer base charge applies per project
-(~\$15–25/mo each for identity + platform + operations forwarding rules) plus
-traffic. Required substitute for domain mapping in europe-west9.
+Global external Application Load Balancer base charge applies per front door
+(~\$15–25/mo for `api-gateway` plus each `edge-lb-*` that still has forwarding
+rules) plus traffic. Required substitute for domain mapping in europe-west9.
+
+The path gateway adds one LB in **stawi-api** and backend services (no extra
+forwarding rules) in each domain project.

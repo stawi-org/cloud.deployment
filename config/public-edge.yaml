@@ -1,17 +1,54 @@
-# Edge contract for Cloud Run (host-per-service).
+# Edge contract for Cloud Run.
 #
 # europe-west9 does NOT support classic Cloud Run domain mappings.
-# Hostnames are served via Global HTTPS LBs (apps/edge-lb-*) with Certificate
-# Manager + serverless NEGs + Cloudflare DNS.
+#
+# Front-door patterns (cost order):
+#
+# 1) Cloudflare path proxy (DEFAULT — low cost)
+#    edge/cloudflare-api-gateway → api.stawi.org/<path> → Cloud Run
+#    Free Workers tier / ~$5 paid; no GCP Global LB.
+#
+# 2) Optional GCP path LB (premium)
+#    apps/api-gateway + modules/cloudrun-api-gateway (~$18/mo fixed)
+#
+# 3) Host-per-service LBs (exceptions + optional direct hosts)
+#    apps/edge-lb-* → accounts.stawi.org, oauth2.stawi.org, authz*, …
+#    Module: modules/cloudrun-host-lb
 #
 # DNS ≠ public: control-plane hosts can have DNS while remaining IAM-authenticated.
-# Optional: Cloudflare can still map api.stawi.org/<path> → these hosts.
 
 version: 1
 prod:
   zone: stawi.org
   issuer: https://stawi.org
   region: europe-west9
+
+  # Primary product API surface — Cloudflare Worker (see edge/cloudflare-api-gateway).
+  api_gateway:
+    implementation: cloudflare-worker
+    worker: edge/cloudflare-api-gateway
+    routes_config: edge/cloudflare-api-gateway/config/routes.prod.json
+    hostname: api.stawi.org
+    optional_gcp_lb_app: api-gateway
+    paths:
+      # identity
+      /profile: { service: identity-profile, project: stawi-identity }
+      /tenancy: { service: identity-tenancy, project: stawi-identity }
+      /identity: { service: identity-identity, project: stawi-identity }
+      # platform
+      /devices: { service: platform-devices, project: stawi-platform }
+      /settings: { service: platform-settings, project: stawi-platform }
+      /geolocation: { service: platform-geolocation, project: stawi-platform }
+      /files: { service: platform-files, project: stawi-platform }
+      # operations
+      /audit: { service: operations-audit, project: stawi-operations }
+      /formstore: { service: operations-formstore, project: stawi-operations }
+      /queuestore: { service: operations-queuestore, project: stawi-operations }
+      /redirect: { service: operations-redirect, project: stawi-operations }
+      /thesa: { service: operations-thesa, project: stawi-operations }
+      /trustage: { service: operations-trustage, project: stawi-operations }
+
+  # Host-based LBs — login/OIDC/control-plane + optional direct product hosts.
   front_doors:
     edge-lb-identity:
       gcp_project: stawi-identity
@@ -21,6 +58,7 @@ prod:
         oauth2-w.stawi.org: identity-oauth2-hydra-admin
         authz.stawi.org: identity-authorization-keto-read
         authz-w.stawi.org: identity-authorization-keto-write
+        # Optional direct hosts (clients should prefer api.stawi.org/<path>)
         profile.stawi.org: identity-profile
         tenancy.stawi.org: identity-tenancy
         identity.stawi.org: identity-identity
@@ -40,24 +78,10 @@ prod:
         redirect.stawi.org: operations-redirect
         thesa.stawi.org: operations-thesa
         trustage.stawi.org: operations-trustage
+
   # IAM-authenticated control plane (no allUsers). Still have DNS via edge-lb-identity.
   authenticated:
     - identity-authorization-keto-read
     - identity-authorization-keto-write
     - identity-oauth2-hydra-admin
     - identity-tenancy
-  cloudflare_path_aliases:
-    api.stawi.org:
-      /profile: profile.stawi.org
-      /tenancy: tenancy.stawi.org
-      /identity: identity.stawi.org
-      /devices: devices.stawi.org
-      /settings: settings.stawi.org
-      /geolocation: geolocation.stawi.org
-      /files: files.stawi.org
-      /audit: audit.stawi.org
-      /formstore: formstore.stawi.org
-      /queuestore: queuestore.stawi.org
-      /redirect: redirect.stawi.org
-      /thesa: thesa.stawi.org
-      /trustage: trustage.stawi.org

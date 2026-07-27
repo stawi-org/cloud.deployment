@@ -83,9 +83,9 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 | `tenancy.stawi.org` | `identity-tenancy` |
 | `identity.stawi.org` | `identity-identity` |
 
-Optional legacy `api.stawi.org/<path>` → implement in **Cloudflare**, not Cloud Run.
+Product APIs under **`api.stawi.org/<path>`** → **`api-gateway`** (path LB in stawi-api).
 
-Front door: **`edge-lb-identity`** (Global HTTPS LB — domain mapping unavailable in europe-west9).  
+Host front door: **`edge-lb-identity`** (accounts, oauth2, authz*, optional direct hosts — domain mapping unavailable in europe-west9).  
 See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
 
 ## Container images (public GHCR)

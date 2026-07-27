@@ -1,0 +1,69 @@
+# Deploy Cloudflare Worker path gateway for api.stawi.org
+#
+# Secrets:
+#   CLOUDFLARE_API_TOKEN — Workers Scripts:Edit + Workers Routes:Edit + DNS:Read on stawi.org
+# Optional:
+#   CLOUDFLARE_ACCOUNT_ID — if wrangler cannot resolve the account from the token
+name: edge-api-gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: Run smoke tests against api.stawi.org after deploy
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "edge/cloudflare-api-gateway/**"
+      - ".github/workflows/edge-api-gateway.yml"
+
+concurrency:
+  group: edge-api-gateway
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: edge/cloudflare-api-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: edge/cloudflare-api-gateway/package-lock.json
+
+      - name: Install
+        run: |
+          if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
+
+      - name: Validate + test
+        run: |
+          npm run validate
+          npm test
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is required (Workers Scripts:Edit + Zone Workers Routes:Edit)"
+            exit 1
+          fi
+          npx wrangler deploy
+
+      - name: Smoke api.stawi.org
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          # Allow route propagation
+          sleep 5
+          GATEWAY_BASE=https://api.stawi.org npm run smoke

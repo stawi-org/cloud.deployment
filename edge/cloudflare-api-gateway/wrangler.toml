@@ -1,0 +1,16 @@
+# Cloudflare Worker — unified path API gateway for api.stawi.org
+# Deploy: CLOUDFLARE_API_TOKEN=… npm run deploy
+# Token needs: Account.Workers Scripts:Edit, Zone.Workers Routes:Edit, Zone.DNS:Read (zone_name lookup)
+
+name = "stawi-api-gateway"
+main = "src/worker.js"
+compatibility_date = "2026-07-01"
+workers_dev = true
+
+# Route all product API traffic through this Worker (edge handles TLS; no GCP LB).
+# zone_name resolves zone_id at deploy time.
+[[routes]]
+pattern = "api.stawi.org/*"
+zone_name = "stawi.org"
+
+# Thin proxy only — stays within Workers free CPU budget under normal load.

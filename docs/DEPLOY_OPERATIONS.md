@@ -124,7 +124,7 @@ Trustage multi-topic env (applied): `QUEUE_EXEC_*` → `operations-trustage-exec
     (`mem://`); trustage runs with `min_instance_count = 1`.
 - **Valkey / Redis:** K8s `VALKEY_CACHE_URL` is not provisioned; trustage sets
   `CACHE_REQUIRE_VALKEY=false`. Add Memorystore when cache is required.
-- **Public hosts / edge:** no `edge-lb-operations` yet; path routes on `api.stawi.org`
+- **Public hosts / edge:** `edge-lb-operations` for optional direct hosts; product paths via **`api-gateway`** on `api.stawi.org`
   (Cloudflare / future LB) still to wire for production public paths.
 - **Migrate jobs:** created with `execute = false`; run manually or flip when schema
   changes need applying.

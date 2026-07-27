@@ -11,7 +11,8 @@ Shared OpenTofu modules under `modules/`. App roots compose these; they do not c
 | `modules/cloudrun-migrate-job` | One-shot migrate job executed on apply |
 | `modules/cloudrun-service` | Cloud Run v2 service |
 | `modules/cloudrun-keep-warm` | Cloud Scheduler pings for cold-start mitigation |
-| `modules/cloudrun-host-lb` | Global HTTPS LB + certs + Cloudflare DNS (public hosts) |
+| `modules/cloudrun-host-lb` | Global HTTPS LB + certs + Cloudflare DNS (host-based public hosts) |
+| `modules/cloudrun-api-gateway` | Path-based Global HTTPS LB for `api.stawi.org` (cross-project Cloud Run backends) |
 
 ---
 

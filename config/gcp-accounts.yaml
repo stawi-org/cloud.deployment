@@ -131,6 +131,24 @@ accounts:
           environment: prod
           domain: operations
           managed-by: cloud-deployment
+  api:
+    description: Unified API gateway front door (api.stawi.org path LB; backends in domain projects)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-prod:
+        # Create/bootstrap with:
+        #   ./scripts/bootstrap-gcp-account.sh --account api --env stawi-prod \
+        #     --project stawi-api --region europe-west9
+        project_id: stawi-api
+        region: europe-west9
+        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-api.iam.gserviceaccount.com
+        labels:
+          environment: prod
+          domain: api
+          managed-by: cloud-deployment
   labs:
     description: Experimental GCP project(s); no production data
     owners:

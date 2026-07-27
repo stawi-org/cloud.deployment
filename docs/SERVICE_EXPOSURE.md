@@ -7,15 +7,34 @@ mode on `modules/cloudrun-service`.
 Secrets stay **per GCP project** (unchanged). This document is about **network
 and IAM reachability**, not Secret Manager placement.
 
+## Two front doors
+
+| Front door | Implementation | Hostname(s) | Routing | Cost |
+|------------|----------------|-------------|---------|------|
+| **API gateway** (default for product APIs) | [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) Worker | `api.stawi.org` | Path prefix → Cloud Run | Free / ~$5 Workers |
+| **Optional GCP path LB** | `apps/api-gateway` | `api.stawi.org` | Same paths via Global LB | ~$18/mo — not default |
+| **Host edge LBs** | `edge-lb-*` | `accounts.*`, `oauth2.*`, `authz*`, optional `profile.*`… | One host rule per service | ~$18/mo each |
+
+Path convention matches the K8s Gateway HTTPRoutes: clients call
+`https://api.stawi.org/profile/…`; the gateway **strips** `/profile` before the
+service so handlers stay at `/`. OAuth audiences remain
+`https://api.stawi.org/profile` (`OAUTH2_RESOURCE_AUDIENCE`).
+
+Host exceptions stay on edge LBs (login UI, OIDC, Keto) — same as cluster policy.
+
+Extend product paths by editing
+`edge/cloudflare-api-gateway/config/routes.prod.json` and deploying the Worker
+(`gh workflow run edge-api-gateway.yml`).
+
 ## DNS does not mean public
 
-Every service should have a **stable hostname** (`*.stawi.org`) via the domain
-edge LB (`edge-lb-identity`, `edge-lb-platform`, `edge-lb-operations`).
+Control-plane hosts (`authz*`, `oauth2-w`, optionally `tenancy`) still get
+stable DNS via `edge-lb-identity` while Cloud Run IAM stays non-anonymous.
 
 | Layer | What it does |
 |-------|----------------|
 | **DNS** | Name → LB IP |
-| **HTTPS LB + serverless NEG** | Host rule → Cloud Run service |
+| **HTTPS LB + serverless NEG** | Host or path rule → Cloud Run service |
 | **Cloud Run IAM** (`roles/run.invoker`) | Who may invoke (anonymous vs allow-list) |
 | **Ingress** | `ALL` vs `INTERNAL_ONLY` (VPC) |
 
@@ -42,7 +61,22 @@ invoker-grantable cross-project.
 Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 (Hydra admin) when private networking is ready.
 
-## Hostname inventory (prod)
+## Hostname / path inventory (prod)
+
+### Path gateway (`api-gateway` → `api.stawi.org`)
+
+| Path | Cloud Run service | Project | Mode |
+|------|-------------------|---------|------|
+| `/profile` | identity-profile | stawi-identity | public |
+| `/tenancy` | identity-tenancy | stawi-identity | **authenticated** (app OAuth + invoker) |
+| `/identity` | identity-identity | stawi-identity | public |
+| `/devices` | platform-devices | stawi-platform | public |
+| `/settings` | platform-settings | stawi-platform | public |
+| `/geolocation` | platform-geolocation | stawi-platform | public |
+| `/files` | platform-files | stawi-platform | public |
+| `/audit` … `/trustage` | operations-* | stawi-operations | public |
+
+### Host exceptions (`edge-lb-*`)
 
 | Hostname | Cloud Run service | Mode | Notes |
 |----------|-------------------|------|--------|
@@ -51,11 +85,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Hydra admin (`serve admin`) |
 | `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Keto read API |
 | `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Keto write API |
-| `profile.stawi.org` | identity-profile | public | Product |
-| `tenancy.stawi.org` | identity-tenancy | **authenticated** | Tenancy control plane (IAM invoker; app OAuth still applied in-process) |
-| `identity.stawi.org` | identity-identity | public | Product |
-| `devices.stawi.org` … | platform-* | public | Platform product |
-| `audit.stawi.org` … | operations-* | public | Operations product |
+| `profile.stawi.org` … | product services | (varies) | Optional direct host; prefer path gateway |
 
 Registry: [`config/public-edge.yaml`](../config/public-edge.yaml).
 
@@ -144,13 +174,15 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 ## Operational checklist
 
-1. Apply **edge-lb-identity** (hosts including `oauth2-w`, `authz`, `authz-w`).
-2. Wait for Certificate Manager certs **ACTIVE** on new hostnames.
-3. Apply **Keto** with identity + ops/platform invokers.
-4. Apply **Hydra** (public + admin) with admin invokers + `advertise_admin_hostname`.
-5. Apply **Frame** apps (identity, then ops/platform) so they use DNS control-plane URLs.
-6. Confirm anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
-7. Later: Shared VPC → flip Keto/admin to `exposure=private`.
+1. Bootstrap **`stawi-api`** + cross-project LB IAM (see [`apps/api-gateway/README.md`](../apps/api-gateway/README.md)).
+2. Apply **api-gateway** (path routes on `api.stawi.org`).
+3. Apply **edge-lb-identity** (hosts including `oauth2-w`, `authz`, `authz-w`, accounts, oauth2).
+4. Wait for Certificate Manager certs **ACTIVE** on new hostnames.
+5. Apply **Keto** with identity + ops/platform invokers.
+6. Apply **Hydra** (public + admin) with admin invokers + `advertise_admin_hostname`.
+7. Apply **Frame** apps (identity, then ops/platform) so they use DNS control-plane URLs.
+8. Confirm `https://api.stawi.org/profile/healthz` → **200**; anonymous curl to `authz*`, `oauth2-w` → **403**; `oauth2` public health → **200**.
+9. Later: Shared VPC → flip Keto/admin to `exposure=private`.
 
 ## Tenancy (authenticated control plane)
 
