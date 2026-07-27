@@ -304,7 +304,22 @@ jobs:
           # (otherwise apply 409s on google_secret_manager_secret).
           if [[ "$USE_FRAME" == "true" ]]; then
             echo "module.frame present — skip Pub/Sub import; import orphaned SM shells if any"
-            # Auth Google OAuth shells are seeded out-of-band; ensure state ownership.
+            # Import any SM secret whose id starts with the app name (covers
+            # database-url, extra_secret_ids, OAuth shells, etc.). Prevents 409
+            # when secrets exist in GCP but not in state after region moves.
+            while IFS= read -r sid; do
+              [[ -z "$sid" ]] && continue
+              # short name only
+              short="${sid##*/}"
+              import_if_missing \
+                "module.frame.module.secrets.google_secret_manager_secret.this[\"${short}\"]" \
+                "projects/${PROJECT_ID}/secrets/${short}"
+            done < <(
+              gcloud secrets list --project="$PROJECT_ID" \
+                --filter="name~/${APP}" \
+                --format='value(name)' 2>/dev/null || true
+            )
+            # Auth Google OAuth shells may not match name~/${APP} pattern edge cases
             if [[ "$APP" == "identity-authentication" ]]; then
               for sid in \
                 identity-authentication-google-oauth-client-id \
