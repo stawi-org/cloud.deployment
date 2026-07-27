@@ -81,6 +81,20 @@ curl -sSI https://authz.stawi.org/health/ready
 | One Global LB (`edge-lb-identity` control plane) | ~$18/mo |
 | Retired platform/ops host LBs | $0 after destroy |
 
+## Server-side (Cloud Run → Hydra / APIs)
+
+Cloud Run’s resolver can fail on **Cloudflare orange-cloud** hostnames
+(`oauth2.stawi.org` → “lame referral”), which breaks login token exchange.
+
+| Env | Value |
+|-----|--------|
+| `OAUTH2_SERVICE_URI` | Hydra **Cloud Run** URL (`*.run.app`) |
+| `OAUTH2_SERVICE_ADMIN_URI` | Hydra admin **Cloud Run** URL |
+| `OAUTH2_CLIENT_ASSERTION_AUDIENCE` | `https://oauth2.stawi.org/oauth2/token` (public token URL) |
+| Browser authorize / discovery | `https://oauth2.stawi.org` |
+
+Wired in `modules/frame-cloudrun-app` and `identity-authentication` internal Hydra URL.
+
 ## Out of scope
 
 - Cloud Run domain mapping (unavailable in region)  

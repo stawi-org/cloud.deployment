@@ -13,13 +13,45 @@ provider "google" {
 locals {
   is_prod         = var.platform == "stawi-prod"
   accounts_origin = local.is_prod ? "https://accounts.stawi.org" : "https://accounts.stawi.dev"
-  # Product APIs only on the path gateway (no profile.stawi.org / devices.* hosts).
+  # Browser-facing OIDC (Cloudflare SSL).
   oauth2_public = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
   api_base      = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
-  profile_uri   = "${local.api_base}/profile"
-  tenancy_uri   = "${local.api_base}/tenancy"
-  devices_uri   = "${local.api_base}/devices"
-  files_uri     = "${local.api_base}/files"
+  # Server-side service URLs: Cloud Run only. Orange-cloud public hostnames are
+  # unreliable from Cloud Run DNS and broke Google social login token exchange.
+  profile_uri = data.google_cloud_run_v2_service.profile.uri
+  tenancy_uri = data.google_cloud_run_v2_service.tenancy.uri
+  devices_uri = data.google_cloud_run_v2_service.devices.uri
+  files_uri   = data.google_cloud_run_v2_service.files.uri
+}
+
+data "google_cloud_run_v2_service" "profile" {
+  name     = "identity-profile"
+  location = var.region
+  project  = var.project_id
+}
+
+data "google_cloud_run_v2_service" "tenancy" {
+  name     = "identity-tenancy"
+  location = var.region
+  project  = var.project_id
+}
+
+data "google_cloud_run_v2_service" "devices" {
+  name     = "platform-devices"
+  location = var.region
+  project  = "stawi-platform"
+}
+
+data "google_cloud_run_v2_service" "files" {
+  name     = "platform-files"
+  location = var.region
+  project  = "stawi-platform"
+}
+
+data "google_cloud_run_v2_service" "hydra_public" {
+  name     = "identity-oauth2-hydra"
+  location = var.region
+  project  = var.project_id
 }
 
 module "frame" {
@@ -113,10 +145,10 @@ module "frame" {
     # Primary tenant/partition from cluster prod (stawi root).
     DEFAULT_TENANT_ID                  = "c2f4j7au6s7f91uqnojg"
     DEFAULT_PARTITION_ID               = "c2f4j7au6s7f91uqnokg"
-    FEDCM_PUBLIC_ORIGIN                = local.accounts_origin
-    # Public Hydra (not run.app) — FedCM + token facade browser/server hops.
-    FEDCM_HYDRA_PUBLIC_URL             = local.oauth2_public
-    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL   = local.oauth2_public
+    FEDCM_PUBLIC_ORIGIN = local.accounts_origin
+    # Browser Hydra host (CF SSL) vs server-side Hydra (Cloud Run URL).
+    FEDCM_HYDRA_PUBLIC_URL           = local.oauth2_public
+    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL = data.google_cloud_run_v2_service.hydra_public.uri
     NATIVE_CREDENTIAL_EXCHANGE_ENABLED = "true"
     AUTH_PROVIDER_GOOGLE_CALLBACK_URL  = "${local.accounts_origin}/s/social/callback"
     AUTH_PROVIDER_GOOGLE_SCOPES        = "openid email profile"

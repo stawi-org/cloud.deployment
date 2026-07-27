@@ -109,10 +109,9 @@ resource "google_compute_backend_service" "run" {
 
 resource "google_compute_url_map" "https" {
   project = var.project_id
-  name    = "${var.name}-https"
+  name    = local.url_map_name
 
-  # Stable default that does not pin a host backend (avoids destroy races when
-  # hosts shrink — backends were still referenced while default_service moved).
+  # Stable default that does not pin a host backend.
   default_url_redirect {
     https_redirect         = true
     host_redirect          = "stawi.org"
@@ -134,6 +133,10 @@ resource "google_compute_url_map" "https" {
       name            = "pm-${replace(path_matcher.key, ".", "-")}"
       default_service = google_compute_backend_service.run[path_matcher.key].id
     }
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

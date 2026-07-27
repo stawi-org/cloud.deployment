@@ -84,19 +84,20 @@ locals {
     var.extra_secret_values,
   )
 
-  # Stable DNS hosts (edge LB). Prod prefers DNS over run.app so every GCP project
-  # shares the same identity control-plane URLs. DNS alone does not make a host public —
-  # Keto / Hydra admin stay IAM-authenticated (see docs/SERVICE_EXPOSURE.md).
+  # Browser-facing OIDC host (discovery / authorize UX on Cloudflare SSL).
   oauth2_public_host = local.is_prod ? "oauth2.stawi.org" : "oauth2.stawi.dev"
-  oauth2_admin_host  = local.is_prod ? "oauth2-w.stawi.org" : "oauth2-w.stawi.dev"
+  oauth2_public_url  = "https://${local.oauth2_public_host}"
 
-  # Prod: DNS hostnames. Non-prod: Cloud Run URLs (edge LB may not exist).
-  oauth2_origin = local.is_prod ? "https://${local.oauth2_public_host}" : data.google_cloud_run_v2_service.hydra.uri
-  oauth2_admin_origin = local.is_prod ? "https://${local.oauth2_admin_host}" : try(
+  # Server-side Hydra HTTP calls always use Cloud Run URLs. Cloudflare orange-cloud
+  # names (oauth2.stawi.org) can fail from Cloud Run's resolver ("lame referral")
+  # and break login (token mint / private_key_jwt). See docs/SSL_EDGE_POLICY.md.
+  oauth2_origin = data.google_cloud_run_v2_service.hydra.uri
+  oauth2_admin_origin = try(
     data.google_cloud_run_v2_service.hydra_admin[0].uri,
     local.oauth2_origin,
   )
-  token_url = "${local.oauth2_origin}/oauth2/token"
+  # Assertion audience must match Hydra's advertised public token endpoint.
+  token_url = "${local.oauth2_public_url}/oauth2/token"
 
   # Prefer direct Cloud Run URLs for AUTHORIZATION_SERVICE_* — Frame talks gRPC
   # to Keto. run.app + h2c is reliable end-to-end; edge DNS hosts remain for
