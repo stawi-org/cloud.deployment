@@ -5,8 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       project:
+        description: GCP project for operations
+        required: true
+        type: string
         default: stawi-operations
       region:
+        description: Cloud Run region
+        required: true
+        type: string
         default: europe-west9
 
 jobs:
