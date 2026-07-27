@@ -51,15 +51,24 @@ jobs:
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'c358ea38bde6fd03d13bf87068635230' }}
         run: |
           set -euo pipefail
           if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
             echo "::error::CLOUDFLARE_API_TOKEN is required (Workers Scripts:Edit + Zone Workers Routes:Edit)"
             exit 1
           fi
+          # Fail fast with a clear message if the token is DNS-only
+          code=$(curl -sS -o /tmp/cf-workers.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts" || true)
+          if [[ "$code" != "200" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN cannot list Workers (HTTP ${code}). Update the secret with Account Workers Scripts:Edit + Zone Workers Routes:Edit on stawi.org. See edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md"
+            head -c 500 /tmp/cf-workers.json || true
+            echo
+            exit 1
+          fi
           npx wrangler deploy
-
       - name: Smoke api.stawi.org
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke || github.event_name == 'push' }}
         run: |

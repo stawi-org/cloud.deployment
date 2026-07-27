@@ -64,7 +64,11 @@ Neon API key is loaded **only** when `app.yaml` has `neon.account`.
 ./scripts/bootstrap-neon-account.sh --account platform --api-key "$PLATFORM_NEON_API_KEY" \
   --org-hint "Stawi Platform" --org-id org-calm-cell-68997035
 
-# 4) Cloudflare DNS for public edge (edge-lb-identity / edge-lb-platform)
-#    Token needs Zone → DNS → Edit on stawi.org (same scope as deployment.infra 04-dns).
+# 4) Cloudflare — DNS for edge-lb-* AND Workers for api.stawi.org gateway
+#    Prefer one token with:
+#      Account: Workers Scripts Edit
+#      Zone stawi.org: Workers Routes Edit + DNS Edit
+#    See edge/cloudflare-api-gateway/scripts/ensure-token-scopes.md
 #    gh secret set CLOUDFLARE_API_TOKEN --body "$TOKEN"
+#    gh secret set CLOUDFLARE_ACCOUNT_ID --body "c358ea38bde6fd03d13bf87068635230"  # optional
 ```

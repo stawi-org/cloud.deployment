@@ -6,6 +6,8 @@ name = "stawi-api-gateway"
 main = "src/worker.js"
 compatibility_date = "2026-07-01"
 workers_dev = true
+# Ant Investor Account (from wrangler whoami with CLOUDFLARE_API_TOKEN)
+account_id = "c358ea38bde6fd03d13bf87068635230"
 
 # Route all product API traffic through this Worker (edge handles TLS; no GCP LB).
 # zone_name resolves zone_id at deploy time.
