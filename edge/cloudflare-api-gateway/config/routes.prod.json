@@ -7,7 +7,10 @@
     "health_path": "/_gateway/health",
     "routes_path": "/_gateway/routes",
     "docs_path": "/_gateway/docs",
-    "hub_paths": ["/", "/docs"],
+    "hub_paths": [
+      "/",
+      "/docs"
+    ],
     "expose_route_list": true,
     "scalar": {
       "theme": "default",
@@ -28,37 +31,42 @@
     {
       "id": "accounts",
       "hostname": "accounts.stawi.org",
-      "origin": "https://identity-authentication-akpnezytka-od.a.run.app",
+      "origin": "https://identity-authentication-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Login UI. CF CNAME → Cloud Run."
+      "notes": "Login UI. CF CNAME → Cloud Run.",
+      "service": "identity-authentication"
     },
     {
       "id": "oauth2",
       "hostname": "oauth2.stawi.org",
-      "origin": "https://identity-oauth2-hydra-akpnezytka-od.a.run.app",
+      "origin": "https://identity-oauth2-hydra-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "OIDC public. CF CNAME → Cloud Run."
+      "notes": "OIDC public. CF CNAME → Cloud Run.",
+      "service": "identity-oauth2-hydra"
     },
     {
       "id": "oauth2-w",
       "hostname": "oauth2-w.stawi.org",
-      "origin": "https://identity-oauth2-hydra-admin-akpnezytka-od.a.run.app",
+      "origin": "https://identity-oauth2-hydra-admin-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token."
+      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token.",
+      "service": "identity-oauth2-hydra-admin"
     },
     {
       "id": "authz",
       "hostname": "authz.stawi.org",
-      "origin": "https://identity-authorization-keto-read-akpnezytka-od.a.run.app",
+      "origin": "https://identity-authorization-keto-read-akpnezytka-ew.a.run.app",
       "protocol": "grpc",
-      "notes": "Keto read gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable."
+      "notes": "Keto read gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable.",
+      "service": "identity-authorization-keto-read"
     },
     {
       "id": "authz-w",
       "hostname": "authz-w.stawi.org",
-      "origin": "https://identity-authorization-keto-write-akpnezytka-od.a.run.app",
+      "origin": "https://identity-authorization-keto-write-akpnezytka-ew.a.run.app",
       "protocol": "grpc",
-      "notes": "Keto write gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable."
+      "notes": "Keto write gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable.",
+      "service": "identity-authorization-keto-write"
     }
   ],
   "routes": [
@@ -67,7 +75,7 @@
       "prefix": "/profile",
       "service": "identity-profile",
       "project": "stawi-identity",
-      "origin": "https://identity-profile-akpnezytka-od.a.run.app",
+      "origin": "https://identity-profile-akpnezytka-ew.a.run.app",
       "strip_prefix": true,
       "enabled": true,
       "public": true,
@@ -84,7 +92,7 @@
       "prefix": "/tenancy",
       "service": "identity-tenancy",
       "project": "stawi-identity",
-      "origin": "https://identity-tenancy-akpnezytka-od.a.run.app",
+      "origin": "https://identity-tenancy-akpnezytka-ew.a.run.app",
       "strip_prefix": true,
       "enabled": true,
       "public": true,
@@ -100,7 +108,7 @@
       "prefix": "/identity",
       "service": "identity-identity",
       "project": "stawi-identity",
-      "origin": "https://identity-identity-akpnezytka-od.a.run.app",
+      "origin": "https://identity-identity-akpnezytka-ew.a.run.app",
       "strip_prefix": true,
       "enabled": true,
       "public": true,
@@ -130,7 +138,7 @@
       "prefix": "/settings",
       "service": "platform-settings",
       "project": "stawi-platform",
-      "origin": "https://platform-settings-diujdvkz4a-od.a.run.app",
+      "origin": "https://platform-settings-diujdvkz4a-ew.a.run.app",
       "strip_prefix": true,
       "enabled": true,
       "public": true,
@@ -145,7 +153,7 @@
       "prefix": "/geolocation",
       "service": "platform-geolocation",
       "project": "stawi-platform",
-      "origin": "https://platform-geolocation-diujdvkz4a-od.a.run.app",
+      "origin": "https://platform-geolocation-diujdvkz4a-ew.a.run.app",
       "strip_prefix": true,
       "enabled": true,
       "public": true,

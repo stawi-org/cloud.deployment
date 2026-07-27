@@ -95,5 +95,59 @@ for (const r of config.routes || []) {
   }
 }
 
+// direct_cnames: map stable host id → Cloud Run service name
+const DIRECT_SERVICE = {
+  accounts: "identity-authentication",
+  oauth2: "identity-oauth2-hydra",
+  "oauth2-w": "identity-oauth2-hydra-admin",
+  authz: "identity-authorization-keto-read",
+  "authz-w": "identity-authorization-keto-write",
+};
+for (const h of config.direct_cnames || []) {
+  const svc = h.service || DIRECT_SERVICE[h.id];
+  if (!svc) {
+    console.log(`keep direct ${h.id}: no service mapping`);
+    continue;
+  }
+  const live = urls.get(svc);
+  if (live && isRunApp(live) && live !== h.origin) {
+    console.log(`update direct ${h.id}: ${h.origin || "(empty)"} → ${live}`);
+    h.origin = live;
+    if (!h.service) h.service = svc;
+    changed++;
+  } else if (live) {
+    console.log(`ok direct ${h.id}: ${live}`);
+  } else {
+    console.log(`keep direct ${h.id}: ${h.origin || "(no origin)"} (no live URL)`);
+  }
+}
+
+// Also resolve services from any extra projects used by direct_cnames only
+const directProjects = ["stawi-identity"];
+for (const project of directProjects) {
+  if (projects.includes(project)) continue;
+  try {
+    const out = execFileSync(
+      "gcloud",
+      [
+        "run",
+        "services",
+        "list",
+        `--project=${project}`,
+        `--region=${region}`,
+        "--format=json(metadata.name,status.url)",
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    for (const s of JSON.parse(out || "[]")) {
+      if (s.metadata?.name && s.status?.url) {
+        urls.set(s.metadata.name, s.status.url.replace(/\/$/, ""));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 console.log(`Wrote ${path} (${changed} changes)`);
