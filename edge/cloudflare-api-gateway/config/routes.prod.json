@@ -1,12 +1,20 @@
 {
   "version": 1,
-  "description": "Path map for api.stawi.org → Cloud Run. Source of truth for the Worker. Extend by adding a route object; run scripts/validate-routes.mjs before deploy.",
+  "description": "Path map for api.stawi.org → Cloud Run. Source of truth for the Worker + Scalar hub. Extend by adding a route; run npm run validate before deploy.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
     "health_path": "/_gateway/health",
     "routes_path": "/_gateway/routes",
-    "expose_route_list": true
+    "docs_path": "/_gateway/docs",
+    "hub_paths": ["/", "/docs"],
+    "expose_route_list": true,
+    "scalar": {
+      "theme": "default",
+      "dark_mode": true,
+      "title": "Stawi API",
+      "cdn": "https://cdn.jsdelivr.net/npm/@scalar/api-reference"
+    }
   },
   "origin_allowlist": {
     "host_suffixes": [
@@ -38,7 +46,14 @@
       "origin": "https://identity-profile-akpnezytka-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Profile",
+        "description": "Contacts, addresses, roster, verification (Connect RPC).",
+        "openapi_path": "/openapi.yaml",
+        "default": true
+      }
     },
     {
       "id": "tenancy",
@@ -49,7 +64,13 @@
       "strip_prefix": true,
       "enabled": true,
       "public": false,
-      "notes": "Cloud Run IAM authenticated (no allUsers). Callers need a Google ID token as invoker plus app OAuth."
+      "docs": {
+        "enabled": false,
+        "title": "Tenancy",
+        "openapi_path": "/openapi.yaml",
+        "notes": "Not public on Cloud Run IAM; enable in hub when a public OpenAPI path exists."
+      },
+      "notes": "Cloud Run IAM authenticated (no allUsers)."
     },
     {
       "id": "identity",
@@ -59,7 +80,12 @@
       "origin": "https://identity-identity-akpnezytka-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Identity",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "devices",
@@ -69,7 +95,12 @@
       "origin": "https://platform-devices-diujdvkz4a-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Devices",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "settings",
@@ -79,7 +110,12 @@
       "origin": "https://platform-settings-diujdvkz4a-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Settings",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "geolocation",
@@ -89,7 +125,12 @@
       "origin": "https://platform-geolocation-diujdvkz4a-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Geolocation",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "files",
@@ -99,7 +140,12 @@
       "origin": "https://platform-files-diujdvkz4a-od.a.run.app",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Files",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "audit",
@@ -110,7 +156,11 @@
       "strip_prefix": true,
       "enabled": true,
       "public": true,
-      "notes": "Origin falls back to host LB until refresh-origins can read stawi-operations."
+      "docs": {
+        "enabled": true,
+        "title": "Audit",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "formstore",
@@ -121,7 +171,11 @@
       "strip_prefix": true,
       "enabled": true,
       "public": true,
-      "notes": "Host LB origin until run.app URL is known."
+      "docs": {
+        "enabled": true,
+        "title": "Formstore",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "queuestore",
@@ -131,7 +185,12 @@
       "origin": "https://queuestore.stawi.org",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Queuestore",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "redirect",
@@ -141,7 +200,12 @@
       "origin": "https://redirect.stawi.org",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Redirect",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "thesa",
@@ -151,7 +215,12 @@
       "origin": "https://thesa.stawi.org",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Thesa",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "trustage",
@@ -161,7 +230,12 @@
       "origin": "https://trustage.stawi.org",
       "strip_prefix": true,
       "enabled": true,
-      "public": true
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Trustage",
+        "openapi_path": "/openapi.yaml"
+      }
     }
   ]
 }

@@ -26,6 +26,14 @@ Extend product paths by editing
 `edge/cloudflare-api-gateway/config/routes.prod.json` and deploying the Worker
 (`gh workflow run edge-api-gateway.yml`).
 
+### API documentation hub (Scalar)
+
+`https://api.stawi.org/` and `/docs` serve a **[Scalar](https://github.com/scalar/scalar)**
+multi-document hub. Each route with `docs.enabled: true` and an `openapi_path`
+(default `/openapi.yaml`) appears in the document switcher. Specs are loaded via
+the gateway (`/{prefix}/openapi.yaml`); the Worker rewrites OpenAPI `servers` to
+`https://api.stawi.org/{prefix}` so Try-it and samples use the path gateway.
+
 ## DNS does not mean public
 
 Control-plane hosts (`authz*`, `oauth2-w`, optionally `tenancy`) still get

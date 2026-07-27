@@ -101,3 +101,33 @@ describe("routing semantics", () => {
     assert.equal(matchRoute(nested, "/pay/other")?.id, "a");
   });
 });
+
+describe("Scalar docs catalog", () => {
+  it("includes profile with openapi via gateway path", () => {
+    const docsRoutes = (config.routes || []).filter(
+      (r) => r.enabled !== false && r.docs?.enabled !== false && r.public !== false,
+    );
+    assert.ok(docsRoutes.some((r) => r.id === "profile"));
+    const profile = docsRoutes.find((r) => r.id === "profile");
+    assert.equal(profile.docs.openapi_path, "/openapi.yaml");
+    assert.equal(profile.docs.default, true);
+  });
+
+  it("excludes non-public tenancy from hub by default", () => {
+    const tenancy = (config.routes || []).find((r) => r.id === "tenancy");
+    assert.ok(tenancy);
+    assert.equal(tenancy.public, false);
+    assert.equal(tenancy.docs?.enabled, false);
+  });
+
+  it("builds unique slugs for Scalar sources", () => {
+    const slugs = new Set();
+    for (const r of config.routes || []) {
+      if (r.enabled === false || r.docs?.enabled === false || r.public === false) continue;
+      const slug = r.docs?.slug || r.id;
+      assert.equal(slugs.has(slug), false, `dup slug ${slug}`);
+      slugs.add(slug);
+    }
+    assert.ok(slugs.size >= 1);
+  });
+});

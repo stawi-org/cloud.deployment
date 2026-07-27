@@ -1,20 +1,50 @@
 # Cloudflare API gateway (`api.stawi.org`)
 
-Low-cost **path proxy** in front of multi-project Cloud Run services.
+Low-cost **path proxy** + **[Scalar](https://github.com/scalar/scalar) multi-API docs hub**
+in front of multi-project Cloud Run services.
 
 ```
-https://api.stawi.org/profile/…  →  identity-profile (Cloud Run)
-https://api.stawi.org/devices/…  →  platform-devices
+https://api.stawi.org/            →  Scalar hub (all documented APIs)
+https://api.stawi.org/docs        →  same hub
+https://api.stawi.org/profile/…   →  identity-profile (Cloud Run)
+https://api.stawi.org/profile/openapi.yaml  →  OpenAPI (servers rewritten to gateway)
+https://api.stawi.org/devices/…   →  platform-devices
 …
 ```
 
 No GCP Global Load Balancer. Cloudflare terminates TLS and routes by path prefix
 (same product convention as the K8s Gateway HTTPRoutes).
 
+## Scalar hub
+
+The hub is generated from `routes[].docs` in [`config/routes.prod.json`](./config/routes.prod.json).
+
+| Field | Purpose |
+|-------|---------|
+| `docs.enabled` | Include in Scalar document switcher |
+| `docs.title` | Label in the hub |
+| `docs.openapi_path` | Path on the **service** (default `/openapi.yaml`) after prefix strip |
+| `docs.default` | Default document when the hub loads |
+| `docs.description` | Optional blurb |
+
+Scalar loads each spec from the **gateway** URL:
+
+`https://api.stawi.org{prefix}{openapi_path}`  
+e.g. `https://api.stawi.org/profile/openapi.yaml`
+
+The Worker rewrites the OpenAPI `servers` entry to  
+`https://api.stawi.org{prefix}` so **Try it** and code samples hit the path gateway
+(Connect paths like `/profile.v1.ProfileService/Create` stay relative to that base).
+
+Services that do not expose OpenAPI yet still appear if `docs.enabled: true`; Scalar
+will show a load error for that document until the service serves the path.
+Set `docs.enabled: false` to hide them.
+
 ## Extend (add a service)
 
 1. Deploy the Cloud Run service as usual (`apps/<name>`).
-2. Append one object to [`config/routes.prod.json`](./config/routes.prod.json):
+2. Serve OpenAPI on the service (Frame: `/openapi.yaml` or `/debug/frame/openapi/{name}`).
+3. Append one object to [`config/routes.prod.json`](./config/routes.prod.json):
 
 ```json
 {
@@ -25,11 +55,17 @@ No GCP Global Load Balancer. Cloudflare terminates TLS and routes by path prefix
   "origin": "https://payments-payment-xxxxx-od.a.run.app",
   "strip_prefix": true,
   "enabled": true,
-  "public": true
+  "public": true,
+  "docs": {
+    "enabled": true,
+    "title": "Payment",
+    "description": "Checkout and payment intents.",
+    "openapi_path": "/openapi.yaml"
+  }
 }
 ```
 
-3. Prefer live origins:
+4. Prefer live origins:
 
 ```bash
 npm run refresh-origins   # needs gcloud auth on domain projects
@@ -37,11 +73,14 @@ npm run validate && npm test
 npm run deploy            # CLOUDFLARE_API_TOKEN required
 ```
 
-4. Smoke:
+5. Smoke:
 
 ```bash
 curl -sS https://api.stawi.org/_gateway/health
+curl -sS https://api.stawi.org/_gateway/docs | head
+curl -sSI https://api.stawi.org/docs
 curl -sSI https://api.stawi.org/payment/
+curl -sS https://api.stawi.org/payment/openapi.yaml | head
 ```
 
 **Rules**
@@ -52,6 +91,7 @@ curl -sSI https://api.stawi.org/payment/
 | `origin` must be `https` and allowlisted (`*.run.app` or known `*.stawi.org` hosts) | Blocks open-proxy footguns |
 | Longest prefix wins | Safe nested paths later |
 | `strip_prefix: true` (default) | Service keeps handlers at `/` (Connect: `/profile.v1…`) |
+| `docs.openapi_path` on the service root | After strip, gateway fetches that path from Cloud Run |
 
 ## Safety
 
@@ -108,8 +148,11 @@ gh workflow run edge-api-gateway.yml
 
 | Path | Purpose |
 |------|---------|
+| `GET /` or `/docs` | **Scalar multi-API hub** (HTML) |
 | `GET /_gateway/health` | Liveness JSON |
 | `GET /_gateway/routes` | Registered prefixes (no secrets) |
+| `GET /_gateway/docs` | Docs catalog JSON (Scalar sources + openapi URLs) |
+| `GET /{prefix}/openapi.yaml` | Proxied OpenAPI with gateway `servers` rewrite |
 
 ## Relation to GCP `apps/api-gateway`
 

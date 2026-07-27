@@ -69,6 +69,20 @@ for (const r of config.routes || []) {
   if (!r.service || !r.project) {
     warnings.push(`${r.id}: missing service/project metadata`);
   }
+
+  if (r.docs) {
+    if (r.docs.enabled !== false) {
+      const op = r.docs.openapi_path || "/openapi.yaml";
+      if (!op.startsWith("/")) {
+        errors.push(`${r.id}: docs.openapi_path must start with /`);
+      }
+      if (!r.docs.title) {
+        warnings.push(`${r.id}: docs.title missing (will use id)`);
+      }
+    }
+  } else if (r.public !== false) {
+    warnings.push(`${r.id}: no docs block — add docs.enabled + openapi_path for Scalar hub`);
+  }
 }
 
 // Nested prefix ambiguity check (warn only — longest match handles it)

@@ -43,6 +43,26 @@ await check("gateway health", `${base}${config.gateway?.health_path || "/_gatewa
   }
 });
 
+await check("docs hub HTML", `${base}/docs`, (r, b) => {
+  return r.status === 200 && (b.includes("Scalar") || b.includes("createApiReference") || b.includes("@scalar"));
+});
+
+await check("docs catalog JSON", `${base}/_gateway/docs`, (r, b) => {
+  if (r.status !== 200) return false;
+  try {
+    const j = JSON.parse(b);
+    return Array.isArray(j.sources) && j.sources.length >= 1;
+  } catch {
+    return false;
+  }
+});
+
+// Profile OpenAPI through gateway (prefix strip + server rewrite)
+await check("profile openapi via gateway", `${base}/profile/openapi.yaml`, (r, b) => {
+  if (r.status !== 200) return false;
+  return b.includes("openapi") || b.includes("paths:") || b.includes('"paths"');
+});
+
 // Public routes: any status except gateway 502/521/connection is progress.
 // App 404 means proxy + Cloud Run IAM path works.
 for (const r of config.routes || []) {

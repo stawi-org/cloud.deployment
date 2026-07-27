@@ -1,16 +1,16 @@
 /**
- * stawi-api-gateway — path-based reverse proxy for api.stawi.org → Cloud Run.
+ * stawi-api-gateway — path proxy + Scalar multi-API docs hub for api.stawi.org.
  *
- * Safety model:
- *  - Only configured path prefixes are accepted (longest match wins).
- *  - Origins are fixed in config and re-checked against an allowlist at runtime.
- *  - Host header is forced to the origin host (required for Cloud Run *.run.app).
- *  - Not an open proxy: no user-controlled origin or arbitrary host rewrite.
+ * Safety:
+ *  - Only configured path prefixes (longest match).
+ *  - Origins allowlisted at config + runtime (not an open proxy).
+ *  - Host forced to origin; OpenAPI servers rewritten to gateway path bases.
  *
- * Extend: edit config/routes.prod.json, validate, deploy.
+ * Extend: config/routes.prod.json → validate → deploy.
  */
 
 import routesConfig from "../config/routes.prod.json";
+import { isOpenAPIPath, rewriteOpenAPIServers } from "./openapi-rewrite.js";
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -21,7 +21,6 @@ const HOP_BY_HOP = new Set([
   "trailers",
   "transfer-encoding",
   "upgrade",
-  // Cloudflare / browser hop noise we regenerate
   "cf-connecting-ip",
   "cf-ipcountry",
   "cf-ray",
@@ -29,11 +28,8 @@ const HOP_BY_HOP = new Set([
   "cdn-loop",
 ]);
 
-/** @typedef {{ id: string, prefix: string, origin: string, strip_prefix?: boolean, enabled?: boolean, public?: boolean, service?: string }} Route */
-
 function normalizePrefix(p) {
   if (!p || p[0] !== "/") return null;
-  // collapse trailing slashes except root
   if (p.length > 1 && p.endsWith("/")) return p.slice(0, -1);
   return p;
 }
@@ -47,7 +43,6 @@ function buildRouteTable(config) {
     }))
     .filter((r) => r.prefix && r.origin);
 
-  // Longest prefix first so /profile/v2 would win over /profile if both exist.
   routes.sort((a, b) => b.prefix.length - a.prefix.length);
   return routes;
 }
@@ -56,7 +51,10 @@ const ROUTES = buildRouteTable(routesConfig);
 const HOSTNAME = routesConfig.hostname || "api.stawi.org";
 const HEALTH = routesConfig.gateway?.health_path || "/_gateway/health";
 const ROUTES_PATH = routesConfig.gateway?.routes_path || "/_gateway/routes";
+const DOCS_META = routesConfig.gateway?.docs_path || "/_gateway/docs";
+const HUB_PATHS = new Set(routesConfig.gateway?.hub_paths || ["/", "/docs"]);
 const EXPOSE_ROUTES = routesConfig.gateway?.expose_route_list !== false;
+const SCALAR = routesConfig.gateway?.scalar || {};
 
 function originAllowed(originUrl, config) {
   let u;
@@ -66,19 +64,13 @@ function originAllowed(originUrl, config) {
     return false;
   }
   if (u.protocol !== "https:") return false;
-
   const host = u.hostname.toLowerCase();
   const suffixes = config.origin_allowlist?.host_suffixes || [".a.run.app", ".run.app"];
   if (suffixes.some((s) => host.endsWith(s))) return true;
-
   const extra = config.origin_allowlist?.extra_hosts || [];
   return extra.map((h) => h.toLowerCase()).includes(host);
 }
 
-/**
- * @param {string} pathname
- * @returns {Route | null}
- */
 function matchRoute(pathname) {
   for (const r of ROUTES) {
     if (pathname === r.prefix || pathname.startsWith(r.prefix + "/")) {
@@ -88,19 +80,12 @@ function matchRoute(pathname) {
   return null;
 }
 
-/**
- * Strip configured prefix; never allow path escape outside "/".
- * /profile/foo → /foo ; /profile → /
- */
 function stripPrefix(pathname, prefix, doStrip) {
   if (!doStrip) return pathname || "/";
   let rest = pathname.slice(prefix.length);
   if (rest === "") rest = "/";
   if (!rest.startsWith("/")) rest = "/" + rest;
-  // block /../ style after strip
-  const resolved = new URL(rest, "https://gateway.invalid").pathname;
-  if (resolved.includes("\0")) return null;
-  return resolved;
+  return new URL(rest, "https://gateway.invalid").pathname;
 }
 
 function copyRequestHeaders(req, originHost, publicHost) {
@@ -109,21 +94,18 @@ function copyRequestHeaders(req, originHost, publicHost) {
     const key = k.toLowerCase();
     if (HOP_BY_HOP.has(key)) continue;
     if (key === "host") continue;
-    // Drop absolute-form leftovers
     if (key === "x-forwarded-host" || key === "x-forwarded-proto") continue;
     out.append(k, v);
   }
   out.set("Host", originHost);
   out.set("X-Forwarded-Host", publicHost);
   out.set("X-Forwarded-Proto", "https");
-  // Preserve client IP for app logs / rate limits
   const clientIp = req.headers.get("CF-Connecting-IP");
   if (clientIp) {
     out.set("X-Real-IP", clientIp);
     const prior = req.headers.get("X-Forwarded-For");
     out.set("X-Forwarded-For", prior ? `${prior}, ${clientIp}` : clientIp);
   }
-  // Mark traffic as via stawi API gateway (debug / policy)
   out.set("X-Stawi-Gateway", "cloudflare-api-gateway");
   return out;
 }
@@ -140,31 +122,17 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
   });
 }
 
-function gatewayHealth() {
-  return jsonResponse({
-    ok: true,
-    gateway: "cloudflare-api-gateway",
-    hostname: HOSTNAME,
-    routes: ROUTES.length,
-    ts: new Date().toISOString(),
-  });
-}
-
-function gatewayRoutes() {
-  if (!EXPOSE_ROUTES) {
-    return jsonResponse({ error: "not_found" }, 404);
-  }
-  return jsonResponse({
-    hostname: HOSTNAME,
-    routes: ROUTES.map((r) => ({
-      id: r.id,
-      prefix: r.prefix,
-      service: r.service,
-      public: r.public !== false,
-      // intentional: do not expose full origin host details beyond service id in public list?
-      // Operators need to debug — include origin host only (not secrets).
-      origin_host: safeOriginHost(r.origin),
-    })),
+function htmlResponse(html, status = 200) {
+  return new Response(html, {
+    status,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "public, max-age=60",
+      "x-stawi-gateway": "cloudflare-api-gateway",
+      // Allow Scalar CDN + same-origin OpenAPI fetches
+      "content-security-policy":
+        "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com; font-src 'self' https://fonts.scalar.com data:; img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'",
+    },
   });
 }
 
@@ -176,55 +144,188 @@ function safeOriginHost(origin) {
   }
 }
 
+/** Docs catalog for Scalar + /_gateway/docs */
+function docsCatalog() {
+  const sources = [];
+  for (const r of ROUTES) {
+    const docs = r.docs || {};
+    if (docs.enabled === false) continue;
+    // Skip non-public by default (Cloud Run IAM would block browser OpenAPI fetch)
+    if (r.public === false && docs.include_authenticated !== true) continue;
+
+    const openapiPath = docs.openapi_path || "/openapi.yaml";
+    const pathPart = openapiPath.startsWith("/") ? openapiPath : `/${openapiPath}`;
+    const title = docs.title || r.id;
+    const slug = docs.slug || r.id;
+    const serverUrl = `https://${HOSTNAME}${r.prefix}`;
+    const url = `https://${HOSTNAME}${r.prefix}${pathPart}`;
+
+    sources.push({
+      id: r.id,
+      title,
+      slug,
+      description: docs.description || "",
+      url,
+      openapi_path: pathPart,
+      prefix: r.prefix,
+      service: r.service,
+      default: docs.default === true,
+      servers: [{ url: serverUrl, description: "Stawi API gateway" }],
+    });
+  }
+  // Ensure one default
+  if (sources.length && !sources.some((s) => s.default)) {
+    sources[0].default = true;
+  }
+  return sources;
+}
+
+function gatewayHealth() {
+  return jsonResponse({
+    ok: true,
+    gateway: "cloudflare-api-gateway",
+    hostname: HOSTNAME,
+    routes: ROUTES.length,
+    docs: docsCatalog().length,
+    hub: Array.from(HUB_PATHS),
+    ts: new Date().toISOString(),
+  });
+}
+
+function gatewayRoutes() {
+  if (!EXPOSE_ROUTES) return jsonResponse({ error: "not_found" }, 404);
+  return jsonResponse({
+    hostname: HOSTNAME,
+    routes: ROUTES.map((r) => ({
+      id: r.id,
+      prefix: r.prefix,
+      service: r.service,
+      public: r.public !== false,
+      origin_host: safeOriginHost(r.origin),
+      docs: r.docs?.enabled !== false,
+    })),
+  });
+}
+
+function gatewayDocsMeta() {
+  return jsonResponse({
+    hostname: HOSTNAME,
+    title: SCALAR.title || "Stawi API",
+    sources: docsCatalog(),
+  });
+}
+
 /**
- * @param {Request} request
- * @param {ExecutionContext} _ctx
+ * Build Scalar multi-document config.
+ * Each source is loaded via the gateway path so OpenAPI servers can be rewritten.
  */
-async function handle(request, _ctx) {
-  const url = new URL(request.url);
+function buildScalarConfig() {
+  const sources = docsCatalog().map((s) => {
+    const entry = {
+      title: s.title,
+      slug: s.slug,
+      url: s.url,
+      default: s.default || false,
+    };
+    return entry;
+  });
 
-  // Only serve the configured public hostname (and workers.dev for previews).
-  const host = url.hostname.toLowerCase();
-  const allowedHost =
-    host === HOSTNAME.toLowerCase() ||
-    host.endsWith(".workers.dev") ||
-    host === "localhost";
-  if (!allowedHost) {
-    return jsonResponse({ error: "host_not_allowed", host }, 421);
-  }
+  // Per-document server override via multi-configuration array
+  const configs = docsCatalog().map((s) => ({
+    title: s.title,
+    slug: s.slug,
+    url: s.url,
+    default: s.default || false,
+    servers: s.servers,
+    // Prefer gateway same-origin; no external Scalar proxy required
+    telemetry: false,
+    hideClientButton: false,
+    metaData: {
+      title: `${SCALAR.title || "Stawi API"} · ${s.title}`,
+    },
+  }));
 
-  if (url.pathname === HEALTH || url.pathname === "/_gateway/healthz") {
-    return gatewayHealth();
-  }
-  if (url.pathname === ROUTES_PATH) {
-    return gatewayRoutes();
-  }
+  return {
+    theme: SCALAR.theme || "default",
+    darkMode: SCALAR.dark_mode !== false,
+    telemetry: false,
+    // Prefer multi-config so each API gets correct servers for Try-it
+    configs,
+    // Fallback sources list if multi-config shape changes
+    sources,
+  };
+}
 
-  // No bare "/" product surface — avoid accidental default backends.
-  if (url.pathname === "/" || url.pathname === "") {
-    return jsonResponse(
-      {
-        error: "not_found",
-        message: "Use a service path prefix, e.g. /profile/…",
-        health: HEALTH,
-        routes: EXPOSE_ROUTES ? ROUTES_PATH : undefined,
-      },
-      404,
-    );
-  }
+function renderHubHtml() {
+  const catalog = docsCatalog();
+  const scalarCfg = buildScalarConfig();
+  const title = SCALAR.title || "Stawi API";
+  const cdn = SCALAR.cdn || "https://cdn.jsdelivr.net/npm/@scalar/api-reference";
 
-  const route = matchRoute(url.pathname);
-  if (!route) {
-    return jsonResponse(
-      {
-        error: "no_route",
-        path: url.pathname,
-        message: "No API route registered for this path prefix.",
-      },
-      404,
-    );
-  }
+  // Multi-configuration: one entry per service with servers rewrite for Try-it
+  const createArg =
+    catalog.length === 0
+      ? JSON.stringify({
+          content: {
+            openapi: "3.1.0",
+            info: {
+              title,
+              version: "0.0.0",
+              description:
+                "No OpenAPI-enabled routes yet. Add docs.enabled + openapi_path on a route in routes.prod.json.",
+            },
+            paths: {},
+          },
+        })
+      : JSON.stringify(scalarCfg.configs);
 
+  // Escape </script> in JSON
+  const configJson = createArg.replace(/</g, "\\u003c");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="Stawi unified API documentation — all services under api.stawi.org" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #app { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="${escapeHtml(cdn)}"></script>
+  <script>
+    (function () {
+      var configs = ${configJson};
+      // Scalar: multi-document via createApiReference(selector, config | config[])
+      Scalar.createApiReference('#app', configs);
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function wantsHtml(request) {
+  if (request.method !== "GET" && request.method !== "HEAD") return false;
+  const accept = (request.headers.get("Accept") || "").toLowerCase();
+  if (accept.includes("text/html")) return true;
+  // Browsers often send */* ; treat no Accept as HTML for hub
+  if (!accept || accept === "*/*") return true;
+  return false;
+}
+
+async function proxyToRoute(request, route, url) {
   if (!originAllowed(route.origin, routesConfig)) {
     return jsonResponse(
       {
@@ -253,21 +354,17 @@ async function handle(request, _ctx) {
   }
 
   const target = new URL(stripped + url.search, originBase);
-  // Ensure we never leave the origin host
   if (target.hostname !== originBase.hostname) {
     return jsonResponse({ error: "origin_escape_blocked" }, 500);
   }
 
   const headers = copyRequestHeaders(request, originBase.host, HOSTNAME);
-
   /** @type {RequestInit} */
   const init = {
     method: request.method,
     headers,
     redirect: "manual",
   };
-
-  // Body only when allowed (avoid GET/HEAD body quirks)
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
   }
@@ -287,16 +384,92 @@ async function handle(request, _ctx) {
     );
   }
 
-  // Pass through response; add gateway marker (do not strip CORS from origin).
   const respHeaders = new Headers(upstream.headers);
   respHeaders.set("x-stawi-gateway", "cloudflare-api-gateway");
   respHeaders.set("x-stawi-route", route.id);
+
+  // Rewrite OpenAPI servers so clients and Scalar Try-it hit the gateway path.
+  if (
+    request.method === "GET" &&
+    upstream.ok &&
+    isOpenAPIPath(stripped)
+  ) {
+    const raw = await upstream.text();
+    const serverUrl = `https://${HOSTNAME}${route.prefix}`;
+    const rewritten = rewriteOpenAPIServers(
+      raw,
+      upstream.headers.get("content-type"),
+      serverUrl,
+    );
+    respHeaders.set("content-type", rewritten.contentType);
+    // Avoid double content-length
+    respHeaders.delete("content-length");
+    // CORS for browser Scalar loading specs from same origin is fine;
+    // still allow * for tools that hit gateway openapi URLs cross-origin.
+    if (!respHeaders.has("access-control-allow-origin")) {
+      respHeaders.set("access-control-allow-origin", "*");
+    }
+    return new Response(rewritten.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: respHeaders,
+    });
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: respHeaders,
   });
+}
+
+/**
+ * @param {Request} request
+ */
+async function handle(request) {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+  const allowedHost =
+    host === HOSTNAME.toLowerCase() ||
+    host.endsWith(".workers.dev") ||
+    host === "localhost";
+  if (!allowedHost) {
+    return jsonResponse({ error: "host_not_allowed", host }, 421);
+  }
+
+  if (url.pathname === HEALTH || url.pathname === "/_gateway/healthz") {
+    return gatewayHealth();
+  }
+  if (url.pathname === ROUTES_PATH) {
+    return gatewayRoutes();
+  }
+  if (url.pathname === DOCS_META) {
+    return gatewayDocsMeta();
+  }
+
+  // Scalar hub: / and /docs
+  if (HUB_PATHS.has(url.pathname) || url.pathname === "/docs/") {
+    if (wantsHtml(request) || url.pathname.startsWith("/docs")) {
+      return htmlResponse(renderHubHtml());
+    }
+    // Non-HTML clients on / get machine-readable index
+    return gatewayDocsMeta();
+  }
+
+  const route = matchRoute(url.pathname);
+  if (!route) {
+    return jsonResponse(
+      {
+        error: "no_route",
+        path: url.pathname,
+        message: "No API route registered for this path prefix.",
+        docs: "https://" + HOSTNAME + "/docs",
+      },
+      404,
+    );
+  }
+
+  return proxyToRoute(request, route, url);
 }
 
 export default {
