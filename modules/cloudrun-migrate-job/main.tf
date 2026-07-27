@@ -2,9 +2,9 @@
 # once on apply so the schema exists before the service starts.
 #
 # Migration commands (by workload type):
-#   Frame services:  args = ["migrate"]
-#   Ory Hydra:       args = ["migrate", "sql", "-e", "--yes"]  (DSN from env)
-#   Ory Keto:        args = ["migrate", "up", "-y"]            (DSN from env)
+#   Frame services:  args = ["setup"]   (full setup plan: migrate/bootstrap/permissions/…)
+#   Ory Hydra:       args = ["migrate", "sql", "-e", "--yes"]  (DSN from env; not Frame setup)
+#   Ory Keto:        args = ["migrate", "up", "-y"]            (DSN from env; not Frame setup)
 #
 # Prefer Neon *direct* connection URLs (not pooler) so session advisory locks work.
 

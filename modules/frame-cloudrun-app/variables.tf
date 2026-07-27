@@ -236,7 +236,7 @@ variable "resource_path" {
 variable "requested_audience_paths" {
   type        = list(string)
   default     = ["/profile", "/tenancy"]
-  description = "Extra OAuth audience paths under api base"
+  description = "Outbound OAuth audience paths under api base (business deps). Own resource_path is not included — see OAUTH2_RESOURCE_AUDIENCE. /tenancy is auto-appended when permissions_registration is true."
 }
 
 variable "app_env" {
@@ -263,11 +263,11 @@ variable "migrate_execute" {
 
 variable "migrate_args" {
   type        = list(string)
-  # Legacy argv migrate still works via ShouldRunSetup + RunSetupForProcess
-  # (runs registered migrate/bootstrap/permissions/verify steps). Prefer
-  # ["setup","migrate","permissions",…] once apps register full plans.
-  default     = ["migrate"]
-  description = "Setup/migrate Job argv. Prefer [\"setup\",\"migrate\",\"permissions\"]; legacy [\"migrate\"] runs well-known registered steps."
+  # Frame setup plan: argv "setup" with no task list runs every registered step
+  # (migrate, bootstrap, permissions, verify, …) in registration order.
+  # Prefer this over legacy ["migrate"] (DO_MIGRATION well-known subset).
+  default     = ["setup"]
+  description = "Setup Job argv. Default [\"setup\"] runs the full registered plan. Use [\"setup\",\"migrate\",\"permissions\"] for an explicit subset; legacy [\"migrate\"] still works."
 }
 
 variable "migrate_env" {
@@ -279,7 +279,7 @@ variable "migrate_env" {
 variable "permissions_registration" {
   type        = bool
   default     = true
-  description = "Set PERMISSIONS_REGISTRATION_URL on runtime + migrate (Frame PreStart manifest registration). Colony parity."
+  description = "Set PERMISSIONS_REGISTRATION_URL on runtime + migrate and auto-add /tenancy to OAUTH2_REQUESTED_AUDIENCES. Permission manifests publish only via setup Job (setup permissions), not runtime PreStart (Frame ≥ v2.1)."
 }
 
 # ---------------------------------------------------------------------------

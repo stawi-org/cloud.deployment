@@ -25,17 +25,19 @@ See **[GITHUB_SECRETS.md](GITHUB_SECRETS.md)**.
 
 ---
 
-## Migrations (automatic on apply)
+## Setup jobs (automatic on apply)
 
-Each app root runs a **Cloud Run Job** (`{app}-migrate`) before the service:
+Each Frame app root runs a **Cloud Run Job** (`{app}-migrate` name; argv is **setup**):
 
-| App | Migrate command | DB URL |
-|-----|-----------------|--------|
-| Frame services (auth, identity, profile, tenancy) | `migrate` | Neon **direct** (advisory locks) |
+| App | Job argv | DB URL |
+|-----|----------|--------|
+| Frame services (auth, identity, profile, tenancy) | `setup` (full plan: migrate + bootstrap + permissions + …) | Neon **direct** (advisory locks) |
 | Hydra | `migrate sql -e --yes` | Neon direct as `DSN` |
 | Keto | `migrate up -y` | Neon direct as `DSN` |
 
-Runtime services use the **pooled** Neon URL. Re-apply re-runs the job when the image or migrate args change.
+Frame jobs use `DO_SETUP=true` and `args = ["setup"]` so every registered setup step runs (schema, bootstrap, permission manifest registration). Do **not** use permissions-only or legacy `migrate` argv for normal deploys.
+
+Runtime services use the **pooled** Neon URL. Re-apply re-runs the job when the image or setup args change.
 
 ## Deploy order (apply)
 

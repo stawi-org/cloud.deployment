@@ -27,7 +27,16 @@ locals {
     "/${var.app_name}"
   )
   resource_path = var.resource_path != "" ? var.resource_path : local.default_resource_path
-  audience_paths        = distinct(concat([local.resource_path], var.requested_audience_paths))
+  # Colony parity: requested audiences are *outbound* resource indicators only
+  # (business deps). Own resource_path is OAUTH2_RESOURCE_AUDIENCE for inbound
+  # callers — never request self as audience on client_credentials mints or
+  # Hydra rejects with "audience has not been whitelisted".
+  # When permissions_registration is on, always include /tenancy so setup jobs
+  # can POST /_internal/register/permissions without each app listing it.
+  audience_paths = distinct(concat(
+    var.requested_audience_paths,
+    var.permissions_registration ? ["/tenancy"] : [],
+  ))
 
   # Hydra SA clients use colony IDs (service-profile, service-devices, …),
   # not Cloud Run app names (identity-profile, platform-devices).
@@ -150,8 +159,8 @@ locals {
       KETO_SERVICE_ADMIN_URI = local.keto_write_uri
     } : {},
     # Permission manifests: setup Job only (Frame ≥ v2.1.0 has no runtime PreStart).
-    # Still inject URL on runtime so shared images can run setup argv; publishing
-    # does not run unless ShouldRunSetup / RunSetupForProcess is invoked.
+    # Job default argv is ["setup"] (full registered plan). Still inject URL on
+    # runtime so shared images can run setup argv when used as a one-shot Job.
     var.permissions_registration ? {
       PERMISSIONS_REGISTRATION_URL = local.permissions_registration_url
     } : {},
@@ -169,6 +178,8 @@ locals {
     local.frame_oauth_env,
     {
       LOG_LEVEL             = "INFO"
+      # Prefer setup plan (argv ["setup"] or DO_SETUP) over legacy DO_MIGRATION.
+      DO_SETUP              = "true"
       EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
       OTEL_TRACES_EXPORTER  = "none"
       OTEL_METRICS_EXPORTER = "none"

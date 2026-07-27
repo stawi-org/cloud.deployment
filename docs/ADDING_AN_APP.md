@@ -55,7 +55,7 @@ Frame apps call **one** composition module (see [FRAME_CLOUDRUN_APP.md](FRAME_CL
 |-------|------|
 | Hydra + Keto data | OIDC + ReBAC URIs (same- or cross-project) |
 | `edge-contract` | Public edge defaults |
-| Neon + SM | Pooled runtime URL + direct migrate URL |
+| Neon + SM | Pooled runtime URL + direct setup-job URL |
 | Pub/Sub | Regional `{app}-events` + Frame push OIDC |
 | Migrate job | `execute=false` by default; `mem://` events |
 | Cloud Run | h2c, public invoker, OAuth/Keto env |
@@ -78,7 +78,7 @@ Migrations use the Neon **direct** connection string; the service uses the **poo
 - Topic: `{app_name}-events` with **regional** `message_storage_policy`
 - Push subscription → `POST https://{service}/_frame/queue/{app}-events`
 - Runtime env (Frame ≥2.0.10): dual-URL `EVENTS_QUEUE_*` + full `FRAME_QUEUE_PUSH_OIDC_*`
-- Migrate jobs keep `EVENTS_QUEUE_URL=mem://frame.events.migrate`
+- Setup jobs use argv `["setup"]` + `DO_SETUP=true` (full plan); keep `EVENTS_QUEUE_URL=mem://frame.events.migrate`
 - Services must blank-import `_ "gocloud.dev/pubsub/gcppubsub"` and depend on Frame ≥ **v2.0.10**
 
 Do **not** wire cluster NATS/JetStream here. Multi-topic apps (e.g. trustage) pass
@@ -108,7 +108,7 @@ Pub/Sub resources live in the **same GCP project** as Cloud Run.
 
 **Do not** rely on OpenTofu for routine image bumps. Service repos ship directly to Cloud Run via WIF + [`cloudrun-ship`](https://github.com/antinvestor/common/blob/main/.github/workflows/cloudrun-ship.yml) on each `v*.*.*` tag. See [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md).
 
-OpenTofu ignores container image on services/migrate jobs so infra applies never clobber a ship.
+OpenTofu ignores container image on services/setup jobs so infra applies never clobber a ship.
 
 Repo secrets required: `R2_*` + `SOPS_AGE_KEY` — see [GITHUB_SECRETS.md](GITHUB_SECRETS.md).
 

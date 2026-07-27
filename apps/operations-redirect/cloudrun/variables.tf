@@ -115,7 +115,7 @@ variable "memory" {
 
 variable "migrate_args" {
   type    = list(string)
-  default = ["migrate"]
+  default = ["setup"]
 }
 
 variable "analytics_base_url" {
