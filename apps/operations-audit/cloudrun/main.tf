@@ -37,6 +37,7 @@ module "frame" {
 
   # Owns hydra-webhook-psk (synced from identity) + audit-signing-key.
   extra_secret_ids            = local.generated_secret_ids
+  extra_version_ids           = local.generated_secret_ids
   extra_secret_values         = local.generated_secret_values
   grant_oauth_signer_accessor = false
   secret_env_extra = {

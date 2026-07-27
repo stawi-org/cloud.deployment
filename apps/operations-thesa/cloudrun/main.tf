@@ -9,6 +9,33 @@ provider "google" {
   region  = var.region
 }
 
+# Prefer TF_VAR; else copy analytics staged on identity (k8s → SM bootstrap path).
+data "google_secret_manager_secret_version" "analytics_backend_url" {
+  count   = var.analytics_backend_url == "" ? 1 : 0
+  project = var.identity_project_id
+  secret  = "${var.app_name}-analytics-backend-url"
+  version = "latest"
+}
+
+data "google_secret_manager_secret_version" "analytics_token" {
+  count   = var.analytics_token == "" ? 1 : 0
+  project = var.identity_project_id
+  secret  = "${var.app_name}-analytics-token"
+  version = "latest"
+}
+
+locals {
+  analytics_backend_url_value = (
+    var.analytics_backend_url != ""
+    ? var.analytics_backend_url
+    : data.google_secret_manager_secret_version.analytics_backend_url[0].secret_data
+  )
+  analytics_token_value = (
+    var.analytics_token != ""
+    ? var.analytics_token
+    : data.google_secret_manager_secret_version.analytics_token[0].secret_data
+  )
+}
 
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
@@ -33,16 +60,19 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
 
-  # Analytics secret IDs always declared (seed via sync-cluster-secrets-to-gcp.sh).
-  # Optional TF_VAR bootstrap; values never in git.
+  # Analytics always versioned (TF_VAR or identity SM copy). Never commit values.
   extra_secret_ids = toset([
     "${var.app_name}-analytics-backend-url",
     "${var.app_name}-analytics-token",
   ])
-  extra_secret_values = merge(
-    var.analytics_backend_url != "" ? { "${var.app_name}-analytics-backend-url" = var.analytics_backend_url } : {},
-    var.analytics_token != "" ? { "${var.app_name}-analytics-token" = var.analytics_token } : {},
-  )
+  extra_version_ids = toset([
+    "${var.app_name}-analytics-backend-url",
+    "${var.app_name}-analytics-token",
+  ])
+  extra_secret_values = {
+    "${var.app_name}-analytics-backend-url" = local.analytics_backend_url_value
+    "${var.app_name}-analytics-token"       = local.analytics_token_value
+  }
   secret_env_extra = {
     ANALYTICS_BACKEND_URL = { secret = "${var.app_name}-analytics-backend-url" }
     ANALYTICS_TOKEN       = { secret = "${var.app_name}-analytics-token" }

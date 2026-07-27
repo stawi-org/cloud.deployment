@@ -59,6 +59,16 @@ module "frame" {
       "identity-authentication-google-oauth-client-secret",
     ],
   ))
+  # Tofu-managed versions only for secrets with values this apply (generated + optional TF_VAR).
+  extra_version_ids = toset(concat(
+    [
+      "identity-authentication-csrf-secret",
+      "identity-authentication-cookie-hash-key",
+      "identity-authentication-cookie-block-key",
+    ],
+    var.google_oauth_client_id != "" ? ["identity-authentication-google-oauth-client-id"] : [],
+    var.google_oauth_client_secret != "" ? ["identity-authentication-google-oauth-client-secret"] : [],
+  ))
   # Optional bootstrap from TF_VAR (CI/local); prefer scripts/sync-cluster-secrets-to-gcp.sh
   extra_secret_values = merge(
     local.generated_secret_values,

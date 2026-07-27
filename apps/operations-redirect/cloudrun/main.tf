@@ -10,6 +10,36 @@ provider "google" {
   region  = var.region
 }
 
+# Analytics may be staged on identity during ops project bootstrap (k8s → SM sync).
+# Prefer TF_VAR; else copy from identity so Cloud Run always has a version to mount.
+data "google_secret_manager_secret_version" "analytics_username" {
+  count   = var.analytics_username == "" ? 1 : 0
+  project = var.identity_project_id
+  secret  = "${var.app_name}-analytics-username"
+  version = "latest"
+}
+
+data "google_secret_manager_secret_version" "analytics_password" {
+  count   = var.analytics_password == "" ? 1 : 0
+  project = var.identity_project_id
+  secret  = "${var.app_name}-analytics-password"
+  version = "latest"
+}
+
+locals {
+  # Sensitive values OK in secret_values; never use them in extra_version_ids keys.
+  analytics_username_value = (
+    var.analytics_username != ""
+    ? var.analytics_username
+    : data.google_secret_manager_secret_version.analytics_username[0].secret_data
+  )
+  analytics_password_value = (
+    var.analytics_password != ""
+    ? var.analytics_password
+    : data.google_secret_manager_secret_version.analytics_password[0].secret_data
+  )
+}
+
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
 
@@ -33,10 +63,15 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
 
-  # Encryption phrase always mounted. Analytics secret IDs always declared so
-  # scripts/sync-cluster-secrets-to-gcp.sh can seed values without TF_VAR;
-  # optional bootstrap via TF_VAR still supported. Never commit values.
+  # Encryption + analytics always versioned (values from random / TF_VAR / identity SM).
   extra_secret_ids = toset(concat(
+    tolist(local.generated_secret_ids),
+    [
+      "${var.app_name}-analytics-username",
+      "${var.app_name}-analytics-password",
+    ],
+  ))
+  extra_version_ids = toset(concat(
     tolist(local.generated_secret_ids),
     [
       "${var.app_name}-analytics-username",
@@ -45,8 +80,10 @@ module "frame" {
   ))
   extra_secret_values = merge(
     local.generated_secret_values,
-    var.analytics_username != "" ? { "${var.app_name}-analytics-username" = var.analytics_username } : {},
-    var.analytics_password != "" ? { "${var.app_name}-analytics-password" = var.analytics_password } : {},
+    {
+      "${var.app_name}-analytics-username" = local.analytics_username_value
+      "${var.app_name}-analytics-password" = local.analytics_password_value
+    },
   )
   secret_env_extra = {
     ENCRYPTION_PHRASE  = { secret = "service-files-encryption" }

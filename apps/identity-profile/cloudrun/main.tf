@@ -49,6 +49,11 @@ module "frame" {
     "identity-profile-dek-aes-key",
     "identity-profile-dek-hmac-key",
   ])
+  extra_version_ids = toset([
+    "identity-profile-dek-key-id",
+    "identity-profile-dek-aes-key",
+    "identity-profile-dek-hmac-key",
+  ])
   extra_secret_values = {
     "identity-profile-dek-key-id"   = "contacts-dek-cloud"
     "identity-profile-dek-aes-key"  = base64encode(random_password.dek_aes.result)

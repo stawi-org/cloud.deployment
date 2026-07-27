@@ -36,6 +36,10 @@ module "frame" {
     "${var.app_name}-cloudflare-turn-token-id",
     "${var.app_name}-cloudflare-turn-api-token",
   ])
+  extra_version_ids = toset(concat(
+    var.cloudflare_turn_token_id != "" ? ["${var.app_name}-cloudflare-turn-token-id"] : [],
+    var.cloudflare_turn_api_token != "" ? ["${var.app_name}-cloudflare-turn-api-token"] : [],
+  ))
   extra_secret_values = merge(
     var.cloudflare_turn_token_id != "" ? {
       "${var.app_name}-cloudflare-turn-token-id" = var.cloudflare_turn_token_id

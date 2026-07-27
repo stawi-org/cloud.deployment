@@ -43,6 +43,12 @@ module "frame" {
     "${var.app_name}-s3-access-key-id",
     "${var.app_name}-s3-access-key-secret",
   ])
+  extra_version_ids = toset(concat(
+    ["${var.app_name}-encryption-phrase"],
+    var.s3_endpoint != "" ? ["${var.app_name}-s3-endpoint"] : [],
+    var.s3_access_key_id != "" ? ["${var.app_name}-s3-access-key-id"] : [],
+    var.s3_access_key_secret != "" ? ["${var.app_name}-s3-access-key-secret"] : [],
+  ))
   extra_secret_values = merge(
     {
       "${var.app_name}-encryption-phrase" = random_password.encryption_phrase.result

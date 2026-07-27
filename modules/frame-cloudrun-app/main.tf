@@ -60,13 +60,12 @@ locals {
   # for_each keys must never be sensitive.
   # Do NOT use keys()/length() of sensitive maps (extra_secret_values) — OpenTofu
   # 1.10 marks the whole ternary and panics on for_each ("value is marked").
-  # Callers pass non-sensitive extra_secret_ids; default version ids to that set
-  # (or explicit extra_version_ids). Values are looked up by id at apply time.
-  extra_version_ids = (
-    length(var.extra_version_ids) > 0
-    ? var.extra_version_ids
-    : var.extra_secret_ids
-  )
+  #
+  # extra_secret_ids  → create SM secret shells (values may be seeded out-of-band).
+  # extra_version_ids → tofu-managed versions only (must be subset with values in
+  #                     extra_secret_values). Empty = no managed versions for extras.
+  # Never default version_ids to all secret_ids — missing secret_values[id] fails plan.
+  extra_version_ids = var.extra_version_ids
 
   secret_values = merge(
     var.has_database ? {

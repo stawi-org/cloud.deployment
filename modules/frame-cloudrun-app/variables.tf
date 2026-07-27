@@ -126,7 +126,7 @@ variable "extra_secret_values" {
 variable "extra_version_ids" {
   type        = set(string)
   default     = []
-  description = "Which extra_secret_ids get managed versions (default: keys of extra_secret_values)"
+  description = "Non-sensitive set of extra_secret_ids that get tofu-managed versions. Must have matching entries in extra_secret_values. Leave empty when values are seeded out-of-band (Vault/k8s → SM)."
 }
 
 variable "secret_env_extra" {
