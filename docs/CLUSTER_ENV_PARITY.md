@@ -7,7 +7,7 @@ Audit of Colony HelmRelease env (deployment.manifests) against
 
 | Cluster | Cloud Run |
 |---------|-----------|
-| `http://service-*.*.svc` | Edge DNS (`https://{host}.stawi.org`) or Keto/Hydra `*.run.app` for gRPC/IAM |
+| `http://service-*.*.svc` | Product: `https://api.stawi.org/<path>`; Hydra: `oauth2*.stawi.org`; Keto: `authz*.stawi.org` |
 | `nats://…` `EVENTS_QUEUE_URL` | `gcppubsub://` + dual-URL Frame push (module/pubsub) |
 | `NATS_CREDENTIALS_FILE` / SPIFFE / `K8S_*` | Omitted (not applicable) |
 | `DATABASE_USERNAME` / `PASSWORD` | Single `DATABASE_URL` Secret Manager |
@@ -41,7 +41,7 @@ Audit of Colony HelmRelease env (deployment.manifests) against
 | App | Notes |
 |-----|--------|
 | **operations-audit** | `AUDIT_SIGNING_KEY`, `DATABASE_LOG_QUERIES` — requires Neon `DATABASE_URL` + full frame env (broken if shell-only deploy) |
-| **operations-formstore** | MAX_SUBMISSION_SIZE, SUBMISSION_RATE_LIMIT, FILE_SERVICE_URL → files.stawi.org |
+| **operations-formstore** | MAX_SUBMISSION_SIZE, SUBMISSION_RATE_LIMIT, FILE_SERVICE_URL → `api.stawi.org/files` |
 | **operations-queuestore** | ENQUEUE_RATE_LIMIT, STATS_CACHE_TTL_SECONDS |
 | **operations-redirect** | JOBS_BASE_URL, LINK_EXPIRED_WEBHOOKS (empty until opportunities migrates), analytics always mounted |
 | **operations-thesa** | ANALYTICS_BACKEND_TYPE; analytics URL/token always mounted |

@@ -81,38 +81,42 @@ gcloud certificate-manager certificates list --project=stawi-operations --locati
 
 ## Host map (prod)
 
-### Identity (`edge-lb-identity`)
+### Product APIs — `api.stawi.org` only (Cloudflare Worker)
+
+No per-service product hosts (`profile.stawi.org`, `devices.*`, …). Paths:
+
+| Path | Service | Exposure |
+|------|---------|----------|
+| `/profile` | identity-profile | public |
+| `/tenancy` | identity-tenancy | authenticated (IAM) |
+| `/identity` | identity-identity | public |
+| `/devices` | platform-devices | public |
+| `/settings` | platform-settings | public |
+| `/geolocation` | platform-geolocation | public |
+| `/files` | platform-files | public |
+| `/audit`, `/formstore`, … | operations-* | public |
+
+Full route table: `edge/cloudflare-api-gateway/config/routes.prod.json` and
+`config/public-edge.yaml`.
+
+### Browser / OIDC exceptions (Cloudflare Worker host routes)
 
 | Hostname | Service | Exposure |
 |----------|---------|----------|
-| accounts.stawi.org | identity-authentication | public |
+| accounts.stawi.org | identity-authentication | public (login UI) |
 | oauth2.stawi.org | identity-oauth2-hydra | public (OIDC) |
+
+### Control plane (`edge-lb-identity`, grey-cloud Google LB)
+
+| Hostname | Service | Exposure |
+|----------|---------|----------|
 | oauth2-w.stawi.org | identity-oauth2-hydra-admin | **authenticated** |
 | authz.stawi.org | identity-authorization-keto-read | **authenticated** |
 | authz-w.stawi.org | identity-authorization-keto-write | **authenticated** |
-| profile.stawi.org | identity-profile | public |
-| tenancy.stawi.org | identity-tenancy | authenticated control plane |
-| identity.stawi.org | identity-identity | public |
 
-### Platform (`edge-lb-platform`)
+### Platform / operations host LBs
 
-| Hostname | Service |
-|----------|---------|
-| devices.stawi.org | platform-devices |
-| settings.stawi.org | platform-settings |
-| geolocation.stawi.org | platform-geolocation |
-| files.stawi.org | platform-files |
-
-### Operations (`edge-lb-operations`)
-
-| Hostname | Service |
-|----------|---------|
-| audit.stawi.org | operations-audit |
-| formstore.stawi.org | operations-formstore |
-| queuestore.stawi.org | operations-queuestore |
-| redirect.stawi.org | operations-redirect |
-| thesa.stawi.org | operations-thesa |
-| trustage.stawi.org | operations-trustage |
+**Retired** (`hosts = {}`). Product traffic is path-only on `api.stawi.org`.
 
 ## After certs ACTIVE
 

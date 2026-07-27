@@ -81,19 +81,36 @@ curl -sSI https://authz.stawi.org/health/ready
 | One Global LB (`edge-lb-identity` control plane) | ~$18/mo |
 | Retired platform/ops host LBs | $0 after destroy |
 
-## Server-side (Cloud Run → Hydra / APIs)
+## Server-side (Cloud Run → APIs)
 
-Cloud Run’s resolver can fail on **Cloudflare orange-cloud** hostnames
-(`oauth2.stawi.org` → “lame referral”), which breaks login token exchange.
+Apps call **stable public hostnames**, not `*.run.app` (run.app is edge origin only).
+
+### Product APIs — path gateway
 
 | Env | Value |
 |-----|--------|
-| `OAUTH2_SERVICE_URI` | Hydra **Cloud Run** URL (`*.run.app`) |
-| `OAUTH2_SERVICE_ADMIN_URI` | Hydra admin **Cloud Run** URL |
-| `OAUTH2_CLIENT_ASSERTION_AUDIENCE` | `https://oauth2.stawi.org/oauth2/token` (public token URL) |
-| Browser authorize / discovery | `https://oauth2.stawi.org` |
+| `PROFILE_SERVICE_URI` | `https://api.stawi.org/profile` |
+| `TENANCY_SERVICE_URI` | `https://api.stawi.org/tenancy` |
+| `DEVICE_SERVICE_URI` | `https://api.stawi.org/devices` |
+| `FILES_SERVICE_URI` | `https://api.stawi.org/files` |
+| `PERMISSIONS_REGISTRATION_URL` | `https://api.stawi.org/tenancy/_internal/register/permissions` |
+| `OAUTH2_RESOURCE_AUDIENCE` / requested audiences | `https://api.stawi.org/<path>` |
 
-Wired in `modules/frame-cloudrun-app` and `identity-authentication` internal Hydra URL.
+### Hydra / Keto — dedicated hosts
+
+| Env | Value |
+|-----|--------|
+| `OAUTH2_SERVICE_URI` / Hydra public internal | `https://oauth2.stawi.org` |
+| `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
+| `OAUTH2_CLIENT_ASSERTION_AUDIENCE` | `https://oauth2.stawi.org/oauth2/token` |
+| `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
+| `AUTHORIZATION_SERVICE_WRITE_URI` / `KETO_SERVICE_ADMIN_URI` | `https://authz-w.stawi.org` |
+
+Wired in `modules/frame-cloudrun-app`. Keto/Hydra admin Cloud Run services accept
+these hostnames as `custom_audiences` for Google ID-token invoker calls.
+
+**Do not** use retired product hosts (`profile.stawi.org`, …) or app-level
+`*.run.app` URLs for product HTTP.
 
 ## Out of scope
 

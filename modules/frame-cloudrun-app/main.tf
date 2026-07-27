@@ -84,34 +84,28 @@ locals {
     var.extra_secret_values,
   )
 
-  # Browser-facing OIDC host (discovery / authorize UX on Cloudflare SSL).
+  # Stable public hosts (not product paths on api.stawi.org, not *.run.app).
+  # Hydra public: CF Worker orange. Hydra admin + Keto: Google LB grey + IAM.
+  # Product APIs: api.stawi.org/<path>. See docs/SSL_EDGE_POLICY.md.
   oauth2_public_host = local.is_prod ? "oauth2.stawi.org" : "oauth2.stawi.dev"
   oauth2_public_url  = "https://${local.oauth2_public_host}"
+  oauth2_admin_host  = local.is_prod ? "oauth2-w.stawi.org" : "oauth2-w.stawi.dev"
+  authz_read_host    = local.is_prod ? "authz.stawi.org" : "authz.stawi.dev"
+  authz_write_host   = local.is_prod ? "authz-w.stawi.org" : "authz-w.stawi.dev"
 
-  # Server-side Hydra HTTP calls always use Cloud Run URLs. Cloudflare orange-cloud
-  # names (oauth2.stawi.org) can fail from Cloud Run's resolver ("lame referral")
-  # and break login (token mint / private_key_jwt). See docs/SSL_EDGE_POLICY.md.
-  oauth2_origin = data.google_cloud_run_v2_service.hydra.uri
-  oauth2_admin_origin = try(
-    data.google_cloud_run_v2_service.hydra_admin[0].uri,
-    local.oauth2_origin,
-  )
+  oauth2_origin       = local.oauth2_public_url
+  oauth2_admin_origin = "https://${local.oauth2_admin_host}"
   # Assertion audience must match Hydra's advertised public token endpoint.
   token_url = "${local.oauth2_public_url}/oauth2/token"
 
-  # Prefer direct Cloud Run URLs for AUTHORIZATION_SERVICE_* — Frame talks gRPC
-  # to Keto. run.app + h2c is reliable end-to-end; edge DNS hosts remain for
-  # human/docs and can be set via migrate_env / service_env_extra if needed.
   keto_read_uri = (
-    !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_read[0].uri
+    !var.enable_keto ? local.api_base : "https://${local.authz_read_host}"
   )
   keto_write_uri = (
-    !var.enable_keto ? local.api_base : data.google_cloud_run_v2_service.keto_write[0].uri
+    !var.enable_keto ? local.api_base : "https://${local.authz_write_host}"
   )
 
-  # Tenancy is only on the path gateway (no tenancy.stawi.org product host).
-  # Callers still mint Google ID tokens for Cloud Run IAM (run.app audience /
-  # dual-auth); the public registration URL is the gateway path.
+  # Product tenancy only on path gateway (no tenancy.stawi.org host).
   permissions_registration_url = "${local.api_base}/tenancy/_internal/register/permissions"
 
   frame_oauth_env = merge(
@@ -207,38 +201,6 @@ locals {
     var.secret_env_extra,
     var.migrate_secret_env_extra,
   )
-}
-
-# ---------------------------------------------------------------------------
-# Identity Cloud Run endpoints
-# ---------------------------------------------------------------------------
-
-data "google_cloud_run_v2_service" "hydra" {
-  name     = "identity-oauth2-hydra"
-  location = local.identity_region
-  project  = local.identity_project
-}
-
-# Optional until first hydra-admin apply succeeds (count avoids hard fail on greenfield).
-data "google_cloud_run_v2_service" "hydra_admin" {
-  count    = var.use_hydra_admin_service ? 1 : 0
-  name     = "identity-oauth2-hydra-admin"
-  location = local.identity_region
-  project  = local.identity_project
-}
-
-data "google_cloud_run_v2_service" "keto_read" {
-  count    = var.enable_keto ? 1 : 0
-  name     = "identity-authorization-keto-read"
-  location = local.identity_region
-  project  = local.identity_project
-}
-
-data "google_cloud_run_v2_service" "keto_write" {
-  count    = var.enable_keto ? 1 : 0
-  name     = "identity-authorization-keto-write"
-  location = local.identity_region
-  project  = local.identity_project
 }
 
 # ---------------------------------------------------------------------------

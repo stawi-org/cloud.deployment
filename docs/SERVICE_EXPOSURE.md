@@ -133,15 +133,18 @@ Frame apps (`modules/frame-cloudrun-app`) in **prod** wire:
 
 | Env | Value |
 |-----|--------|
+| Product `*_SERVICE_URI` | `https://api.stawi.org/<path>` (profile, tenancy, devices, files, …) |
+| `PERMISSIONS_REGISTRATION_URL` | `https://api.stawi.org/tenancy/_internal/register/permissions` |
 | `OAUTH2_SERVICE_URI` | `https://oauth2.stawi.org` |
 | `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
-| `AUTHORIZATION_SERVICE_READ_URI` | Keto **read** Cloud Run URL (`*.run.app`) — gRPC client |
-| `AUTHORIZATION_SERVICE_WRITE_URI` | Keto **write** Cloud Run URL (`*.run.app`) — gRPC client |
-| `KETO_SERVICE_ADMIN_URI` | Same as write CR URL (when `enable_keto_admin`) |
+| `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
+| `AUTHORIZATION_SERVICE_WRITE_URI` | `https://authz-w.stawi.org` |
+| `KETO_SERVICE_ADMIN_URI` | `https://authz-w.stawi.org` (when `enable_keto_admin`) |
 
-DNS hosts `authz.stawi.org` / `authz-w.stawi.org` remain for humans and non-gRPC callers.
-Frame’s authorizer uses **gRPC over TLS** to the Cloud Run URLs and mints a Google
-ID token (runtime SA) for `roles/run.invoker`. Keto services use `use_http2` (h2c).
+Product HTTP goes through **`api.stawi.org`**. Hydra/Keto use their stable DNS
+hosts. Frame’s authorizer talks **gRPC over TLS** to `authz*` and mints a Google
+ID token (runtime SA) with audience = that host; Keto Cloud Run accepts those
+hostnames via `custom_audiences` and `use_http2` (h2c).
 
 Cross-project callers still need invoker grants on keto read/write.
 

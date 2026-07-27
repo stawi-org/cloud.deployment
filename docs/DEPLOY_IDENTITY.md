@@ -73,20 +73,20 @@ gcloud secrets describe identity-authentication-database-url --project=stawi-ide
 
 ## Public DNS / edge
 
-**One hostname per service** (no Cloud Run path router). Full map: **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** + `config/public-edge.yaml`.
+Product APIs are **path-only** on Cloudflare (`api.stawi.org/<path>`). Full map:
+**[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** + `config/public-edge.yaml`.
 
-| Host | Service |
-|------|---------|
-| `accounts.stawi.org` | `identity-authentication` |
-| `oauth2.stawi.org` | `identity-oauth2-hydra` |
-| `api.stawi.org/profile` | `identity-profile` (path gateway) |
-| `api.stawi.org/tenancy` | `identity-tenancy` (path gateway; IAM) |
-| `api.stawi.org/identity` | `identity-identity` (path gateway) |
+| Surface | Service |
+|---------|---------|
+| `accounts.stawi.org` | `identity-authentication` (login UI) |
+| `oauth2.stawi.org` | `identity-oauth2-hydra` (OIDC public) |
+| `api.stawi.org/profile` | `identity-profile` |
+| `api.stawi.org/tenancy` | `identity-tenancy` (IAM) |
+| `api.stawi.org/identity` | `identity-identity` |
 
-Product APIs under **`api.stawi.org/<path>`** → **`api-gateway`** (path LB in stawi-api).
-
-Host front door: **`edge-lb-identity`** (accounts, oauth2, authz*, optional direct hosts — domain mapping unavailable in europe-west9).  
-See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
+Edge: **`edge/cloudflare-api-gateway`**. Control-plane grey LB:
+**`edge-lb-identity`** (`oauth2-w`, `authz`, `authz-w` only).  
+See **[SSL_EDGE_POLICY.md](SSL_EDGE_POLICY.md)**.
 
 ## Container images (public GHCR)
 

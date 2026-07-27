@@ -27,18 +27,18 @@ Pub/Sub: regional `{app}-events` + push to `/_frame/queue/{app}-events`.
 
 ## Public DNS / edge
 
-**One hostname per service** (Cloud Run domain mapping). No shared edge router.
+Product APIs are **path-only** on the Cloudflare gateway (no `devices.stawi.org`, …):
 
-| Host | Service |
+| Path | Service |
 |------|---------|
-| `devices.stawi.org` | `platform-devices` |
-| `settings.stawi.org` | `platform-settings` |
-| `geolocation.stawi.org` | `platform-geolocation` |
-| `files.stawi.org` | `platform-files` |
+| `api.stawi.org/devices` | `platform-devices` |
+| `api.stawi.org/settings` | `platform-settings` |
+| `api.stawi.org/geolocation` | `platform-geolocation` |
+| `api.stawi.org/files` | `platform-files` |
 
-Product APIs: **`api-gateway`** (`api.stawi.org/devices`, `/settings`, …).  
-Optional direct hosts: **`edge-lb-platform`** (Global HTTPS LB).  
-See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)**.
+Edge: **`edge/cloudflare-api-gateway`**. Host LB `edge-lb-platform` is retired
+(`hosts = {}`). See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** and
+**[SSL_EDGE_POLICY.md](SSL_EDGE_POLICY.md)**.
 
 ## Neon (required)
 

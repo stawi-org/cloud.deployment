@@ -16,42 +16,11 @@ locals {
   # Browser-facing OIDC (Cloudflare SSL).
   oauth2_public = local.is_prod ? "https://oauth2.stawi.org" : "https://oauth2.stawi.dev"
   api_base      = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
-  # Server-side service URLs: Cloud Run only. Orange-cloud public hostnames are
-  # unreliable from Cloud Run DNS and broke Google social login token exchange.
-  profile_uri = data.google_cloud_run_v2_service.profile.uri
-  tenancy_uri = data.google_cloud_run_v2_service.tenancy.uri
-  devices_uri = data.google_cloud_run_v2_service.devices.uri
-  files_uri   = data.google_cloud_run_v2_service.files.uri
-}
-
-data "google_cloud_run_v2_service" "profile" {
-  name     = "identity-profile"
-  location = var.region
-  project  = var.project_id
-}
-
-data "google_cloud_run_v2_service" "tenancy" {
-  name     = "identity-tenancy"
-  location = var.region
-  project  = var.project_id
-}
-
-data "google_cloud_run_v2_service" "devices" {
-  name     = "platform-devices"
-  location = var.region
-  project  = "stawi-platform"
-}
-
-data "google_cloud_run_v2_service" "files" {
-  name     = "platform-files"
-  location = var.region
-  project  = "stawi-platform"
-}
-
-data "google_cloud_run_v2_service" "hydra_public" {
-  name     = "identity-oauth2-hydra"
-  location = var.region
-  project  = var.project_id
+  # Product deps: path gateway only (no profile.stawi.org / devices.* hosts).
+  profile_uri = "${local.api_base}/profile"
+  tenancy_uri = "${local.api_base}/tenancy"
+  devices_uri = "${local.api_base}/devices"
+  files_uri   = "${local.api_base}/files"
 }
 
 module "frame" {
@@ -132,7 +101,7 @@ module "frame" {
     AUTH_PROVIDER_GOOGLE_SECRET    = { secret = "identity-authentication-google-oauth-client-secret" }
   }
 
-  # Colony service-authentication.yaml env parity (rewritten for Cloud Run DNS).
+  # Colony service-authentication.yaml env parity (path gateway for product APIs).
   app_env = {
     EXPOSE_ERRORS                      = "false"
     TRACE_REQUESTS                     = "false"
@@ -146,9 +115,9 @@ module "frame" {
     DEFAULT_TENANT_ID                  = "c2f4j7au6s7f91uqnojg"
     DEFAULT_PARTITION_ID               = "c2f4j7au6s7f91uqnokg"
     FEDCM_PUBLIC_ORIGIN = local.accounts_origin
-    # Browser Hydra host (CF SSL) vs server-side Hydra (Cloud Run URL).
+    # Hydra public host (oauth2.stawi.org) for browser and server-side token HTTP.
     FEDCM_HYDRA_PUBLIC_URL           = local.oauth2_public
-    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL = data.google_cloud_run_v2_service.hydra_public.uri
+    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL = local.oauth2_public
     NATIVE_CREDENTIAL_EXCHANGE_ENABLED = "true"
     AUTH_PROVIDER_GOOGLE_CALLBACK_URL  = "${local.accounts_origin}/s/social/callback"
     AUTH_PROVIDER_GOOGLE_SCOPES        = "openid email profile"

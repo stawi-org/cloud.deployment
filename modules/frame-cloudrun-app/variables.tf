@@ -54,19 +54,19 @@ variable "identity_region" {
 variable "use_hydra_admin_service" {
   type        = bool
   default     = true
-  description = "Read identity-oauth2-hydra-admin for OAUTH2_SERVICE_ADMIN_URI (IAM-protected). Set false before admin service exists."
+  description = "Legacy no-op (admin URI is always https://oauth2-w.stawi.org). Kept for existing callers."
 }
 
 variable "enable_keto" {
   type        = bool
   default     = true
-  description = "Look up keto-read/write and wire AUTHORIZATION_SERVICE_* to CR URIs"
+  description = "Wire AUTHORIZATION_SERVICE_* to https://authz.stawi.org / authz-w.stawi.org"
 }
 
 variable "enable_keto_admin" {
   type        = bool
   default     = true
-  description = "Set KETO_SERVICE_ADMIN_URI to keto-write (tuple writers)"
+  description = "Set KETO_SERVICE_ADMIN_URI to authz-w (tuple writers)"
 }
 
 variable "oauth_signer_secret" {

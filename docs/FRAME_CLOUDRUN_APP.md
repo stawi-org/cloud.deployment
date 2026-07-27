@@ -121,5 +121,6 @@ relation tuples to Keto via Frame’s **gRPC** authorizer. That requires:
    (`frame_oauth_env` merged into migrate), plus `OAUTH2_SIGNER_API_KEY` when using
    private_key_jwt.
 
-`AUTHORIZATION_SERVICE_*` points at **direct Cloud Run URLs** (not edge DNS) for
-reliable gRPC. Invoker grants for `identity-tenancy@…` remain on keto read/write.
+`AUTHORIZATION_SERVICE_*` points at **`https://authz.stawi.org`** /
+**`https://authz-w.stawi.org`** (stable DNS; Cloud Run `custom_audiences` +
+invoker grants for `identity-tenancy@…` and other runtime SAs).
