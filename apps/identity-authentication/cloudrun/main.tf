@@ -46,9 +46,9 @@ module "frame" {
   memory              = "1Gi"
   min_instance_count  = 1
   enable_keep_warm    = true
-  keep_warm_path      = "/healthz"
-  startup_probe_path  = "/healthz"
-  liveness_probe_path = "/healthz"
+  keep_warm_path      = "/readyz"
+  startup_probe_path  = "/readyz"
+  liveness_probe_path = "/readyz"
 
   # Literal ids only (never keys() of sensitive maps — OpenTofu for_each panic).
   # Google OAuth secret IDs always exist; values seeded out-of-band (Vault/k8s → SM)
