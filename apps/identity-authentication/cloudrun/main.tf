@@ -42,6 +42,7 @@ module "frame" {
   enable_keto_admin        = false
 
   memory              = "1Gi"
+  min_instance_count  = 1
   enable_keep_warm    = true
   keep_warm_path      = "/healthz"
   startup_probe_path  = "/healthz"
@@ -84,6 +85,16 @@ module "frame" {
     SECURE_COOKIE_HASH_KEY         = { secret = "identity-authentication-cookie-hash-key" }
     SECURE_COOKIE_BLOCK_KEY        = { secret = "identity-authentication-cookie-block-key" }
     HYDRA_WEBHOOK_API_PSK          = { secret = "hydra-webhook-psk" }
+    AUTH_PROVIDER_GOOGLE_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
+    AUTH_PROVIDER_GOOGLE_SECRET    = { secret = "identity-authentication-google-oauth-client-secret" }
+  }
+  # Setup plan loads OIDC + secure cookies (not a bare schema migrate).
+  migrate_secret_env_extra = {
+    CSRF_SECRET                    = { secret = "identity-authentication-csrf-secret" }
+    SECURE_COOKIE_HASH_KEY         = { secret = "identity-authentication-cookie-hash-key" }
+    SECURE_COOKIE_BLOCK_KEY        = { secret = "identity-authentication-cookie-block-key" }
+    HYDRA_WEBHOOK_API_PSK          = { secret = "hydra-webhook-psk" }
+    OAUTH2_SIGNER_API_KEY          = { secret = "hydra-webhook-psk" }
     AUTH_PROVIDER_GOOGLE_CLIENT_ID = { secret = "identity-authentication-google-oauth-client-id" }
     AUTH_PROVIDER_GOOGLE_SECRET    = { secret = "identity-authentication-google-oauth-client-secret" }
   }

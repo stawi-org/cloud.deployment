@@ -43,6 +43,7 @@ module "frame" {
   resource_path            = "/profile"
   requested_audience_paths = ["/notification", "/tenancy", "/devices"]
   enable_keto_admin        = false
+  min_instance_count       = 1
 
   extra_secret_ids = toset([
     "identity-profile-dek-key-id",
