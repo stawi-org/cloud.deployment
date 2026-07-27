@@ -195,12 +195,12 @@ Checks refuse `private` + `allUsers`, and warn when non-public has zero invokers
 
 | Surface | Exposure | Protection |
 |---------|----------|------------|
-| `api.stawi.org/tenancy` | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token (audience = service `*.run.app`); app OAuth/Keto in-process |
+| `api.stawi.org/tenancy` | **authenticated** | Cloud Run `roles/run.invoker` + Google ID token; app OAuth/Keto in-process |
 | `/_internal/sync/clients` | Same service via path gateway or direct CR | Scheduler OIDC as `identity-tenancy@…` (audience = Cloud Run service URI) |
 
 Invokers: identity Frame runtimes + ops/platform runtime SAs (`additional_invoker_members` in tfvars), same pattern as Keto.
 
-Callers must mint a **Google identity token** (not only a product OAuth access token) for Cloud Run IAM. Frame’s Keto client already does this; HTTP/Connect clients that call tenancy need ID-token transport (or call via a service that has invoker).
+Callers must mint a **Google identity token** (not only a product OAuth access token) for Cloud Run IAM. Frame dual-auth attaches that token as `X-Serverless-Authorization` with audience **`https://api.stawi.org`** (host only — no path). Tenancy `custom_audiences` must include both `https://api.stawi.org/tenancy` and **`https://api.stawi.org`** so S2S via `TENANCY_SERVICE_URI=https://api.stawi.org/tenancy` succeeds.
 
 ## Out of scope (this pass)
 

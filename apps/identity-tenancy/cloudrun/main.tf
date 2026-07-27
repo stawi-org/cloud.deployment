@@ -72,8 +72,13 @@ module "frame" {
   exposure         = "authenticated"
   public_invoker   = false
   invoker_members  = local.tenancy_invoker_members
-  # Accept Google ID tokens minted for the path-gateway URL (and run.app via default).
-  custom_audiences = [local.tenancy_public_url]
+  # Frame dual-auth mints Google ID tokens with audience = https://host only
+  # (no path). Accept both the path-gateway URL and the api host so S2S via
+  # TENANCY_SERVICE_URI=https://api.stawi.org/tenancy works (X-Serverless-Authorization).
+  custom_audiences = distinct(concat(
+    [local.tenancy_public_url],
+    [local.api_base],
+  ))
 
   app_env = {
     SYNCHRONISE_PRIMARY_PARTITIONS = "true"
