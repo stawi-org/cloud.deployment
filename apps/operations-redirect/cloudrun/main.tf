@@ -33,28 +33,26 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
 
-  # Colony analytics credentials (optional until seeded) + encryption phrase.
+  # Encryption phrase always mounted. Analytics secret IDs always declared so
+  # scripts/sync-cluster-secrets-to-gcp.sh can seed values without TF_VAR;
+  # optional bootstrap via TF_VAR still supported. Never commit values.
   extra_secret_ids = toset(concat(
     tolist(local.generated_secret_ids),
-    var.analytics_username != "" ? ["${var.app_name}-analytics-username"] : [],
-    var.analytics_password != "" ? ["${var.app_name}-analytics-password"] : [],
+    [
+      "${var.app_name}-analytics-username",
+      "${var.app_name}-analytics-password",
+    ],
   ))
   extra_secret_values = merge(
     local.generated_secret_values,
     var.analytics_username != "" ? { "${var.app_name}-analytics-username" = var.analytics_username } : {},
     var.analytics_password != "" ? { "${var.app_name}-analytics-password" = var.analytics_password } : {},
   )
-  secret_env_extra = merge(
-    {
-      ENCRYPTION_PHRASE = { secret = "service-files-encryption" }
-    },
-    var.analytics_username != "" ? {
-      ANALYTICS_USERNAME = { secret = "${var.app_name}-analytics-username" }
-    } : {},
-    var.analytics_password != "" ? {
-      ANALYTICS_PASSWORD = { secret = "${var.app_name}-analytics-password" }
-    } : {},
-  )
+  secret_env_extra = {
+    ENCRYPTION_PHRASE  = { secret = "service-files-encryption" }
+    ANALYTICS_USERNAME = { secret = "${var.app_name}-analytics-username" }
+    ANALYTICS_PASSWORD = { secret = "${var.app_name}-analytics-password" }
+  }
 
   app_env = {
     JOBS_BASE_URL      = "https://jobs.stawi.org/"

@@ -4,12 +4,19 @@
 # Read secret material from the Kubernetes cluster (Vault/ESO-sourced secrets
 # already materialised as k8s Secrets) and write versions into GCP Secret Manager.
 #
-# Vault OpenBao is the cluster source of truth via ExternalSecrets; when Vault is
-# down, k8s secrets still hold the last synced values. This script never writes
-# secret values into the git repo (public-safe).
+# Vault OpenBao is the cluster source of truth via ExternalSecrets
+# (ClusterSecretStore vault-backend, KV v2 mount `secret`). When Vault is down,
+# k8s secrets still hold the last synced values — this script uses those.
+# This script never writes secret values into the git repo (public-safe).
+#
+# Vault skill pattern (when OpenBao pods are Ready):
+#   SA_TOKEN=$(kubectl create token external-secrets -n external-secrets --audience=vault --duration=600s)
+#   # exec into active openbao pod; bao login with kubernetes role external-secrets
+#   # bao kv get -mount=secret stawi/identity/authentication/service-secrets
+# Full path map: docs/CLUSTER_ENV_PARITY.md
 #
 # Prerequisites: kubectl context to the stawi cluster, gcloud auth with secretmanager.admin
-# on target projects, yq/jq optional.
+# on target projects.
 #
 # Usage:
 #   ./scripts/sync-cluster-secrets-to-gcp.sh              # all mapped secrets
@@ -61,21 +68,28 @@ ensure_secret() {
   gcloud secrets create "$name" --project="$project" --replication-policy=automatic --quiet
 }
 
-add_version() {
-  local project="$1" name="$2" value="$3"
-  if [[ -z "$value" ]]; then
-    warn "skip empty value for $project/$name"
-    return 1
-  fi
+# Fetch k8s value only when this secret will be written (honours --only).
+sync_one() {
+  local project="$1" name="$2" ns="$3" secret="$4" key="$5"
+  local alt_ns="${6:-}" alt_secret="${7:-}" alt_key="${8:-}"
   if [[ -n "$ONLY" && "$name" != "$ONLY" ]]; then
     return 0
+  fi
+  local value
+  value="$(k8s_get "$ns" "$secret" "$key")"
+  if [[ -z "$value" && -n "$alt_ns" ]]; then
+    value="$(k8s_get "$alt_ns" "$alt_secret" "$alt_key")"
+  fi
+  if [[ -z "$value" ]]; then
+    warn "skip empty value for $project/$name (k8s $ns/$secret:$key)"
+    return 1
   fi
   ensure_secret "$project" "$name"
   if [[ "$DRY_RUN" == "true" ]]; then
     say "DRY-RUN add version $project/$name (len=${#value})"
     return 0
   fi
-  # Pipe value via process substitution — never write to repo workspace.
+  # Pipe value — never write to repo workspace.
   printf '%s' "$value" | gcloud secrets versions add "$name" \
     --project="$project" \
     --data-file=- \
@@ -92,68 +106,34 @@ say "kubectl context: $(kubectl config current-context 2>/dev/null || echo unkno
 say "Vault/ESO note: ClusterSecretStore may be down; using materialised k8s Secrets"
 
 # --- Identity (stawi-identity) ---
+# Vault: stawi/identity/authentication/service-secrets, oauth2/hydra-secrets, default/dek-keys
 P=stawi-identity
-
-# Google OAuth (Vault: stawi/identity/authentication/service-secrets)
-add_version "$P" "identity-authentication-google-oauth-client-id" \
-  "$(k8s_get identity google-oauth-credentials client-id)"
-add_version "$P" "identity-authentication-google-oauth-client-secret" \
-  "$(k8s_get identity google-oauth-credentials client-secret)"
-
-# Session / CSRF (Vault: stawi/identity/authentication/service-secrets)
-add_version "$P" "identity-authentication-csrf-secret" \
-  "$(k8s_get identity service-authentication-secrets csrf-secret)"
-add_version "$P" "identity-authentication-cookie-hash-key" \
-  "$(k8s_get identity service-authentication-secrets secure-cookie-hash-key)"
-add_version "$P" "identity-authentication-cookie-block-key" \
-  "$(k8s_get identity service-authentication-secrets secure-cookie-block-key)"
-
-# Hydra webhook PSK (generator-backed in cluster; shared SM id)
-# Prefer plain psk for HYDRA_WEBHOOK_API_PSK / WEBHOOK_BEARER_PSK consumers that add Bearer themselves.
-add_version "$P" "hydra-webhook-psk" \
-  "$(k8s_get identity hydra-webhook-psk psk)"
-
-# Hydra system/cookie secrets
-add_version "$P" "identity-oauth2-hydra-secrets-system" \
-  "$(k8s_get identity service-authentication-oauth2-hydra secretsSystem)"
-add_version "$P" "identity-oauth2-hydra-secrets-cookie" \
-  "$(k8s_get identity service-authentication-oauth2-hydra secretsCookie)"
-
-# Profile DEK material (cluster secret service-profile-dek)
-add_version "$P" "identity-profile-dek-aes-key" \
-  "$(k8s_get identity service-profile-dek aes-key)"
-add_version "$P" "identity-profile-dek-hmac-key" \
-  "$(k8s_get identity service-profile-dek hmac-key)"
-add_version "$P" "identity-profile-dek-key-id" \
-  "$(k8s_get identity service-profile-dek key-id)"
+sync_one "$P" "identity-authentication-google-oauth-client-id" identity google-oauth-credentials client-id
+sync_one "$P" "identity-authentication-google-oauth-client-secret" identity google-oauth-credentials client-secret
+sync_one "$P" "identity-authentication-csrf-secret" identity service-authentication-secrets csrf-secret
+sync_one "$P" "identity-authentication-cookie-hash-key" identity service-authentication-secrets secure-cookie-hash-key
+sync_one "$P" "identity-authentication-cookie-block-key" identity service-authentication-secrets secure-cookie-block-key
+# Prefer plain psk (not bearer-psk) for consumers that add Bearer themselves.
+sync_one "$P" "hydra-webhook-psk" identity hydra-webhook-psk psk
+sync_one "$P" "identity-oauth2-hydra-secrets-system" identity service-authentication-oauth2-hydra secretsSystem
+sync_one "$P" "identity-oauth2-hydra-secrets-cookie" identity service-authentication-oauth2-hydra secretsCookie
+sync_one "$P" "identity-profile-dek-aes-key" identity service-profile-dek aes-key
+sync_one "$P" "identity-profile-dek-hmac-key" identity service-profile-dek hmac-key
+sync_one "$P" "identity-profile-dek-key-id" identity service-profile-dek key-id
 
 # --- Platform (stawi-platform) ---
+# Vault: stawi/platform/files/r2-credentials, devices/cloudflare-turn
 P=stawi-platform
+sync_one "$P" "hydra-webhook-psk" platform hydra-webhook-psk psk identity hydra-webhook-psk psk
+sync_one "$P" "platform-files-encryption-phrase" platform service-files-encryption ENCRYPTION_PHRASE
+sync_one "$P" "platform-files-s3-endpoint" platform cloudflare-r2-storage-creds ENDPOINT_URL
+sync_one "$P" "platform-files-s3-access-key-id" platform cloudflare-r2-storage-creds ACCESS_KEY_ID
+sync_one "$P" "platform-files-s3-access-key-secret" platform cloudflare-r2-storage-creds ACCESS_SECRET_KEY
+sync_one "$P" "platform-devices-cloudflare-turn-token-id" platform service-devices-cloudflare-turn-secret cf_turn_id
+sync_one "$P" "platform-devices-cloudflare-turn-api-token" platform service-devices-cloudflare-turn-secret cf_turn_api_key
 
-# Shared hydra psk for Frame OAuth signer on platform services
-add_version "$P" "hydra-webhook-psk" \
-  "$(k8s_get platform hydra-webhook-psk psk || k8s_get identity hydra-webhook-psk psk)"
-
-# Files encryption (Vault/cluster)
-add_version "$P" "platform-files-encryption-phrase" \
-  "$(k8s_get platform service-files-encryption ENCRYPTION_PHRASE)"
-
-# R2/S3 storage (Vault: typically stawi/platform/... cloudflare-r2)
-add_version "$P" "platform-files-s3-endpoint" \
-  "$(k8s_get platform cloudflare-r2-storage-creds ENDPOINT_URL)"
-add_version "$P" "platform-files-s3-access-key-id" \
-  "$(k8s_get platform cloudflare-r2-storage-creds ACCESS_KEY_ID)"
-add_version "$P" "platform-files-s3-access-key-secret" \
-  "$(k8s_get platform cloudflare-r2-storage-creds ACCESS_SECRET_KEY)"
-
-# Cloudflare TURN (Vault: stawi/platform/devices/cloudflare-turn)
-add_version "$P" "platform-devices-cloudflare-turn-token-id" \
-  "$(k8s_get platform service-devices-cloudflare-turn-secret cf_turn_id)"
-add_version "$P" "platform-devices-cloudflare-turn-api-token" \
-  "$(k8s_get platform service-devices-cloudflare-turn-secret cf_turn_api_key)"
-
-# --- Operations (stawi-operations if project exists; else identity for cross-read secrets) ---
-# Prefer stawi-operations when present; audit may still live on identity project today.
+# --- Operations (prefer stawi-operations; fall back to stawi-identity) ---
+# Vault: stawi/operations/audit/signing, thesa/analytics, product-opportunities analytics
 if gcloud projects describe stawi-operations >/dev/null 2>&1; then
   OP=stawi-operations
 else
@@ -161,29 +141,16 @@ else
   warn "project stawi-operations not accessible; ops secrets go to $OP"
 fi
 
-add_version "$OP" "hydra-webhook-psk" \
-  "$(k8s_get operations hydra-webhook-psk psk || k8s_get identity hydra-webhook-psk psk)"
+sync_one "$OP" "hydra-webhook-psk" operations hydra-webhook-psk psk identity hydra-webhook-psk psk
+sync_one "$OP" "audit-signing-key" operations audit-signing-key private_key
+sync_one "$OP" "service-files-encryption" operations service-files-encryption ENCRYPTION_PHRASE platform service-files-encryption ENCRYPTION_PHRASE
+sync_one "$OP" "operations-redirect-analytics-username" operations analytics-credentials-redirect ANALYTICS_USERNAME
+sync_one "$OP" "operations-redirect-analytics-password" operations analytics-credentials-redirect ANALYTICS_PASSWORD
+sync_one "$OP" "operations-thesa-analytics-backend-url" operations analytics-credentials-thesa ANALYTICS_BACKEND_URL
+sync_one "$OP" "operations-thesa-analytics-token" operations analytics-credentials-thesa ANALYTICS_TOKEN
 
-add_version "$OP" "audit-signing-key" \
-  "$(k8s_get operations audit-signing-key private_key)"
-
-add_version "$OP" "service-files-encryption" \
-  "$(k8s_get operations service-files-encryption ENCRYPTION_PHRASE || k8s_get platform service-files-encryption ENCRYPTION_PHRASE)"
-
-add_version "$OP" "operations-redirect-analytics-username" \
-  "$(k8s_get operations analytics-credentials-redirect ANALYTICS_USERNAME)"
-add_version "$OP" "operations-redirect-analytics-password" \
-  "$(k8s_get operations analytics-credentials-redirect ANALYTICS_PASSWORD)"
-
-add_version "$OP" "operations-thesa-analytics-backend-url" \
-  "$(k8s_get operations analytics-credentials-thesa ANALYTICS_BACKEND_URL)"
-add_version "$OP" "operations-thesa-analytics-token" \
-  "$(k8s_get operations analytics-credentials-thesa ANALYTICS_TOKEN)"
-
-# Also seed identity-project audit key if audit is temporarily on stawi-identity
 if [[ "$OP" != "stawi-identity" ]]; then
-  add_version "stawi-identity" "audit-signing-key" \
-    "$(k8s_get operations audit-signing-key private_key)" || true
+  sync_one "stawi-identity" "audit-signing-key" operations audit-signing-key private_key || true
 fi
 
 say "done. Secret values never written to the repository."

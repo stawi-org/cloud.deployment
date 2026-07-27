@@ -1,5 +1,11 @@
 # Required GCP Secret Manager secrets for identity domain (stawi-prod → project stawi-identity).
-# Values are NEVER in git. Populate with scripts/seed-gcp-secrets.sh.
+# Values are NEVER in git. Populate with:
+#   scripts/sync-cluster-secrets-to-gcp.sh   # preferred: k8s (Vault/ESO material) → SM
+#   scripts/seed-gcp-secrets.sh             # operator local KEY=value file
+#
+# Vault OpenBao path convention (KV v2 mount `secret`): stawi/{ns}/...
+# ClusterSecretStore: vault-backend. When OpenBao is down, k8s Secrets still hold
+# last-synced values (used by the sync script).
 #
 # DATABASE_URL secrets are created by OpenTofu from Neon (do not seed manually unless
 # overriding). All other secrets below must exist with at least one version before
@@ -22,11 +28,18 @@ deploy_time:
 # Shared across multiple identity apps
 shared:
   - id: hydra-webhook-psk
-    description: Bearer PSK for Hydra ↔ authentication webhooks
+    description: Bearer / OAuth private_key_jwt signer PSK (plain psk, not bearer-psk)
     required: true
     used_by:
       - identity-authentication
       - identity-oauth2-hydra
+      - identity-profile
+      - identity-tenancy
+      - identity-identity
+    source_hints:
+      - "k8s: identity/hydra-webhook-psk psk"
+      - "vault: stawi/identity/authentication/webhook-psk psk (ESO target webhook-api-psk)"
+      - "scripts/sync-cluster-secrets-to-gcp.sh"
 
 apps:
   identity-authentication:
@@ -47,18 +60,26 @@ apps:
         source_hints:
           - "vault: stawi/identity/authentication/service-secrets google_secret"
           - "k8s: identity/google-oauth-credentials client-secret"
-          - "scripts/sync-cluster-secrets-to-gcp.sh"
       - id: identity-authentication-csrf-secret
         env: CSRF_SECRET
         required: true
+        source_hints:
+          - "vault: stawi/identity/authentication/service-secrets csrf_secret"
+          - "k8s: identity/service-authentication-secrets csrf-secret"
       - id: identity-authentication-cookie-hash-key
         env: SECURE_COOKIE_HASH_KEY
         required: true
+        source_hints:
+          - "vault: stawi/identity/authentication/service-secrets cookie_hash_key"
+          - "k8s: identity/service-authentication-secrets secure-cookie-hash-key"
       - id: identity-authentication-cookie-block-key
         env: SECURE_COOKIE_BLOCK_KEY
         required: true
+        source_hints:
+          - "vault: stawi/identity/authentication/service-secrets cookie_block_key"
+          - "k8s: identity/service-authentication-secrets secure-cookie-block-key"
       - id: hydra-webhook-psk
-        env: HYDRA_WEBHOOK_PSK
+        env: HYDRA_WEBHOOK_API_PSK
         required: true
         shared: true
 
@@ -67,15 +88,24 @@ apps:
       - id: identity-oauth2-hydra-database-url
         managed_by_tofu: true
         env: DATABASE_URL
-        # Hydra also needs DSN — map same secret or set DSN from DATABASE_URL in app config later
       - id: identity-oauth2-hydra-secrets-system
         env: SECRETS_SYSTEM
         required: true
-        description: Ory Hydra secrets.system (generate long random)
+        description: Ory Hydra secrets.system
+        source_hints:
+          - "vault: stawi/identity/oauth2/hydra-secrets secretsSystem"
+          - "k8s: identity/service-authentication-oauth2-hydra secretsSystem"
       - id: identity-oauth2-hydra-secrets-cookie
         env: SECRETS_COOKIE
         required: true
         description: Ory Hydra secrets.cookie
+        source_hints:
+          - "vault: stawi/identity/oauth2/hydra-secrets secretsCookie"
+          - "k8s: identity/service-authentication-oauth2-hydra secretsCookie"
+      - id: identity-oauth2-hydra-token-hook-auth
+        env: OAUTH2_TOKEN_HOOK_AUTH_CONFIG
+        managed_by_tofu: true
+        description: JSON api_key config for Hydra token hook (includes PSK)
       - id: hydra-webhook-psk
         env: WEBHOOK_BEARER_PSK
         required: true
@@ -86,21 +116,61 @@ apps:
       - id: identity-authorization-keto-database-url
         managed_by_tofu: true
         env: DATABASE_URL
+      - id: identity-authorization-keto-keto-yml
+        managed_by_tofu: true
+        description: keto.yml config blob
+      - id: identity-authorization-keto-keto-migrate-yml
+        managed_by_tofu: true
+        description: keto-migrate.yml config blob
 
   identity-tenancy:
     runtime_secrets:
       - id: identity-tenancy-database-url
         managed_by_tofu: true
         env: DATABASE_URL
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
 
   identity-profile:
     runtime_secrets:
       - id: identity-profile-database-url
         managed_by_tofu: true
         env: DATABASE_URL
+      - id: identity-profile-dek-key-id
+        env: DEK_ACTIVE_KEY_ID
+        required: true
+        source_hints:
+          - "vault: stawi/identity/default/dek-keys key-id"
+          - "k8s: identity/service-profile-dek key-id"
+      - id: identity-profile-dek-aes-key
+        env: DEK_ACTIVE_ENCRYPTION_TOKEN
+        required: true
+        source_hints:
+          - "vault: stawi/identity/default/dek-keys aes-key"
+          - "k8s: identity/service-profile-dek aes-key"
+      - id: identity-profile-dek-hmac-key
+        env: DEK_LOOKUP_TOKEN
+        required: true
+        source_hints:
+          - "vault: stawi/identity/default/dek-keys hmac-key"
+          - "k8s: identity/service-profile-dek hmac-key"
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
 
   identity-identity:
     runtime_secrets:
       - id: identity-identity-database-url
         managed_by_tofu: true
         env: DATABASE_URL
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
+
+# Not synced to Cloud Run (cluster-only / intentional skip)
+cluster_only_not_synced:
+  - ghcr-auth  # public GHCR images; no pull secret needed
+  - nats operator/user creds  # Pub/Sub replaces NATS
+  - db-credentials-*  # Neon DATABASE_URL replaces CNPG split creds
+  - observability basic-auth

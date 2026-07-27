@@ -1,18 +1,26 @@
 # Required GCP Secret Manager secrets for operations domain.
-# Prefer project stawi-operations; if unavailable, values may live on stawi-identity
-# until the operations GCP account is fully bootstrapped.
+# Prefer project stawi-operations; if inaccessible, values live on stawi-identity
+# until the operations GCP account is fully bootstrapped (current state: identity).
 # Values NEVER in git — scripts/sync-cluster-secrets-to-gcp.sh
+#
+# Vault paths (KV v2 mount `secret`): stawi/operations/... and product-opportunities.
 
 project_hint: stawi-operations
+fallback_project: stawi-identity
 gcp_account: operations
 env: stawi-prod
 
 shared:
   - id: hydra-webhook-psk
     required: true
+    source_hints:
+      - "k8s: operations/hydra-webhook-psk psk (or identity)"
   - id: service-files-encryption
     description: Shared encryption phrase for redirect (cluster ops secret)
     required: true
+    source_hints:
+      - "k8s: operations/service-files-encryption ENCRYPTION_PHRASE"
+      - "k8s: platform/service-files-encryption ENCRYPTION_PHRASE (fallback)"
 
 apps:
   operations-audit:
@@ -20,34 +28,61 @@ apps:
       - id: operations-audit-database-url
         managed_by_tofu: true
         env: DATABASE_URL
+        note: "Must exist before Cloud Run can start (nil DB panic otherwise)"
       - id: audit-signing-key
         env: AUDIT_SIGNING_KEY
         required: true
         source_hints:
+          - "vault: stawi/operations/audit/signing private_key"
           - "k8s: operations/audit-signing-key private_key"
+          - "scripts/sync-cluster-secrets-to-gcp.sh"
       - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
         shared: true
 
   operations-redirect:
     runtime_secrets:
+      - id: operations-redirect-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
       - id: service-files-encryption
         env: ENCRYPTION_PHRASE
         shared: true
       - id: operations-redirect-analytics-username
         env: ANALYTICS_USERNAME
-        required: false
+        required: true
+        source_hints:
+          - "vault: stawi/product-opportunities/common/analytics-credentials username"
+          - "k8s: operations/analytics-credentials-redirect ANALYTICS_USERNAME"
       - id: operations-redirect-analytics-password
         env: ANALYTICS_PASSWORD
-        required: false
+        required: true
+        source_hints:
+          - "vault: stawi/product-opportunities/common/analytics-credentials password"
+          - "k8s: operations/analytics-credentials-redirect ANALYTICS_PASSWORD"
+      - id: hydra-webhook-psk
+        shared: true
 
   operations-thesa:
     runtime_secrets:
+      - id: operations-thesa-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+        note: "has_database may be false for thesa depending on app design"
       - id: operations-thesa-analytics-backend-url
         env: ANALYTICS_BACKEND_URL
-        required: false
+        required: true
+        source_hints:
+          - "vault: stawi/operations/thesa/analytics backend_url"
+          - "k8s: operations/analytics-credentials-thesa ANALYTICS_BACKEND_URL"
       - id: operations-thesa-analytics-token
         env: ANALYTICS_TOKEN
-        required: false
+        required: true
+        source_hints:
+          - "vault: stawi/operations/thesa/analytics token"
+          - "k8s: operations/analytics-credentials-thesa ANALYTICS_TOKEN"
+      - id: hydra-webhook-psk
+        shared: true
 
   operations-formstore:
     runtime_secrets:
@@ -72,3 +107,8 @@ apps:
         env: DATABASE_URL
       - id: hydra-webhook-psk
         shared: true
+
+cluster_only_not_synced:
+  - ghcr-auth
+  - nats operator/user creds
+  - db-credentials-*
