@@ -1,0 +1,74 @@
+# Clear a stuck OpenTofu/S3 lock object in Cloudflare R2 (412 PreconditionFailed).
+# Use when force-unlock-state cannot get a lock ID from logs.
+name: r2-clear-state-lock
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        required: true
+        type: string
+        description: App name (e.g. platform-devices)
+      env:
+        required: true
+        type: string
+        default: stawi-prod
+        description: Env name (state key segment)
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure AWS CLI for R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "AWS_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}" >> "$GITHUB_ENV"
+          echo "AWS_EC2_METADATA_DISABLED=true" >> "$GITHUB_ENV"
+          echo "AWS_REGION=auto" >> "$GITHUB_ENV"
+          echo "AWS_DEFAULT_REGION=auto" >> "$GITHUB_ENV"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          echo "R2_ENDPOINT=${ENDPOINT}" >> "$GITHUB_ENV"
+          # Bucket name from config/r2-backend.hcl
+          echo "R2_BUCKET=cloud-tofu-state" >> "$GITHUB_ENV"
+
+      - name: List and delete lock objects
+        env:
+          APP: ${{ inputs.app }}
+          ENV_NAME: ${{ inputs.env }}
+        run: |
+          set -euo pipefail
+          PREFIX="cloud-deployment/apps/${APP}/${ENV_NAME}/"
+          echo "Listing s3://${R2_BUCKET}/${PREFIX}"
+          aws s3 ls "s3://${R2_BUCKET}/${PREFIX}" --endpoint-url "${R2_ENDPOINT}" || true
+
+          # Common lock key patterns (S3 native lock + legacy)
+          CANDIDATES=(
+            "${PREFIX}terraform.tfstate.tflock"
+            "${PREFIX}.terraform.tfstate.lock.info"
+            "${PREFIX}terraform.tfstate.lock.info"
+          )
+          for key in "${CANDIDATES[@]}"; do
+            echo "Trying delete: s3://${R2_BUCKET}/${key}"
+            aws s3 rm "s3://${R2_BUCKET}/${key}" --endpoint-url "${R2_ENDPOINT}" 2>/dev/null \
+              && echo "  deleted" || echo "  (absent)"
+          done
+
+          # Any object under prefix containing "lock"
+          aws s3api list-objects-v2 \
+            --bucket "${R2_BUCKET}" \
+            --prefix "${PREFIX}" \
+            --endpoint-url "${R2_ENDPOINT}" \
+            --query 'Contents[].Key' --output text 2>/dev/null | tr '\t' '\n' | while read -r key; do
+            [[ -z "$key" || "$key" == "None" ]] && continue
+            if echo "$key" | grep -qiE 'lock|tflock'; then
+              echo "Deleting lock-like object: $key"
+              aws s3 rm "s3://${R2_BUCKET}/${key}" --endpoint-url "${R2_ENDPOINT}" || true
+            fi
+          done
+          echo "Done. Re-run app-apply for ${APP}/${ENV_NAME}."
