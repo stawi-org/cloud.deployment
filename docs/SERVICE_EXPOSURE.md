@@ -90,8 +90,8 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | Hostname | Cloud Run service | Mode | Notes |
 |----------|-------------------|------|--------|
 | `api.stawi.org/*` | product Cloud Run | public (path) | CF Worker |
-| `accounts.stawi.org` | identity-authentication | public | CF Worker |
-| `oauth2.stawi.org` | identity-oauth2-hydra | public OIDC | CF Worker |
+| `accounts.stawi.org` | identity-authentication | public | Google LB grey |
+| `oauth2.stawi.org` | identity-oauth2-hydra | public OIDC | Google LB grey |
 | `oauth2-w.stawi.org` | identity-oauth2-hydra-admin | **authenticated** | Google LB grey |
 | `authz.stawi.org` | identity-authorization-keto-read | **authenticated** | Google LB grey |
 | `authz-w.stawi.org` | identity-authorization-keto-write | **authenticated** | Google LB grey |

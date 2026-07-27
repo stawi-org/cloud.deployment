@@ -6,17 +6,17 @@
 |-------|----------------|-------------------|---------|
 | Surface | Implementation | SSL | Hosts |
 |---------|----------------|-----|-------|
-| Product + docs | Cloudflare Worker | CF Universal (orange) | `api.stawi.org` |
-| Login UI | Cloudflare Worker | CF Universal (orange) | `accounts.stawi.org` |
-| OIDC public | Cloudflare Worker | CF Universal (orange) | `oauth2.stawi.org` |
+| Product + docs | Cloudflare Worker | CF Universal (orange) | **`api.stawi.org` only** |
+| Login UI | `edge-lb-identity` | Google Cert Manager (grey) | `accounts.stawi.org` |
+| OIDC public | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2.stawi.org` |
 | Control plane | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2-w`, `authz`, `authz-w` |
 | Platform/ops host LBs | retired | — | `hosts = {}` |
 
 Canonical policy: [SSL_EDGE_POLICY.md](./SSL_EDGE_POLICY.md).
 
-**DNS ≠ public.** Control-plane hosts (`oauth2-w`, `authz`, `authz-w`) are on the
-edge LB for stable names and TLS, but Cloud Run IAM still requires
-`roles/run.invoker` (no `allUsers`). See [SERVICE_EXPOSURE.md](./SERVICE_EXPOSURE.md).
+**DNS ≠ public** for control plane. `oauth2-w` / `authz*` still need
+`roles/run.invoker` (no `allUsers`). `accounts` / `oauth2` are public apps.
+See [SERVICE_EXPOSURE.md](./SERVICE_EXPOSURE.md).
 
 **What OpenTofu manages**
 
@@ -51,10 +51,10 @@ CI injects it as `TF_VAR_cloudflare_api_token` for `edge-lb-*` and `api-gateway`
 ## Apply (after secret is set)
 
 ```bash
-# Public edge: api + accounts + oauth2 (Cloudflare SSL)
+# Product path gateway (api.stawi.org only)
 gh workflow run edge-api-gateway.yml
 
-# Control plane grey LB (oauth2-w, authz*) — after Worker is live
+# accounts + oauth2 + control plane (grey Google LB)
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 
 # Destroy retired product host LBs
@@ -99,17 +99,12 @@ No per-service product hosts (`profile.stawi.org`, `devices.*`, …). Paths:
 Full route table: `edge/cloudflare-api-gateway/config/routes.prod.json` and
 `config/public-edge.yaml`.
 
-### Browser / OIDC exceptions (Cloudflare Worker host routes)
+### Browser + control plane (`edge-lb-identity`, grey-cloud Google LB)
 
 | Hostname | Service | Exposure |
 |----------|---------|----------|
 | accounts.stawi.org | identity-authentication | public (login UI) |
 | oauth2.stawi.org | identity-oauth2-hydra | public (OIDC) |
-
-### Control plane (`edge-lb-identity`, grey-cloud Google LB)
-
-| Hostname | Service | Exposure |
-|----------|---------|----------|
 | oauth2-w.stawi.org | identity-oauth2-hydra-admin | **authenticated** |
 | authz.stawi.org | identity-authorization-keto-read | **authenticated** |
 | authz-w.stawi.org | identity-authorization-keto-write | **authenticated** |
@@ -123,14 +118,14 @@ Full route table: `edge/cloudflare-api-gateway/config/routes.prod.json` and
 1. Smoke:
 
 ```bash
-# Path gateway (product APIs)
-curl -sSI https://api.stawi.org/profile/healthz
-curl -sSI https://api.stawi.org/devices/healthz
-curl -sSI https://api.stawi.org/audit/healthz
+# Path gateway (product APIs) — Worker
+curl -sSI https://api.stawi.org/profile/readyz
+curl -sSI https://api.stawi.org/devices/readyz
+curl -sS https://api.stawi.org/_gateway/health
 
-# Host exceptions
+# Login + OIDC — Google LB (not Worker)
 curl -sSI https://oauth2.stawi.org/health/ready
-curl -sSI https://accounts.stawi.org/healthz
+curl -sSI https://accounts.stawi.org/readyz
 
 # Authenticated control plane — expect 403 without identity token
 curl -sSI https://oauth2-w.stawi.org/health/ready

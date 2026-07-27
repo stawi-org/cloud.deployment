@@ -1,17 +1,15 @@
 # Cloudflare public edge (`stawi-api-gateway`)
 
 Implements [docs/SSL_EDGE_POLICY.md](../../docs/SSL_EDGE_POLICY.md): **Cloudflare Universal SSL**
-for public hosts; origins are always Cloud Run `*.run.app`.
+for **`api.stawi.org` only**; origins are always Cloud Run `*.run.app`.
 
 ```
 https://api.stawi.org/            →  Scalar hub
 https://api.stawi.org/profile/…   →  path proxy → identity-profile
-https://accounts.stawi.org/…      →  host proxy → identity-authentication
-https://oauth2.stawi.org/…        →  host proxy → identity-oauth2-hydra
 ```
 
-Control plane (`oauth2-w`, `authz*`) is **not** here — Google Cert Manager + grey DNS
-via `apps/edge-lb-identity`.
+`accounts.stawi.org` and `oauth2.stawi.org` are **not** on this Worker — they use
+Google LB + Cert Manager via `apps/edge-lb-identity` (grey DNS).
 
 ## Scalar hub
 

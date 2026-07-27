@@ -1,12 +1,9 @@
 /**
- * stawi-api-gateway — Cloudflare public edge (see docs/SSL_EDGE_POLICY.md).
+ * stawi-api-gateway — Cloudflare public edge for api.stawi.org only.
+ * See docs/SSL_EDGE_POLICY.md.
  *
- * Hosts (Cloudflare SSL / orange):
- *  - api.stawi.org     → path proxy + Scalar hub
- *  - accounts.stawi.org → login UI (host proxy, no strip)
- *  - oauth2.stawi.org  → OIDC public (host proxy, no strip)
- *
- * Control plane (oauth2-w, authz*) stays on Google Cert Manager + grey DNS.
+ *  - api.stawi.org → path proxy + Scalar hub (this Worker)
+ *  - accounts / oauth2 / oauth2-w / authz* → Google LB (edge-lb-identity), not Worker
  *
  * Safety: origins only *.run.app; not an open proxy.
  * Extend: config/routes.prod.json → validate → deploy.
@@ -470,7 +467,7 @@ async function handle(request) {
     return jsonResponse({ error: "host_not_allowed", host }, 421);
   }
 
-  // --- Host routes: accounts / oauth2 (full path passthrough) ---
+  // Optional host_routes (normally empty — only api.stawi.org is on this Worker).
   const hostRoute = HOST_ROUTES.get(host);
   if (hostRoute) {
     return proxyToOrigin(request, hostRoute, url, host, {
@@ -478,7 +475,7 @@ async function handle(request) {
     });
   }
 
-  // --- api.stawi.org path gateway + hub ---
+  // Path gateway + Scalar hub (api.stawi.org only in prod).
   if (url.pathname === HEALTH || url.pathname === "/_gateway/healthz") {
     return gatewayHealth();
   }

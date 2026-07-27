@@ -13,10 +13,13 @@ provider "cloudflare" {
 
 locals {
   zone_name = "stawi.org"
-  # Control plane only — Google Cert Manager + grey-cloud DNS (docs/SSL_EDGE_POLICY.md).
-  # Public browser hosts (accounts, oauth2) and product APIs use Cloudflare Worker SSL.
-  # These hosts stay IAM-authenticated — DNS ≠ anonymous public.
+  # Google Cert Manager + grey-cloud DNS (docs/SSL_EDGE_POLICY.md).
+  # Browser OIDC + login UI + control plane. Product APIs stay on CF Worker (api.stawi.org only).
+  # authz* / oauth2-w remain IAM-authenticated (DNS ≠ anonymous public).
+  # accounts / oauth2 are public Cloud Run services (allUsers invoker).
   hosts = {
+    "accounts.stawi.org" = { service = "identity-authentication" }
+    "oauth2.stawi.org"   = { service = "identity-oauth2-hydra" }
     "oauth2-w.stawi.org" = { service = "identity-oauth2-hydra-admin" }
     "authz.stawi.org"    = { service = "identity-authorization-keto-read" }
     "authz-w.stawi.org"  = { service = "identity-authorization-keto-write" }

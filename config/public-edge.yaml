@@ -2,9 +2,10 @@
 #
 # SSL split:
 #   Cloudflare Universal SSL (orange) + Worker:
-#     api.stawi.org, accounts.stawi.org, oauth2.stawi.org
-#   Google Certificate Manager (grey DNS) + Global LB:
-#     oauth2-w.stawi.org, authz.stawi.org, authz-w.stawi.org
+#     api.stawi.org only (path APIs + Scalar)
+#   Google Certificate Manager (grey DNS) + Global LB (edge-lb-identity):
+#     accounts.stawi.org, oauth2.stawi.org (public apps)
+#     oauth2-w.stawi.org, authz.stawi.org, authz-w.stawi.org (IAM)
 #
 # Product APIs: only api.stawi.org/<path> (no profile.stawi.org, devices.*, …).
 # Zone SSL mode: Full (strict).
@@ -18,14 +19,12 @@ prod:
     zone_mode: full_strict
     policy_doc: docs/SSL_EDGE_POLICY.md
 
-  # Cloudflare Worker public edge (Universal SSL).
+  # Cloudflare Worker — path gateway only (not accounts / oauth2).
   cloudflare_worker:
     app: edge/cloudflare-api-gateway
     routes_config: edge/cloudflare-api-gateway/config/routes.prod.json
     hostnames:
-      - api.stawi.org        # path APIs + Scalar hub
-      - accounts.stawi.org   # login UI
-      - oauth2.stawi.org     # OIDC public
+      - api.stawi.org
     paths:
       /profile: { service: identity-profile, project: stawi-identity }
       /tenancy: { service: identity-tenancy, project: stawi-identity }
@@ -47,6 +46,8 @@ prod:
       gcp_project: stawi-identity
       cloudflare_proxied: false
       hosts:
+        accounts.stawi.org: identity-authentication
+        oauth2.stawi.org: identity-oauth2-hydra
         oauth2-w.stawi.org: identity-oauth2-hydra-admin
         authz.stawi.org: identity-authorization-keto-read
         authz-w.stawi.org: identity-authorization-keto-write

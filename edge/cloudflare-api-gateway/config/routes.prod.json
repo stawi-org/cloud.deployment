@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "SSL policy: CF orange for api + accounts + oauth2; origins always *.run.app. See docs/SSL_EDGE_POLICY.md.",
+  "description": "Worker path proxy for api.stawi.org only. accounts/oauth2 use Google LB (edge-lb-identity). Origins always *.run.app. See docs/SSL_EDGE_POLICY.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west9",
   "gateway": {
@@ -23,30 +23,7 @@
     ],
     "extra_hosts": []
   },
-  "host_routes": [
-    {
-      "id": "accounts",
-      "hostname": "accounts.stawi.org",
-      "service": "identity-authentication",
-      "project": "stawi-identity",
-      "origin": "https://identity-authentication-akpnezytka-od.a.run.app",
-      "strip_prefix": false,
-      "enabled": true,
-      "public": true,
-      "notes": "Login UI — Cloudflare SSL (orange). Not a product API path."
-    },
-    {
-      "id": "oauth2",
-      "hostname": "oauth2.stawi.org",
-      "service": "identity-oauth2-hydra",
-      "project": "stawi-identity",
-      "origin": "https://identity-oauth2-hydra-akpnezytka-od.a.run.app",
-      "strip_prefix": false,
-      "enabled": true,
-      "public": true,
-      "notes": "OIDC public — Cloudflare SSL (orange)."
-    }
-  ],
+  "host_routes": [],
   "routes": [
     {
       "id": "profile",
