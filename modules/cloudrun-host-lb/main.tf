@@ -14,6 +14,13 @@ locals {
     0,
     63,
   )
+  # Content-addressed URL map so host-set shrinks create a new map before old
+  # backends are destroyed (GCP 400 if BES still attached to live urlMaps).
+  url_map_name = substr(
+    "${var.name}-https-${substr(sha1(join(",", local.hostnames)), 0, 8)}",
+    0,
+    63,
+  )
 }
 
 # ---------------------------------------------------------------------------
