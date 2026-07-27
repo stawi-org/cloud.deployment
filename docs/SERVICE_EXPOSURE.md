@@ -72,7 +72,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 
 ## Hostname / path inventory (prod)
 
-### Path gateway (`api-gateway` → `api.stawi.org`)
+### Product paths (`api.stawi.org` — Cloudflare Worker)
 
 | Path | Cloud Run service | Project | Mode |
 |------|-------------------|---------|------|
@@ -85,7 +85,7 @@ Upgrade path: set `exposure = "private"` (Keto) / `admin_exposure = "private"`
 | `/files` | platform-files | stawi-platform | public |
 | `/audit` … `/trustage` | operations-* | stawi-operations | public |
 
-### Host exceptions (`edge-lb-*`)
+### Hostnames
 
 | Hostname | Cloud Run service | Mode | Notes |
 |----------|-------------------|------|--------|
