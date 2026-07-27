@@ -90,17 +90,22 @@ done
 
 ## Runtime verification (stawi-prod)
 
-All six Cloud Run services report **Ready + ContainerHealthy**. Live `/readyz` probes
-(public `*.run.app`):
+```bash
+# CI: Ready + secret mounts + /readyz (also grants operator viewer IAM)
+gh workflow run ops-verify.yml -f project=stawi-operations -f region=europe-west9
+```
 
-| Service | Ready | `/readyz` | Neon extensions |
-|---------|-------|-----------|-----------------|
-| operations-audit | yes | app-specific (CR healthy) | base + timescaledb |
-| operations-formstore | yes | healthy | base (+ timescaledb if debug-repaired) |
-| operations-queuestore | yes | healthy | base |
-| operations-redirect | yes | app-specific (CR healthy) | base |
-| operations-trustage | yes | healthy | base + timescaledb |
-| operations-thesa | yes | app-specific (no DB) | n/a |
+All six Cloud Run services on **stawi-operations** report **Ready** and **`/readyz` HTTP 200**
+(authenticated ID-token probe). Verified 2026-07-27:
+
+| Service | Ready | `/readyz` | Neon / secrets |
+|---------|-------|-----------|----------------|
+| operations-audit | yes | 200 | base + timescaledb; `AUDIT_SIGNING_KEY`, `DATABASE_URL` |
+| operations-formstore | yes | 200 | base; `DATABASE_URL` |
+| operations-queuestore | yes | 200 | base; `DATABASE_URL` |
+| operations-redirect | yes | 200 | base; `ENCRYPTION_PHRASE`, analytics username/password |
+| operations-thesa | yes | 200 | no DB; analytics backend URL/token |
+| operations-trustage | yes | 200 | base + timescaledb; multi-topic Pub/Sub |
 
 Trustage multi-topic env (applied): `QUEUE_EXEC_*` → `operations-trustage-exec`,
 `QUEUE_EVENT_*` → `operations-trustage-wf-events`, Frame events dual-URL + OIDC push,
