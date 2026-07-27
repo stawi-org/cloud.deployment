@@ -91,8 +91,12 @@ done
 ## Runtime verification (stawi-prod)
 
 ```bash
-# CI: Ready + secret mounts + /readyz (also grants operator viewer IAM)
+# CI: Ready + secret mounts + /readyz
 gh workflow run ops-verify.yml -f project=stawi-operations -f region=europe-west9
+
+# Operator full access (Owner) on the project:
+./scripts/bootstrap-gcp-account.sh \
+  --account operations --env stawi-prod --project stawi-operations --iam-only
 ```
 
 All six Cloud Run services on **stawi-operations** report **Ready** and **`/readyz` HTTP 200**

@@ -7,7 +7,7 @@ GCP bootstrap is **independent of Neon**. It never writes Neon keys.
 1. Enables required APIs (Run, Secret Manager, Pub/Sub, IAM, STS, …).  
 2. Creates deploy service account + WIF pool/provider for `stawi-org/cloud.deployment`.  
 3. Grants deploy SA roles for Cloud Run, SM, Pub/Sub, service accounts.  
-4. Grants human operator `bwire517@gmail.com` project Viewer + Logging Viewer (and private log viewer) so that person can always view all resources and logs.  
+4. Grants human operator `bwire517@gmail.com` **project Owner** so one account can fully manage every bootstrapped domain project (console, gcloud, IAM, secrets, Run, logs). Re-run with `--iam-only` to refresh on existing projects.
 5. Updates `config/gcp-accounts.yaml` (public mirror).  
 6. Writes SOPS-encrypted `credentials/gcp/<account>/<env>/auth.yaml`.  
 
