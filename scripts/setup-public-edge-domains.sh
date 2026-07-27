@@ -12,7 +12,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REGION="${REGION:-europe-west9}"
+REGION="${REGION:-europe-west1}"
 
 IDENTITY_HOSTS=(accounts oauth2 profile tenancy identity)
 PLATFORM_HOSTS=(devices settings geolocation files)
@@ -55,17 +55,15 @@ case "$cmd" in
     ;;
   apply-hint)
     cat <<'EOF'
-Public edge is fully OpenTofu-managed. Do not create Cloud Run domain mappings
-(europe-west9 returns 501) and do not hand-edit Cloudflare for these hosts.
+Preferred edge (europe-west1): Cloud Run domain mappings for accounts/oauth2*/authz*.
+See docs/REGION_MIGRATION_EUROPE_WEST1.md and scripts/create-domain-mappings.sh.
 
+Break-glass Google LB (edge-lb-identity) only if domain mapping fails:
 1) Repo secret CLOUDFLARE_API_TOKEN (Zone:DNS:Edit on stawi.org)
-2) Apply edge LBs (creates LB + certs + CF A + ACME CNAMEs):
-     gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
-     gh workflow run app-apply.yml -f app=edge-lb-platform -f env=stawi-prod
+2) gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
 3) Wait until Certificate Manager state=ACTIVE
-4) Smoke hosts, then set advertise_public_hostname=true on Hydra and re-apply
 
-Details: docs/PUBLIC_EDGE_DNS.md
+Details: docs/PUBLIC_EDGE_DNS.md docs/SSL_EDGE_POLICY.md
 EOF
     ;;
   *)

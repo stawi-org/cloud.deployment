@@ -16,7 +16,7 @@ variable "project_id" {
 variable "region" {
   type        = string
   description = "GCP region from gcp-accounts registry"
-  default     = "europe-west9"
+  default     = "europe-west1"
 }
 
 variable "labels" {
@@ -68,7 +68,7 @@ variable "identity_project_id" {
 
 variable "identity_region" {
   type        = string
-  default     = "europe-west9"
+  default     = "europe-west1"
   description = "Region of identity Cloud Run services"
 }
 

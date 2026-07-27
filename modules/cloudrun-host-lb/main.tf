@@ -1,5 +1,5 @@
-# Host-based HTTPS front door for Cloud Run when classic domain mapping is
-# unavailable (e.g. europe-west9).
+# Host-based HTTPS front door for Cloud Run (break-glass when domain mapping
+# is unsuitable). Production default region is europe-west1 (domain mapping OK).
 #
 # Per hostname: serverless NEG → backend service → URL map host rule.
 # TLS: Certificate Manager (Google-managed) + DNS authorizations (CNAME records).

@@ -2,14 +2,12 @@
 
 ## Front doors
 
-| Stack | Implementation | Project / account | Surface |
-|-------|----------------|-------------------|---------|
 | Surface | Implementation | SSL | Hosts |
 |---------|----------------|-----|-------|
 | Product + docs | Cloudflare Worker | CF Universal (orange) | **`api.stawi.org` only** |
-| Login UI | CF DNS CNAME → `*.run.app` | CF Universal (orange) | `accounts.stawi.org` |
-| OIDC public | CF DNS CNAME → `*.run.app` | CF Universal (orange) | `oauth2.stawi.org` |
-| Control plane | `edge-lb-identity` | Google Cert Manager (grey) | `oauth2-w`, `authz`, `authz-w` |
+| Login + OIDC + control plane | **Cloud Run domain mapping** (preferred, `europe-west1`) | Google managed cert | `accounts`, `oauth2`, `oauth2-w`, `authz`, `authz-w` |
+| Interim | CF CNAME → `*.run.app` + Host rewrite | CF Universal | same hostnames |
+| Break-glass LB | `edge-lb-identity` | Google Cert Manager (grey) | only if mappings fail |
 | Platform/ops host LBs | retired | — | `hosts = {}` |
 
 Canonical policy: [SSL_EDGE_POLICY.md](./SSL_EDGE_POLICY.md).
@@ -30,7 +28,9 @@ See [SERVICE_EXPOSURE.md](./SERVICE_EXPOSURE.md).
 | Traffic DNS | Cloudflare `A` `<host>` → LB IP |
 | HTTP→HTTPS | Port 80 redirect on same IP |
 
-**Why not Cloud Run domain mapping?** Not available in `europe-west9` (API returns 501).
+**Cloud Run domain mapping** is available in **`europe-west1`** (preferred for
+`accounts` / `oauth2*` / `authz*`). Global LB (`edge-lb-*`) is break-glass only.
+See [REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).
 
 **Registry:** [`config/public-edge.yaml`](../config/public-edge.yaml)  
 **Modules:** [`modules/cloudrun-api-gateway`](../modules/cloudrun-api-gateway), [`modules/cloudrun-host-lb`](../modules/cloudrun-host-lb)
@@ -157,8 +157,9 @@ Re-apply after legacy cluster CNAMEs (orange-cloud) without hand-editing Cloudfl
 ## Cost
 
 Global external Application Load Balancer base charge applies per front door
-(~\$15–25/mo for `api-gateway` plus each `edge-lb-*` that still has forwarding
-rules) plus traffic. Required substitute for domain mapping in europe-west9.
+(~\$15–25/mo for each `edge-lb-*` / `api-gateway` that still has forwarding
+rules) plus traffic. Prefer Cloud Run domain mapping in `europe-west1` to avoid
+that cost for identity hosts.
 
 The path gateway adds one LB in **stawi-api** and backend services (no extra
 forwarding rules) in each domain project.

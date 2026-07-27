@@ -1,74 +1,62 @@
 # SSL and edge policy (canonical)
 
 **Goal:** best security + UX with low cost.  
-**Constraint:** Cloud Run domain mapping is unavailable in `europe-west9`.
+**Region:** production Cloud Run is **`europe-west1`** (domain mapping supported).  
+**Constraint (historical):** classic domain mapping was unavailable in `europe-west9` (501).
 
 ## Summary
 
 | Hostname / surface | Client TLS | Edge | Origin | Cloudflare proxy |
 |--------------------|------------|------|--------|------------------|
 | **`api.stawi.org`** (product APIs + Scalar) | Cloudflare Universal SSL | **Worker path proxy only** | Cloud Run `*.run.app` | **Orange** |
-| **`accounts.stawi.org`** (login UI) | Cloudflare Universal SSL | **DNS CNAME → run.app** (no Worker, no Google LB) | `identity-authentication` | **Orange** |
-| **`oauth2.stawi.org`** (OIDC public) | Cloudflare Universal SSL | **DNS CNAME → run.app** (no Worker, no Google LB) | `identity-oauth2-hydra` | **Orange** |
-| **`oauth2-w.stawi.org`** (Hydra admin) | Google Certificate Manager | Global HTTPS LB + NEG | Cloud Run (IAM) | **Grey** |
-| **`authz.stawi.org` / `authz-w`** (Keto) | Google Certificate Manager | Global HTTPS LB + NEG | Cloud Run (IAM) | **Grey** |
+| **`accounts.stawi.org`** (login UI) | CF Universal SSL **or** Google managed cert | Preferred: **Cloud Run domain mapping** + DNS records Google prints; interim: CF CNAME + Host rewrite | `identity-authentication` | Orange (CF path) or grey (native) |
+| **`oauth2.stawi.org`** (OIDC public) | same | same | `identity-oauth2-hydra` | same |
+| **`oauth2-w.stawi.org`** (Hydra admin) | same | same + IAM | `identity-oauth2-hydra-admin` | same |
+| **`authz.stawi.org` / `authz-w`** (Keto) | same | same + IAM | keto read/write | same |
 
-There are **no** product hosts (`profile.stawi.org`, `devices.*`, …).
+There are **no** product hosts (`profile.stawi.org`, `devices.*`, …) — only `api.stawi.org/<path>`.
 
 ## Why this split
 
 ### Cloudflare Worker — **api.stawi.org only**
 
 - Path routing + Scalar multi-API hub  
-- Does **not** front `oauth2` / `accounts`  
+- Does **not** front `oauth2` / `accounts` / control-plane hosts long-term  
 
-### Cloudflare DNS (orange) — login + OIDC public (**no Google LB**)
+### Control-plane + login hosts — prefer Cloud Run domain mapping
 
-Preferred (needs CF Rulesets permission + Host-header Origin Rule capability):
-
-- Orange **CNAME** `accounts` / `oauth2` → Cloud Run `*.run.app`  
-- **Origin Rule** sets `Host` to that run.app hostname  
-- Managed by `ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`  
-
-Free fallback when Origin Rules are unavailable (token/plan):
-
-- Same public hostnames; **Worker host proxy** rewrites to run.app (not path API routing)  
-- `ensure-cf-worker-host-fallback.mjs` — still **no Google LB**  
-
-### Google Certificate Manager (grey) — control plane only
-
-- `oauth2-w` + `authz*` remain IAM-authenticated  
-- OpenTofu `edge-lb-identity` owns A + ACME CNAMEs  
-- **proxied = false**  
-
-## Implementation map
-
-| Component | Role |
-|-----------|------|
-| [`edge/cloudflare-api-gateway`](../edge/cloudflare-api-gateway) | Worker **api only** + DNS ensure for api + direct CNAMEs + origin Host rules |
-| [`apps/edge-lb-identity`](../apps/edge-lb-identity) | Google LB for **oauth2-w, authz, authz-w only** |
-| [`config/public-edge.yaml`](../config/public-edge.yaml) | Registry |
-
-## Operator cutover
+In **`europe-west1`**, map each FQDN with:
 
 ```bash
-gh workflow run edge-api-gateway.yml
-gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod
+gcloud beta run domain-mappings create \
+  --service=SERVICE --domain=FQDN --region=europe-west1 --project=PROJECT
 ```
 
-Smoke:
+Then install the **resourceRecords** Google returns (A/AAAA/CNAME) at Cloudflare.  
+Cloud Run accepts `Host: FQDN` natively — **no Worker Host rewrite, no Google LB**.
 
-```bash
-# Worker
-curl -sS https://api.stawi.org/_gateway/health
-# Must NOT include x-stawi-gateway
-curl -sSI https://accounts.stawi.org/readyz
-curl -sSI https://oauth2.stawi.org/health/ready
-# Control plane grey — 403 without Google identity token
-curl -sSI https://oauth2-w.stawi.org/health/ready
-```
+Caveats (Google docs):
 
-## Notes
+- Feature is **Preview**; Google still recommends Global HTTPS LB for some production cases  
+- Cert provisioning can take minutes–hours  
+- Verify `stawi.org` in Search Console first  
+- For IAM services, keep `custom_audiences = ["https://FQDN"]`
 
-- **Origin Host rewrite** may require a Cloudflare plan that includes Origin Rule *Host header* override. If `ensure-cf-origin-rules.mjs` fails, expand the API token / plan (see CF Origin Rules docs) — do not put accounts/oauth2 back on the api Worker or Google LB unless product decides otherwise.  
-- Zone SSL mode: **Full (strict)**.  
+### Interim (until domain mappings are ACTIVE)
+
+- Orange **CNAME** → `*.run.app` + Origin Rule Host rewrite  
+  (`ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`)  
+- Free fallback: Worker host proxy (`ensure-cf-worker-host-fallback.mjs`)  
+- Do **not** reintroduce Global LB unless domain mapping + CF both fail for gRPC
+
+### Google Global HTTPS LB
+
+- Optional fallback only (`edge-lb-identity` with non-empty `hosts`)  
+- ~$18/mo; not required in `europe-west1` if domain mapping works  
+
+## Zone SSL
+
+Cloudflare zone mode: **Full (strict)** when origin presents a valid cert  
+(Google-managed domain-mapping cert, or run.app cert behind Host rewrite).
+
+See also: [docs/STABLE_DNS.md](./STABLE_DNS.md), [docs/REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).

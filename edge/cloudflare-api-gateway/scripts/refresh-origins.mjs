@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const path = join(root, "config/routes.prod.json");
 const config = JSON.parse(readFileSync(path, "utf8"));
-const region = config.region || "europe-west9";
+const region = config.region || "europe-west1";
 
 const projects = (
   process.env.GCLOUD_PROJECTS ||

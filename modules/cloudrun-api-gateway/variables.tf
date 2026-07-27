@@ -47,7 +47,7 @@ variable "routes" {
 variable "default_region" {
   type        = string
   description = "Default Cloud Run region for serverless NEGs"
-  default     = "europe-west9"
+  default     = "europe-west1"
 }
 
 variable "enable_http_redirect" {

@@ -18,7 +18,7 @@ accounts:
           managed-by: cloud-deployment
       stawi-prod:
         project_id: stawi-identity
-        region: europe-west9
+        region: europe-west1
         # OpenTofu apply (this repo only)
         workload_identity_provider: projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-identity.iam.gserviceaccount.com
@@ -95,7 +95,7 @@ accounts:
           managed-by: cloud-deployment
       stawi-prod:
         project_id: stawi-platform
-        region: europe-west9
+        region: europe-west1
         workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-platform.iam.gserviceaccount.com
         ship_workload_identity_provider: projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-ship
@@ -113,7 +113,7 @@ accounts:
     envs:
       stawi-dev:
         project_id: stawi-operations-dev
-        region: europe-west9
+        region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
         deploy_service_account: tofu-deploy@stawi-operations-dev.iam.gserviceaccount.com
         labels:
@@ -123,7 +123,7 @@ accounts:
       stawi-prod:
         # Filled/confirmed by scripts/bootstrap-gcp-account.sh
         project_id: stawi-operations
-        region: europe-west9
+        region: europe-west1
         workload_identity_provider: projects/1050361697827/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-operations.iam.gserviceaccount.com
         sops_auth_path: credentials/gcp/operations/stawi-prod/auth.yaml
@@ -140,9 +140,9 @@ accounts:
       stawi-prod:
         # Create/bootstrap with:
         #   ./scripts/bootstrap-gcp-account.sh --account api --env stawi-prod \
-        #     --project stawi-api --region europe-west9
+        #     --project stawi-api --region europe-west1
         project_id: stawi-api
-        region: europe-west9
+        region: europe-west1
         workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-api.iam.gserviceaccount.com
         labels:

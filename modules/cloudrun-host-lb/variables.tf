@@ -10,7 +10,7 @@ variable "name" {
 variable "region" {
   type        = string
   description = "Cloud Run region for serverless NEGs"
-  default     = "europe-west9"
+  default     = "europe-west1"
 }
 
 # hostname => Cloud Run service name (same project)

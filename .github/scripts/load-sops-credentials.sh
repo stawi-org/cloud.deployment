@@ -51,21 +51,28 @@ fi
 GCP_JSON=$(sops -d "$GCP_SOPS" | yq -o=json '.')
 # support auth: wrapper or flat
 PROJECT_ID=$(jq -r '.auth.project_id // .project_id // empty' <<<"$GCP_JSON")
-REGION=$(jq -r '.auth.region // .region // empty' <<<"$GCP_JSON")
+SOPS_REGION=$(jq -r '.auth.region // .region // empty' <<<"$GCP_JSON")
 WIF=$(jq -r '.auth.workload_identity_provider // .workload_identity_provider // empty' <<<"$GCP_JSON")
 DEPLOY_SA=$(jq -r '.auth.deploy_service_account // .deploy_service_account // empty' <<<"$GCP_JSON")
 
 # Fall back to public registry (same values; useful if SOPS is sparse)
 [[ -n "$PROJECT_ID" ]] || PROJECT_ID="$REG_PROJECT"
-[[ -n "$REGION" ]] || REGION="$REG_REGION"
 [[ -n "$WIF" ]] || WIF="$REG_WIF"
 [[ -n "$DEPLOY_SA" ]] || DEPLOY_SA="$REG_SA"
+
+# Region is non-secret: config/gcp-accounts.yaml is source of truth (overrides SOPS).
+# Keeps region migrations from being blocked by encrypted auth.yaml drift.
+REGION="${REG_REGION:-}"
+[[ -n "$REGION" ]] || REGION="$SOPS_REGION"
 
 [[ -n "$PROJECT_ID" && -n "$WIF" && -n "$DEPLOY_SA" ]] || {
   echo "ERROR: decrypted GCP auth missing project_id / WIF / deploy_service_account" >&2
   exit 1
 }
 [[ -n "$REGION" ]] || REGION="europe-west1"
+if [[ -n "$SOPS_REGION" && -n "$REG_REGION" && "$SOPS_REGION" != "$REG_REGION" ]]; then
+  echo "::warning::SOPS auth region ($SOPS_REGION) differs from gcp-accounts.yaml ($REG_REGION); using registry region"
+fi
 
 NEON_API_KEY=""
 NEON_ORG_ID=$(jq -r '.neon_org_id // empty' <<<"$CTX")

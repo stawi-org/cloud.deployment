@@ -1,6 +1,6 @@
 # Platform domain deploy (Cloud Run + Neon)
 
-**GCP project:** `stawi-platform` (305282281906) · **region:** `europe-west9`  
+**GCP project:** `stawi-platform` (305282281906) · **region:** `europe-west1`  
 **GCP account key:** `platform` (`config/gcp-accounts.yaml`)  
 **Neon account key:** `platform` — **required for all platform apps going forward**  
 **Neon org:** `org-calm-cell-68997035` (Stawi Platform)
@@ -21,7 +21,7 @@ Do **not** point platform apps at `neon.account: identity`. Identity Neon
 
 App names must match Neon `allowed_app_prefixes: [platform-]`.
 
-Cloud Run + migrate jobs: Ready in `stawi-platform` / `europe-west9`.  
+Cloud Run + migrate jobs: Ready in `stawi-platform` / `europe-west1`.  
 DB secrets: `{app}-database-url` (+ `-direct`) in Secret Manager (Neon pooled/direct hosts, `eu-central-1`).  
 Pub/Sub: regional `{app}-events` + push to `/_frame/queue/{app}-events`.
 

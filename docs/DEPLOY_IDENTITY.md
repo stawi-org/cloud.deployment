@@ -63,7 +63,7 @@ identity-identity
 4. Confirm each:
 
 ```bash
-gcloud run services list --project=stawi-identity --region=europe-west9
+gcloud run services list --project=stawi-identity --region=europe-west1
 gcloud secrets describe identity-authentication-database-url --project=stawi-identity
 ```
 
@@ -84,9 +84,10 @@ Product APIs are **path-only** on Cloudflare (`api.stawi.org/<path>`). Full map:
 | `api.stawi.org/tenancy` | `identity-tenancy` (IAM) |
 | `api.stawi.org/identity` | `identity-identity` |
 
-Edge: **`edge/cloudflare-api-gateway`**. Control-plane grey LB:
-**`edge-lb-identity`** (`oauth2-w`, `authz`, `authz-w` only).  
-See **[SSL_EDGE_POLICY.md](SSL_EDGE_POLICY.md)**.
+Edge: **`edge/cloudflare-api-gateway`** for `api.stawi.org` only.  
+Control-plane + login hosts: **Cloud Run domain mapping** in `europe-west1`
+(`scripts/create-domain-mappings.sh`); see **[SSL_EDGE_POLICY.md](SSL_EDGE_POLICY.md)**
+and **[REGION_MIGRATION_EUROPE_WEST1.md](REGION_MIGRATION_EUROPE_WEST1.md)**.
 
 ## Container images (public GHCR)
 
@@ -119,7 +120,7 @@ Scheduler** job that GETs a health/login path every **5 minutes**:
 
 Module: [`modules/cloudrun-keep-warm`](../modules/cloudrun-keep-warm).  
 Cost is request/active seconds only (cents–few dollars/month at idle), not idle min-instance rates.  
-Scheduler region: `europe-west1` (HTTP target still hits Cloud Run in `europe-west9`).
+Scheduler region: `europe-west1` (HTTP target still hits Cloud Run in `europe-west1`).
 
 To pause keep-warm temporarily: set `paused = true` on the module or pause the job in GCP console.
 

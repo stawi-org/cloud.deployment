@@ -37,7 +37,7 @@ Shared values (public, not secrets):
 
 ```text
 project_id:                   stawi-identity
-region:                       europe-west9
+region:                       europe-west1
 ship_service_account:         cloudrun-ship@stawi-identity.iam.gserviceaccount.com
 workload_identity_provider:   projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-ship
 ```
@@ -120,7 +120,7 @@ Re-run ship for a previous tag, or:
 
 ```bash
 gcloud run services update-traffic identity-profile \
-  --region=europe-west9 --project=stawi-identity \
+  --region=europe-west1 --project=stawi-identity \
   --to-revisions=PREVIOUS_REVISION=100
 ```
 

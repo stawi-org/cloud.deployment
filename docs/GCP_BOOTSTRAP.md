@@ -32,7 +32,7 @@ CI uses **WIF** from the SOPS file (or registry mirror) — no long-lived GCP ke
   --account identity \
   --env stawi-prod \
   --project stawi-identity \
-  --region europe-west9 \
+  --region europe-west1 \
   --repo-path "$PWD"
 
 # New domain (auto-registers accounts.operations + envs.stawi-prod)
@@ -40,7 +40,7 @@ CI uses **WIF** from the SOPS file (or registry mirror) — no long-lived GCP ke
   --account operations \
   --env stawi-prod \
   --project stawi-operations \
-  --region europe-west9
+  --region europe-west1
 ```
 
 ## After bootstrap

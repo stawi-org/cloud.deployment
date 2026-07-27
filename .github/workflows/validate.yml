@@ -60,7 +60,7 @@ jobs:
           TF_VAR_image: example.com/app:validate
           TF_VAR_platform: stawi-prod
           TF_VAR_project_id: stawi-identity
-          TF_VAR_region: europe-west9
+          TF_VAR_region: europe-west1
         run: |
           set -euo pipefail
           tofu init -backend=false -input=false

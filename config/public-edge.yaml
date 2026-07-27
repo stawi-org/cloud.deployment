@@ -1,13 +1,14 @@
 # Edge contract for Cloud Run — see docs/SSL_EDGE_POLICY.md
 #
+# Region: europe-west1 (Cloud Run domain mapping supported).
+#
 # SSL split:
 #   Cloudflare Universal SSL (orange) + Worker:
 #     api.stawi.org only (path APIs + Scalar)
-#   Cloudflare Universal SSL (orange) + DNS CNAME → *.run.app (no Worker, no Google LB):
-#     accounts.stawi.org, oauth2.stawi.org
-#     (+ Origin Rule Host rewrite to run.app)
-#   Google Certificate Manager (grey DNS) + Global LB (edge-lb-identity):
-#     oauth2-w.stawi.org, authz.stawi.org, authz-w.stawi.org (IAM)
+#   Preferred: Cloud Run domain mapping + DNS records Google prints:
+#     accounts, oauth2, oauth2-w, authz, authz-w
+#   Interim: CF orange CNAME → *.run.app + Origin Host rewrite / Worker fallback
+#   Break-glass: Google Global LB (edge-lb-identity hosts non-empty)
 #
 # Product APIs: only api.stawi.org/<path>.
 # Zone SSL mode: Full (strict).
@@ -16,7 +17,7 @@ version: 1
 prod:
   zone: stawi.org
   issuer: https://stawi.org
-  region: europe-west9
+  region: europe-west1
   ssl:
     zone_mode: full_strict
     policy_doc: docs/SSL_EDGE_POLICY.md
@@ -41,19 +42,38 @@ prod:
       /thesa: { service: operations-thesa, project: stawi-operations }
       /trustage: { service: operations-trustage, project: stawi-operations }
 
-  # Orange CNAME → Cloud Run (managed by edge/cloudflare-api-gateway ensure-cf-dns)
+  # Preferred long-term: Cloud Run domain mappings (see scripts/create-domain-mappings.sh)
+  domain_mappings:
+    - hostname: accounts.stawi.org
+      service: identity-authentication
+      project: stawi-identity
+    - hostname: oauth2.stawi.org
+      service: identity-oauth2-hydra
+      project: stawi-identity
+    - hostname: oauth2-w.stawi.org
+      service: identity-oauth2-hydra-admin
+      project: stawi-identity
+    - hostname: authz.stawi.org
+      service: identity-authorization-keto-read
+      project: stawi-identity
+    - hostname: authz-w.stawi.org
+      service: identity-authorization-keto-write
+      project: stawi-identity
+
+  # Interim orange CNAME → Cloud Run (managed by edge/cloudflare-api-gateway ensure-cf-dns)
   cloudflare_direct_cnames:
     - accounts.stawi.org  # identity-authentication
     - oauth2.stawi.org    # identity-oauth2-hydra
+    - oauth2-w.stawi.org
+    - authz.stawi.org
+    - authz-w.stawi.org
 
   front_doors:
     edge-lb-identity:
       gcp_project: stawi-identity
       cloudflare_proxied: false
-      hosts:
-        oauth2-w.stawi.org: identity-oauth2-hydra-admin
-        authz.stawi.org: identity-authorization-keto-read
-        authz-w.stawi.org: identity-authorization-keto-write
+      # Empty = no Google LB. Re-add hosts only as break-glass.
+      hosts: {}
     edge-lb-platform:
       gcp_project: stawi-platform
       hosts: {}

@@ -8,7 +8,7 @@
 # Usage:
 #   ./scripts/mirror-ghcr-to-ar.sh \
 #     --project stawi-identity \
-#     --location europe-west9 \
+#     --location europe-west1 \
 #     --repo apps \
 #     --src ghcr.io/antinvestor/service-authentication:v1.54.53 \
 #     --name service-authentication \
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 PROJECT=""
-LOCATION="europe-west9"
+LOCATION="europe-west1"
 REPO="apps"
 PLATFORM="linux/amd64"
 SRCS=()

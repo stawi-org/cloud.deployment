@@ -15,7 +15,7 @@ on:
       region:
         description: Region
         required: true
-        default: europe-west9
+        default: europe-west1
 
 jobs:
   logs:

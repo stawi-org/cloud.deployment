@@ -70,7 +70,7 @@ Product per-service hostnames are **not** used. Clients use `api.stawi.org/<path
      --account api \
      --env stawi-prod \
      --project stawi-api \
-     --region europe-west9
+     --region europe-west1
    ```
 
 2. **Cross-project IAM**

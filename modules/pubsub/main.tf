@@ -106,7 +106,7 @@ resource "google_pubsub_topic" "this" {
 
   message_retention_duration = each.value.message_retention_duration
 
-  # Keep storage in the workload region (e.g. europe-west9) — avoid multi-continent hops.
+  # Keep storage in the workload region (e.g. europe-west1) — avoid multi-continent hops.
   dynamic "message_storage_policy" {
     for_each = length(local.persistence_regions) > 0 ? [1] : []
     content {

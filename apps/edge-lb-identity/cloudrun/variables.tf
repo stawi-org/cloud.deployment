@@ -2,7 +2,7 @@ variable "app_name" { type = string }
 variable "project_id" { type = string }
 variable "region" {
   type    = string
-  default = "europe-west9"
+  default = "europe-west1"
 }
 variable "platform" { type = string }
 variable "labels" {

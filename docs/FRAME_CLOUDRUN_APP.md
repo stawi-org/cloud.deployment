@@ -22,7 +22,7 @@ drifted on:
 | setup/migrate execute | identity true; ops/platform false | **false** (Job argv `["setup"]`) |
 | OTEL exporters | ops none; others OTLP from edge | **none** on service |
 | Keep-warm / probes | auth only | optional flags |
-| Region default | west1 vs west9 | **europe-west9** |
+| Region default | west1 vs west9 | **europe-west1** |
 
 ## App root checklist
 

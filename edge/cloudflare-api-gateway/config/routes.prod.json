@@ -2,7 +2,7 @@
   "version": 1,
   "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME → Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
-  "region": "europe-west9",
+  "region": "europe-west1",
   "gateway": {
     "health_path": "/_gateway/health",
     "routes_path": "/_gateway/routes",

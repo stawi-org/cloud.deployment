@@ -4,7 +4,7 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 
 | Plane | Account key | Project / org |
 |-------|-------------|----------------|
-| GCP | `operations` | `stawi-operations` (europe-west9) |
+| GCP | `operations` | `stawi-operations` (europe-west1) |
 | Neon | `operations` | org registered via `bootstrap-neon-account.sh` |
 
 ## Applications
@@ -40,7 +40,7 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
      --project stawi-operations \
      --account operations \
      --env stawi-prod \
-     --region europe-west9
+     --region europe-west1
    ```
 2. Neon account bootstrapped (API key + SOPS):
    ```bash
@@ -92,7 +92,7 @@ done
 
 ```bash
 # CI: Ready + secret mounts + /readyz
-gh workflow run ops-verify.yml -f project=stawi-operations -f region=europe-west9
+gh workflow run ops-verify.yml -f project=stawi-operations -f region=europe-west1
 
 # Operator full access (Owner) on the project:
 ./scripts/bootstrap-gcp-account.sh \

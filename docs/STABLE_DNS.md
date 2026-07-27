@@ -17,30 +17,28 @@ Apps and clients should only use **hostnames we control**. Backends
 **Do not put `*.run.app` in app env** except temporary break-glass. Runtime
 config uses the table above (`modules/frame-cloudrun-app`).
 
-## Architecture (no Google LB)
+## Architecture (prefer domain mapping in `europe-west1`)
 
 ```
 Client / S2S
     │
     ├─ https://api.stawi.org/<path>     → CF Worker → Cloud Run (path strip)
     │
-    └─ https://oauth2*.stawi.org        → CF orange CNAME → *.a.run.app
-       https://authz*.stawi.org           + Origin Rule: Host = run.app hostname
+    └─ https://oauth2*.stawi.org        → Cloud Run domain mapping (preferred)
+       https://authz*.stawi.org           DNS records from `gcloud beta run domain-mappings`
        https://accounts.stawi.org
+                                      ── or interim CF CNAME + Host rewrite ──
 ```
 
-Cloud Run routes by **Host**. A bare CNAME to `*.run.app` is not enough —
-Cloudflare must rewrite the origin Host header (and optionally SNI) to the
-Cloud Run service hostname. That is free on plans that allow Origin Rules
-Host override; scripts:
+**Preferred:** map FQDNs with Cloud Run domain mapping (`scripts/create-domain-mappings.sh`).
+Cloud Run then accepts `Host: oauth2-w.stawi.org` natively — no Worker, no Google LB.
 
-- `edge/cloudflare-api-gateway/scripts/ensure-cf-dns.mjs`
-- `edge/cloudflare-api-gateway/scripts/ensure-cf-origin-rules.mjs`
-- HTTP fallback if Origin Rules 403: `ensure-cf-worker-host-fallback.mjs`
+**Interim** (before mappings ACTIVE): orange CNAME → `*.run.app` + Origin Host rewrite
+(`ensure-cf-dns.mjs` / `ensure-cf-origin-rules.mjs` / Worker host fallback).
 
-**Google Global HTTPS LB is not required** for oauth2*/authz*/accounts.
-`edge-lb-identity` keeps `hosts = {}` so any leftover `edge-id` LB is destroyed
-(~$18/mo saved). Re-add hosts there only if CF cannot rewrite Host for gRPC.
+**Google Global HTTPS LB** is break-glass only (`edge-lb-identity` hosts non-empty).
+
+Region migration: [REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).
 
 ### Caveats
 

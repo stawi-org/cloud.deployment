@@ -36,7 +36,7 @@ module "gateway" {
       path_prefix     = "/profile"
       service         = "identity-profile"
       backend_project = "stawi-identity"
-      region          = "europe-west9"
+      region          = "europe-west1"
     }
   }
   cloudflare_zone_id = var.cloudflare_zone_id

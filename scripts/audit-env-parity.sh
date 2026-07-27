@@ -180,7 +180,7 @@ def live_envs(project, service):
   try:
     out = subprocess.check_output(
       ["gcloud", "run", "services", "describe", service,
-       f"--project={project}", "--region=europe-west9", "--format=json"],
+       f"--project={project}", "--region=europe-west1", "--format=json"],
       text=True, timeout=90, stderr=subprocess.DEVNULL,
     )
   except Exception as e:

@@ -18,7 +18,7 @@ variable "project_id" {
 
 variable "region" {
   type    = string
-  default = "europe-west9"
+  default = "europe-west1"
 }
 
 variable "platform" {
