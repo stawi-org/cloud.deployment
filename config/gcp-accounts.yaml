@@ -164,3 +164,19 @@ accounts:
           environment: dev
           domain: labs
           managed-by: cloud-deployment
+  communications:
+    description: GCP account communications (auto-registered by bootstrap-gcp-account.sh)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-prod:
+        project_id: stawi-communications
+        region: europe-west1
+        workload_identity_provider: projects/278179989699/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-communications.iam.gserviceaccount.com
+        sops_auth_path: credentials/gcp/communications/stawi-prod/auth.yaml
+        labels:
+          managed-by: cloud-deployment
+          domain: communications
+          environment: prod
