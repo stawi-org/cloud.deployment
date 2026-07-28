@@ -69,6 +69,84 @@ const ALLOWED_REQUEST_HOSTS = new Set([
   ...HOST_ROUTES.keys(),
 ]);
 
+// Browser CORS for SPA frontends (opportunities.stawi.org → api.stawi.org).
+// allow_origins: ["*"] = any Origin (reflect request Origin when present).
+const CORS = {
+  allow_origins: routesConfig.gateway?.cors?.allow_origins || ["*"],
+  allow_methods:
+    routesConfig.gateway?.cors?.allow_methods ||
+    "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
+  allow_headers:
+    routesConfig.gateway?.cors?.allow_headers ||
+    "Authorization, Content-Type, Accept, Origin, X-Requested-With, X-Request-Id, X-Serverless-Authorization, Connect-Protocol-Version, Connect-Timeout-Ms, Grpc-Timeout, User-Agent",
+  expose_headers:
+    routesConfig.gateway?.cors?.expose_headers ||
+    "Content-Type, Content-Length, X-Request-Id, X-Stawi-Gateway, X-Stawi-Route, Traceparent, Grpc-Status, Grpc-Message",
+  max_age: routesConfig.gateway?.cors?.max_age ?? 86400,
+  allow_credentials: routesConfig.gateway?.cors?.allow_credentials !== false,
+};
+
+function corsAllowOrigin(request) {
+  const reqOrigin = request.headers.get("Origin");
+  const allowed = CORS.allow_origins || ["*"];
+  const any =
+    allowed.includes("*") ||
+    allowed.some((o) => String(o).trim() === "*");
+  if (any) {
+    // Reflect Origin so credentialed fetches work (browsers reject * + credentials).
+    return reqOrigin && reqOrigin !== "null" ? reqOrigin : "*";
+  }
+  if (!reqOrigin) return null;
+  const hit = allowed.find(
+    (o) => String(o).toLowerCase() === reqOrigin.toLowerCase(),
+  );
+  return hit ? reqOrigin : null;
+}
+
+/** @param {Request} request @param {Headers} headers */
+function applyCorsHeaders(request, headers) {
+  const allow = corsAllowOrigin(request);
+  if (!allow) return headers;
+  headers.set("Access-Control-Allow-Origin", allow);
+  headers.set("Vary", "Origin");
+  if (CORS.allow_credentials && allow !== "*") {
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  headers.set("Access-Control-Allow-Methods", CORS.allow_methods);
+  const reqHdrs = request.headers.get("Access-Control-Request-Headers");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    reqHdrs && reqHdrs.trim() ? reqHdrs : CORS.allow_headers,
+  );
+  headers.set("Access-Control-Expose-Headers", CORS.expose_headers);
+  if (CORS.max_age != null) {
+    headers.set("Access-Control-Max-Age", String(CORS.max_age));
+  }
+  return headers;
+}
+
+/** @param {Request} request */
+function corsPreflightResponse(request) {
+  const headers = applyCorsHeaders(request, new Headers());
+  if (!headers.has("Access-Control-Allow-Origin")) {
+    return new Response(null, { status: 403 });
+  }
+  headers.set("Content-Length", "0");
+  return new Response(null, { status: 204, headers });
+}
+
+/** @param {Request} request @param {Response} response */
+function withCors(request, response) {
+  const headers = new Headers(response.headers);
+  applyCorsHeaders(request, headers);
+  // Prefer gateway CORS over upstream (avoid duplicate / conflicting ACAO).
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function originAllowed(originUrl, config) {
   let u;
   try {
@@ -138,6 +216,8 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
     },
   });
 }
+
+// Note: callers should pass responses through withCors() at the fetch boundary.
 
 function htmlResponse(html, status = 200) {
   return new Response(html, {
@@ -421,6 +501,18 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
   respHeaders.set("x-stawi-gateway", "cloudflare-api-gateway");
   respHeaders.set("x-stawi-route", route.id);
 
+  // Strip upstream CORS so gateway policy is authoritative.
+  for (const h of [
+    "access-control-allow-origin",
+    "access-control-allow-credentials",
+    "access-control-allow-methods",
+    "access-control-allow-headers",
+    "access-control-expose-headers",
+    "access-control-max-age",
+  ]) {
+    respHeaders.delete(h);
+  }
+
   if (
     opts.rewriteOpenAPI &&
     request.method === "GET" &&
@@ -436,9 +528,6 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
     );
     respHeaders.set("content-type", rewritten.contentType);
     respHeaders.delete("content-length");
-    if (!respHeaders.has("access-control-allow-origin")) {
-      respHeaders.set("access-control-allow-origin", "*");
-    }
     return new Response(rewritten.body, {
       status: upstream.status,
       statusText: upstream.statusText,
@@ -465,6 +554,11 @@ async function handle(request) {
     host === "localhost";
   if (!allowedHost) {
     return jsonResponse({ error: "host_not_allowed", host }, 421);
+  }
+
+  // Browser CORS preflight — answer at the edge (do not proxy OPTIONS to origin).
+  if (request.method === "OPTIONS") {
+    return corsPreflightResponse(request);
   }
 
   // Optional host_routes (normally empty — only api.stawi.org is on this Worker).
@@ -513,5 +607,8 @@ async function handle(request) {
 }
 
 export default {
-  fetch: handle,
+  async fetch(request) {
+    const res = await handle(request);
+    return withCors(request, res);
+  },
 };

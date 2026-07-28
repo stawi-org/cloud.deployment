@@ -12,6 +12,11 @@
       "/docs"
     ],
     "expose_route_list": true,
+    "cors": {
+      "allow_origins": ["*"],
+      "allow_credentials": true,
+      "notes": "Reflect any Origin so browser SPAs (e.g. opportunities.stawi.org) can call api.stawi.org with Authorization."
+    },
     "scalar": {
       "theme": "default",
       "dark_mode": true,
