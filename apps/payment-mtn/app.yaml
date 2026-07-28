@@ -1,0 +1,12 @@
+name: payment-mtn
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: payments
+neon:
+  account: payments
+runtime: cloudrun
+domain: payments
+version: 1

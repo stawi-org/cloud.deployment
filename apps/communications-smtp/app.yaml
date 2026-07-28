@@ -1,0 +1,12 @@
+name: communications-smtp
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: communications
+neon:
+  account: communications
+runtime: cloudrun
+domain: communications
+version: 1

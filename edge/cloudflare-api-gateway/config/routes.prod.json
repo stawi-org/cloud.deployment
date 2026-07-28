@@ -278,6 +278,198 @@
         "openapi_path": "/openapi.yaml"
       },
       "notes": "Enable after refresh-origins with operations project access."
+    },
+    {
+      "id": "notification",
+      "prefix": "/notification",
+      "service": "communications-notification",
+      "project": "stawi-communications",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Notification",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Enable after Cloud Run apply + refresh-origins on stawi-communications."
+    },
+    {
+      "id": "notification-africastalking",
+      "prefix": "/notification-africastalking",
+      "service": "communications-at",
+      "project": "stawi-communications",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "AT SMS", "openapi_path": "/openapi.yaml" },
+      "notes": "Integration worker; enable with communications stack."
+    },
+    {
+      "id": "notification-emailsmtp",
+      "prefix": "/notification-emailsmtp",
+      "service": "communications-smtp",
+      "project": "stawi-communications",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Email SMTP", "openapi_path": "/openapi.yaml" },
+      "notes": "Integration worker; seed SMTP SM secrets first."
+    },
+    {
+      "id": "payment",
+      "prefix": "/payment",
+      "service": "payment-payment",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Payment",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Apply payment-* integrations before payment-payment (shared Pub/Sub topics)."
+    },
+    {
+      "id": "payment-mpesa",
+      "prefix": "/payment-mpesa",
+      "service": "payment-mpesa",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "M-Pesa", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-stripe",
+      "prefix": "/payment-stripe",
+      "service": "payment-stripe",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Stripe", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-polar",
+      "prefix": "/payment-polar",
+      "service": "payment-polar",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Polar", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-pawapay",
+      "prefix": "/payment-pawapay",
+      "service": "payment-pawapay",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "PawaPay", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-flutterwave",
+      "prefix": "/payment-flutterwave",
+      "service": "payment-flutterwave",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Flutterwave", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-jenga",
+      "prefix": "/payment-jenga",
+      "service": "payment-jenga",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Jenga", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-airtel",
+      "prefix": "/payment-airtel",
+      "service": "payment-airtel",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "Airtel", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "payment-mtn",
+      "prefix": "/payment-mtn",
+      "service": "payment-mtn",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": { "enabled": false, "title": "MTN", "openapi_path": "/openapi.yaml" }
+    },
+    {
+      "id": "checkout",
+      "prefix": "/checkout",
+      "service": "checkout-checkout",
+      "project": "stawi-payments",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Checkout",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME → Cloud Run)."
+    },
+    {
+      "id": "ledger",
+      "prefix": "/ledger",
+      "service": "ledger-ledger",
+      "project": "stawi-ledger",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Ledger",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "GCP stawi-ledger + Neon ledger account (with billing)."
+    },
+    {
+      "id": "billing",
+      "prefix": "/billing",
+      "service": "ledger-billing",
+      "project": "stawi-ledger",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Billing",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Co-located with ledger on stawi-ledger; calls checkout/payment on stawi-payments via api.stawi.org."
     }
   ]
 }

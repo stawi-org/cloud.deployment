@@ -24,6 +24,11 @@ locals {
     startswith(var.app_name, "operations-") ? "/${trimprefix(var.app_name, "operations-")}" :
     startswith(var.app_name, "identity-") ? "/${trimprefix(var.app_name, "identity-")}" :
     startswith(var.app_name, "platform-") ? "/${trimprefix(var.app_name, "platform-")}" :
+    startswith(var.app_name, "communications-") ? "/${trimprefix(var.app_name, "communications-")}" :
+    startswith(var.app_name, "payment-") ? "/${trimprefix(var.app_name, "payment-")}" :
+    startswith(var.app_name, "checkout-") ? "/${trimprefix(var.app_name, "checkout-")}" :
+    startswith(var.app_name, "billing-") ? "/${trimprefix(var.app_name, "billing-")}" :
+    startswith(var.app_name, "ledger-") ? "/${trimprefix(var.app_name, "ledger-")}" :
     "/${var.app_name}"
   )
   resource_path = var.resource_path != "" ? var.resource_path : local.default_resource_path
@@ -44,6 +49,11 @@ locals {
     startswith(var.app_name, "identity-") ? "service-${trimprefix(var.app_name, "identity-")}" :
     startswith(var.app_name, "platform-") ? "service-${trimprefix(var.app_name, "platform-")}" :
     startswith(var.app_name, "operations-") ? "service-${trimprefix(var.app_name, "operations-")}" :
+    startswith(var.app_name, "communications-") ? "service-${trimprefix(var.app_name, "communications-")}" :
+    startswith(var.app_name, "payment-") ? "service-${trimprefix(var.app_name, "payment-")}" :
+    startswith(var.app_name, "checkout-") ? "service-${trimprefix(var.app_name, "checkout-")}" :
+    startswith(var.app_name, "billing-") ? "service-${trimprefix(var.app_name, "billing-")}" :
+    startswith(var.app_name, "ledger-") ? "service-${trimprefix(var.app_name, "ledger-")}" :
     var.app_name
   )
   oauth2_service_client_id = var.oauth2_service_client_id != "" ? var.oauth2_service_client_id : local.default_oauth2_service_client_id

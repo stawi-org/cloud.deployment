@@ -1,0 +1,47 @@
+# Required GCP Secret Manager secrets for communications domain (stawi-communications).
+# Values NEVER in git — scripts/sync-cluster-secrets-to-gcp.sh or console.
+
+project_hint: stawi-communications
+gcp_account: communications
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    required: true
+    source_hints:
+      - "owned by communications-notification OpenTofu (mirrors identity)"
+
+apps:
+  communications-notification:
+    runtime_secrets:
+      - id: communications-notification-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
+
+  communications-at:
+    runtime_secrets:
+      - id: hydra-webhook-psk
+        shared: true
+        note: "AfricasTalking SMS integration (resource_path /notification-africastalking)"
+
+  communications-smtp:
+    runtime_secrets:
+      - id: smtp-server-host
+        env: SMTP_SERVER_HOST
+        required: true
+        source_hints:
+          - "k8s: communications/smtp2go-credentials SMTP_SERVER_HOST"
+      - id: smtp-server-port
+        env: SMTP_SERVER_PORT
+        required: true
+      - id: smtp-server-access-key
+        env: SMTP_SERVER_ACCESS_KEY
+        required: true
+      - id: smtp-server-secret-key
+        env: SMTP_SERVER_SECRET_KEY
+        required: true
+      - id: hydra-webhook-psk
+        shared: true

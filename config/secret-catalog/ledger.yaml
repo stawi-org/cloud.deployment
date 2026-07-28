@@ -1,0 +1,34 @@
+# Required GCP Secret Manager secrets for ledger domain (stawi-ledger).
+# Hosts ledger-ledger + ledger-billing (checkout stays on stawi-payments).
+
+project_hint: stawi-ledger
+gcp_account: ledger
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    required: true
+    source_hints:
+      - "owned by ledger-ledger OpenTofu (mirrors identity)"
+      - "k8s: finance/hydra-webhook-psk"
+
+apps:
+  ledger-ledger:
+    runtime_secrets:
+      - id: ledger-ledger-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: ledger-ledger-database-url-direct
+        managed_by_tofu: true
+      - id: hydra-webhook-psk
+        env: OAUTH2_SIGNER_API_KEY
+        shared: true
+
+  ledger-billing:
+    runtime_secrets:
+      - id: ledger-billing-database-url
+        managed_by_tofu: true
+      - id: ledger-billing-database-url-direct
+        managed_by_tofu: true
+      - id: hydra-webhook-psk
+        shared: true

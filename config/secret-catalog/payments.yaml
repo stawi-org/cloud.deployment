@@ -1,0 +1,86 @@
+# Required GCP Secret Manager secrets for payments domain (stawi-payments).
+# Includes payment core, rail integrations, and checkout.
+# Ledger + billing secrets live in config/secret-catalog/ledger.yaml (stawi-ledger).
+
+project_hint: stawi-payments
+gcp_account: payments
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    required: true
+    source_hints:
+      - "owned by payment-payment OpenTofu (mirrors identity)"
+      - "k8s: finance/hydra-webhook-psk"
+
+apps:
+  payment-payment:
+    runtime_secrets:
+      - id: payment-payment-database-url
+        managed_by_tofu: true
+      - id: payment-payment-database-url-direct
+        managed_by_tofu: true
+      - id: hydra-webhook-psk
+        shared: true
+
+  checkout-checkout:
+    runtime_secrets:
+      - id: checkout-checkout-database-url
+        managed_by_tofu: true
+      - id: checkout-checkout-database-url-direct
+        managed_by_tofu: true
+      - id: checkout-signing-secret
+        env: CHECKOUT_SIGNING_SECRET
+        required: true
+        source_hints:
+          - "k8s: finance/checkout-signing-secret"
+      - id: checkout-internal-token
+        env: CHECKOUT_INTERNAL_TOKEN
+        required: true
+      - id: checkout-card-encryption-key
+        env: CHECKOUT_CARD_ENCRYPTION_KEY
+        required: true
+      - id: hydra-webhook-psk
+        shared: true
+
+  payment-flutterwave:
+    runtime_secrets:
+      - id: flutterwave-client-id
+        env: FLUTTERWAVE_CLIENT_ID
+        required: true
+      - id: flutterwave-client-secret
+        env: FLUTTERWAVE_CLIENT_SECRET
+        required: true
+      - id: flutterwave-encryption-key
+        env: FLUTTERWAVE_ENCRYPTION_KEY
+        required: true
+      - id: flutterwave-webhook-secret
+        env: FLUTTERWAVE_WEBHOOK_SECRET
+        required: true
+
+  payment-pawapay:
+    runtime_secrets:
+      - id: pawapay-api-token
+        env: PAWAPAY_API_TOKEN
+        required: true
+      - id: pawapay-signature-key-id
+        env: PAWAPAY_SIGNATURE_KEY_ID
+        required: true
+      - id: pawapay-private-key-pem
+        env: PAWAPAY_PRIVATE_KEY_PEM
+        required: true
+
+  payment-jenga:
+    runtime_secrets:
+      - id: jenga-api-key
+        env: JENGA_API_KEY
+        required: true
+      - id: jenga-consumer-secret
+        env: JENGA_CONSUMER_SECRET
+        required: true
+      - id: jenga-merchant-code
+        env: JENGA_MERCHANT_CODE
+        required: true
+
+  # mpesa / stripe / polar / airtel / mtn: rail credentials typically via
+  # platform settings service; only hydra-webhook-psk + Pub/Sub at deploy time.
