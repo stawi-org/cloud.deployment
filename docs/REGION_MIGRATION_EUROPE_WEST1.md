@@ -56,26 +56,17 @@ Not required for CI after the registry-preference change.
 
 ---
 
-## 2. Artifact Registry (optional)
+## 2. Artifact Registry
 
-Existing repos:
+**Do not use AR for service images.** Ship only from public GHCR
+(`ghcr.io/antinvestor/...`). West9 AR `apps` repos were deleted to stop storage cost.
 
-- `europe-west9-docker.pkg.dev/stawi-identity/apps`
-- `europe-west9-docker.pkg.dev/stawi-platform/apps`
-
-Cloud Run in west1 **can pull** west9 AR (cross-region). For cleanliness:
+If any leftover AR repository appears:
 
 ```bash
-for proj in stawi-identity stawi-platform; do
-  gcloud artifacts repositories create apps \
-    --project=$proj --repository-format=docker \
-    --location=europe-west1 \
-    --description="Apps (europe-west1)" || true
-done
-# mirror-ghcr-to-ar.sh LOCATION default is now europe-west1
+gcloud artifacts repositories delete apps \
+  --project=PROJECT --location=LOCATION --quiet
 ```
-
-Primary ship path remains **public GHCR** — AR is optional.
 
 ---
 

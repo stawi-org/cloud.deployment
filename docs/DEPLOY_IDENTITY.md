@@ -91,8 +91,8 @@ and **[REGION_MIGRATION_EUROPE_WEST1.md](REGION_MIGRATION_EUROPE_WEST1.md)**.
 
 ## Container images (public GHCR)
 
-Service images are **public** on GHCR. Cloud Run pulls them directly — no
-Artifact Registry mirror and no dual-push:
+Service images are **public** on GHCR only. Cloud Run pulls them directly — no
+Artifact Registry:
 
 ```text
 ghcr.io/antinvestor/service-authentication:vX.Y.Z
@@ -129,7 +129,7 @@ To pause keep-warm temporarily: set `paused = true` on the module or pause the j
 | Item | Action |
 |------|--------|
 | Custom domains / DNS | Cloudflare / Cloud Run domain mapping |
-| Ship Frame images to AR | Service-repo release → AR + `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)) |
+| Ship Frame images via GHCR | Service-repo release → GHCR + `cloudrun-ship` (see [CLOUDRUN_SHIP.md](CLOUDRUN_SHIP.md)) |
 | Tenancy service-bot → Keto bootstrap | Requires Frame TLS gRPC client + keto `use_http2` + migrate OAuth/Keto env (see FRAME_CLOUDRUN_APP.md) |
 | Google OAuth client secrets | Optional `google_oauth_*` vars on authentication |
 

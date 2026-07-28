@@ -9,22 +9,37 @@
 
 Cloud Run does **not** auto-pull new tags. Shipping is explicit: release → WIF → `gcloud run` update.
 
+## Policy (hard rules)
+
+| Rule | Value |
+|------|--------|
+| **Image registry** | **Public GHCR only** — `ghcr.io/antinvestor/...` |
+| **Cloud Run region** | **`europe-west1` only** (Paris/`europe-west9` retired) |
+| **Artifact Registry** | **Not used** for service images (no `*.pkg.dev` mirrors) |
+| **OpenTofu** | Ignores image on service/job (`lifecycle.ignore_changes`) |
+
+The reusable workflow enforces registry + region:
+
+[`antinvestor/common/.github/workflows/cloudrun-ship.yml`](https://github.com/antinvestor/common/blob/main/.github/workflows/cloudrun-ship.yml)
+
+- Default `region: europe-west1`
+- Fails if `region` is `europe-west9` (or any non–west1 value)
+- Fails if image is not `ghcr.io/...` (rejects `*.pkg.dev` / `gcr.io`)
+
 ## Architecture
 
 ```text
 antinvestor/service-profile  tag v1.53.5
-  ├─ docker-release (GHCR)
-  └─ cloudrun-ship (reusable, antinvestor/common)
-       WIF provider: github-ship
-       SA:           cloudrun-ship@stawi-identity.iam.gserviceaccount.com
+  ├─ docker-release → ghcr.io/antinvestor/service-profile:v1.53.5  (public)
+  └─ cloudrun-ship
+       WIF: github-ship → cloudrun-ship@PROJECT
+       region: europe-west1 (fixed)
        1. update {app}-migrate job image
        2. execute migrate --wait
-       3. update Cloud Run service image  → new revision
+       3. update Cloud Run service image → new revision
 ```
 
-OpenTofu **ignores** container image on services and migrate jobs (`lifecycle.ignore_changes`), so infra applies never revert a ship.
-
-## Identity domain (stawi-prod)
+## Identity (stawi-prod)
 
 | GitHub repo | GHCR image | Cloud Run service | Migrate job |
 |-------------|------------|-------------------|-------------|
@@ -33,13 +48,27 @@ OpenTofu **ignores** container image on services and migrate jobs (`lifecycle.ig
 | `antinvestor/service-authentication` | `ghcr.io/antinvestor/service-authentication-tenancy` | `identity-tenancy` | `identity-tenancy-migrate` |
 | `antinvestor/service-fintech` | `ghcr.io/antinvestor/service-fintech-identity` | `identity-identity` | `identity-identity-migrate` |
 
-Shared values (public, not secrets):
-
 ```text
 project_id:                   stawi-identity
 region:                       europe-west1
 ship_service_account:         cloudrun-ship@stawi-identity.iam.gserviceaccount.com
 workload_identity_provider:   projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-ship
+```
+
+## Platform (stawi-prod)
+
+| GitHub repo | GHCR image | Cloud Run service |
+|-------------|------------|-------------------|
+| `antinvestor/service-profile` (devices package) | `ghcr.io/antinvestor/service-profile-devices` | `platform-devices` |
+| `antinvestor/service-profile` (settings) | `ghcr.io/antinvestor/service-profile-settings` | `platform-settings` |
+| `antinvestor/service-profile` (geolocation) | `ghcr.io/antinvestor/service-profile-geolocation` | `platform-geolocation` |
+| `antinvestor/service-files` | `ghcr.io/antinvestor/service-files` | `platform-files` |
+
+```text
+project_id:                   stawi-platform
+region:                       europe-west1
+ship_service_account:         cloudrun-ship@stawi-platform.iam.gserviceaccount.com
+workload_identity_provider:   projects/305282281906/locations/global/workloadIdentityPools/github/providers/github-ship
 ```
 
 ## Bootstrap (once per GCP project)
@@ -52,71 +81,41 @@ workload_identity_provider:   projects/721554040672/locations/global/workloadIde
   --ship-repo antinvestor/service-profile,antinvestor/service-authentication,antinvestor/service-fintech
 ```
 
-- **tofu-deploy** WIF provider stays locked to `stawi-org/cloud.deployment`.
-- **github-ship** provider only allows listed antinvestor service repos.
+- **tofu-deploy** WIF stays locked to `stawi-org/cloud.deployment`.
+- **github-ship** only allowlists listed antinvestor service repos.
+- Does **not** create Artifact Registry or grant AR roles.
 
-## Reusable workflow
+## GHCR must stay public
 
-[`antinvestor/common/.github/workflows/cloudrun-ship.yml`](https://github.com/antinvestor/common/blob/main/.github/workflows/cloudrun-ship.yml)
-
-Caller supplies image, service, project, region, WIF, ship SA, optional migrate job.
-
-Service allowlist (default): identity Frame apps + platform (`platform-devices`, `platform-settings`, `platform-geolocation`, `platform-files`). Pass `allowed_services` to override.
-
-## GHCR images are public (no AR mirror)
-
-**Policy:** `ghcr.io/antinvestor/*` service images are **public** so Cloud Run can pull them with no registry credentials and without mirroring into Artifact Registry.
+Cloud Run pulls `ghcr.io` anonymously — packages must be public.
 
 | Concern | How |
 |---------|-----|
-| New releases | `antinvestor/common` `docker-release.yml` attempts to set package visibility public after push |
-| Existing private packages | `scripts/make-ghcr-public.sh` or workflow `make-ghcr-public.yml` on `antinvestor/common` |
-| Ship | `cloudrun-ship` uses `ghcr.io/antinvestor/...:vX.Y.Z` directly |
-
-Optional org secret **`GHCR_ADMIN_TOKEN`**: classic PAT with `write:packages` + `read:packages` (package admin / org owner). Needed when the GitHub Packages visibility API is restricted for `GITHUB_TOKEN`.
+| New releases | `docker-release.yml` sets package visibility public after push |
+| Existing private packages | `scripts/make-ghcr-public.sh` or `make-ghcr-public.yml` on `antinvestor/common` |
 
 ```bash
-# One-shot: make remaining private packages public
 gh auth refresh -h github.com -s read:packages,write:packages
 ./scripts/make-ghcr-public.sh
-
-# Or via Actions (after setting GHCR_ADMIN_TOKEN)
-gh workflow run make-ghcr-public.yml -R antinvestor/common
 ```
 
-Verify anonymous pull:
+## Caller contract (`release.yaml`)
 
-```bash
-# Should return 200 for a public package
-TOKEN=$(curl -sS "https://ghcr.io/token?service=ghcr.io&scope=repository:antinvestor/service-profile:pull" | jq -r .token)
-curl -sSI -H "Authorization: Bearer $TOKEN" \
-  "https://ghcr.io/v2/antinvestor/service-profile/manifests/latest"
+```yaml
+uses: antinvestor/common/.github/workflows/cloudrun-ship.yml@main
+with:
+  image: ghcr.io/antinvestor/service-profile:${{ github.ref_name }}
+  service: identity-profile
+  project_id: stawi-identity
+  region: europe-west1   # optional; defaults to europe-west1; west9 is rejected
+  migrate_job: identity-profile-migrate
+  ship_service_account: cloudrun-ship@stawi-identity.iam.gserviceaccount.com
+  workload_identity_provider: projects/721554040672/locations/global/workloadIdentityPools/github/providers/github-ship
 ```
 
-### Emergency: AR mirror (only if a package is still private)
-
-If a package is still private and you cannot change visibility yet:
-
-```bash
-./scripts/mirror-ghcr-to-ar.sh --project stawi-identity --repo apps \
-  --src ghcr.io/antinvestor/service-authentication:v1.54.62 \
-  --name service-authentication --tag v1.54.62
-```
-
-Point `envs/stawi-prod.tfvars` `image` at the AR tag only as a temporary bootstrap.
-
-## Adding a new Frame service
-
-1. Apply app stack in this repo (service + migrate job + messaging exist).
-2. Grant ship SA `roles/iam.serviceAccountUser` on the new runtime SA (re-run bootstrap with updated `--runtime-sa`).
-3. Add repo to WIF allowlist (`--ship-repo`) if new.
-4. In the service repo `release.yaml`, add a `ship` job calling `cloudrun-ship.yml` after `docker` with **`ghcr.io/...` image**.
-5. Prefer semver tags; avoid shipping `:latest` to prod.
-6. Confirm the GHCR package is **public** (docker-release step or `make-ghcr-public.sh`).
+Do **not** pass `*.pkg.dev` images or `region: europe-west9`.
 
 ## Rollback
-
-Re-run ship for a previous tag, or:
 
 ```bash
 gcloud run services update-traffic identity-profile \
@@ -124,10 +123,12 @@ gcloud run services update-traffic identity-profile \
   --to-revisions=PREVIOUS_REVISION=100
 ```
 
-## What still requires cloud.deployment apply
+Or re-ship a previous semver tag via the service repo workflow.
 
-- New env vars (e.g. queue OIDC), secrets, scaling, Pub/Sub topics
+## What still needs cloud.deployment apply
+
+- New env vars, secrets, scaling, Pub/Sub topics
 - First-time service create
-- Neon / IAM / WIF bootstrap changes
+- Neon / IAM / WIF bootstrap
 
 Image-only releases never need a monorepo pin PR.
