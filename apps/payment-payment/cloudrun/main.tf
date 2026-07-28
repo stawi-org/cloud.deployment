@@ -96,11 +96,6 @@ module "frame" {
     PAYMENT_FAILURE_TOPIC      = "svc.payments.failure"
     SECURELY_RUN_SERVICE       = "true"
   }
-
-  depends_on = [
-    google_pubsub_topic.prompt,
-    google_pubsub_topic.rail_payments,
-  ]
 }
 
 resource "google_pubsub_topic_iam_member" "publish_prompt" {
