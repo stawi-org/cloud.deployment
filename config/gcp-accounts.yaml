@@ -70,14 +70,15 @@ accounts:
           domain: payments
           managed-by: cloud-deployment
       stawi-prod:
-        project_id: stawi-payments-prod
+        project_id: stawi-payments
         region: europe-west1
-        workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/cloud-deployment
-        deploy_service_account: tofu-deploy@stawi-payments-prod.iam.gserviceaccount.com
+        workload_identity_provider: projects/131149412918/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-payments.iam.gserviceaccount.com
         labels:
           environment: prod
           domain: payments
           managed-by: cloud-deployment
+        sops_auth_path: credentials/gcp/payments/stawi-prod/auth.yaml
   platform:
     description: Shared platform edge GCP
     owners:
