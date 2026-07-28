@@ -1,5 +1,5 @@
 # communications-notification — Frame Cloud Run via modules/frame-cloudrun-app.
-
+# hydra-webhook-psk is seeded OOB into stawi-communications (copy of identity).
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -9,22 +9,6 @@ provider "google" {
   project = var.project_id
   region  = var.region
 }
-
-
-# Mirror hydra-webhook-psk from identity (private_key_jwt webhooks).
-data "google_secret_manager_secret_version" "identity_hydra_psk" {
-  project = var.identity_project_id
-  secret  = "hydra-webhook-psk"
-  version = "latest"
-}
-
-locals {
-  generated_secret_ids = toset(["hydra-webhook-psk"])
-  generated_secret_values = {
-    "hydra-webhook-psk" = data.google_secret_manager_secret_version.identity_hydra_psk.secret_data
-  }
-}
-
 
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
@@ -50,10 +34,8 @@ module "frame" {
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-notification"
 
-  extra_secret_ids            = local.generated_secret_ids
-  extra_version_ids           = local.generated_secret_ids
-  extra_secret_values         = local.generated_secret_values
-  grant_oauth_signer_accessor = false
+  # Local SM secret hydra-webhook-psk (seeded; not tofu-managed value).
+  grant_oauth_signer_accessor = true
 
   app_env = {
     PROFILE_SERVICE_URI = "https://api.stawi.org/profile"

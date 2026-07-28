@@ -1,4 +1,5 @@
 # payment-payment — Frame Cloud Run (owns shared integrator Pub/Sub topics).
+# hydra-webhook-psk seeded OOB into stawi-payments (copy of identity).
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -13,12 +14,6 @@ data "google_project" "this" {
   project_id = var.project_id
 }
 
-data "google_secret_manager_secret_version" "identity_hydra_psk" {
-  project = var.identity_project_id
-  secret  = "hydra-webhook-psk"
-  version = "latest"
-}
-
 locals {
   prompt_topics = {
     mpesa       = "payment-mpesa-prompts"
@@ -30,16 +25,11 @@ locals {
     airtel      = "payment-airtel-prompts"
     mtn         = "payment-mtn-prompts"
   }
-  # payment-polar-payments is the PAYMENT_LINK target (same naming as other rails).
   polar_payments_topic = "payment-polar-payments"
   prompt_route_uris = merge(
     { for k, topic in local.prompt_topics : k => "gcppubsub://${var.project_id}/${topic}" },
     { "m-pesa" = "gcppubsub://${var.project_id}/${local.prompt_topics["mpesa"]}" },
   )
-  generated_secret_ids = toset(["hydra-webhook-psk"])
-  generated_secret_values = {
-    "hydra-webhook-psk" = data.google_secret_manager_secret_version.identity_hydra_psk.secret_data
-  }
 }
 
 # Shared topics for rails (integrations attach push subscriptions only).
@@ -87,10 +77,7 @@ module "frame" {
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-payment"
 
-  extra_secret_ids            = local.generated_secret_ids
-  extra_version_ids           = local.generated_secret_ids
-  extra_secret_values         = local.generated_secret_values
-  grant_oauth_signer_accessor = false
+  grant_oauth_signer_accessor = true
 
   service_env_extra = {
     INITIATE_PROMPT_TOPIC_NAME = "mpesa-prompts"
