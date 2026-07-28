@@ -181,3 +181,19 @@ accounts:
           managed-by: cloud-deployment
           domain: communications
           environment: prod
+  ledger:
+    description: GCP account ledger (auto-registered by bootstrap-gcp-account.sh)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-prod:
+        project_id: stawi-ledger
+        region: europe-west1
+        workload_identity_provider: projects/142000360471/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-ledger.iam.gserviceaccount.com
+        sops_auth_path: credentials/gcp/ledger/stawi-prod/auth.yaml
+        labels:
+          managed-by: cloud-deployment
+          domain: ledger
+          environment: prod
