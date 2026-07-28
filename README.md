@@ -29,10 +29,7 @@ app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF /
 - **One OpenTofu root + R2 state per app per env** (independent CI)
 - **Pub/Sub only** for messaging (no NATS)
 - **Identity greenfield** apps under `apps/identity-*` — [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md)
-| [docs/DEPLOY_IDENTITY.md](docs/DEPLOY_IDENTITY.md) | Full identity deploy + Secret Manager seed |
-| [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | **What to set in GitHub only** |
-| [docs/GCP_BOOTSTRAP.md](docs/GCP_BOOTSTRAP.md) | Cloud Shell GCP account bootstrap (WIF + SOPS PR) |
-| [docs/NEON_BOOTSTRAP.md](docs/NEON_BOOTSTRAP.md) | Independent Neon org onboard (SOPS + optional GH Env) |
+- **Payments / ledger split** — checkout on `stawi-payments`; ledger + billing on `stawi-ledger` — [docs/DEPLOY_PAYMENTS_LEDGER_COMMS.md](docs/DEPLOY_PAYMENTS_LEDGER_COMMS.md)
 
 ## Docs
 
@@ -42,6 +39,7 @@ app.yaml  →  gcp.account  →  config/gcp-accounts.yaml   →  project / WIF /
 | [docs/ADDING_AN_APP.md](docs/ADDING_AN_APP.md) | Add an app |
 | [docs/IDENTITY_GREENFIELD.md](docs/IDENTITY_GREENFIELD.md) | Identity domain big-bang |
 | [docs/DEPLOY_IDENTITY.md](docs/DEPLOY_IDENTITY.md) | Full identity deploy + Secret Manager seed |
+| [docs/DEPLOY_PAYMENTS_LEDGER_COMMS.md](docs/DEPLOY_PAYMENTS_LEDGER_COMMS.md) | Communications + payments + ledger/billing Cloud Run |
 | [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) | **What to set in GitHub only** |
 | [docs/GCP_BOOTSTRAP.md](docs/GCP_BOOTSTRAP.md) | Cloud Shell GCP account bootstrap (WIF + SOPS PR) |
 | [docs/NEON_BOOTSTRAP.md](docs/NEON_BOOTSTRAP.md) | Independent Neon org onboard (SOPS + optional GH Env) |
