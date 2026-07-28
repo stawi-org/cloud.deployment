@@ -60,3 +60,15 @@ accounts:
     sensitivity: medium
     sops_auth_path: credentials/neon/operations/auth.yaml
     neon_org_hint: Stawi Operations
+  communications:
+    description: Neon organization for communications domain (auto-registered by bootstrap-neon-account.sh)
+    owners:
+      - platform
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - communications-
+    sensitivity: medium
+    sops_auth_path: credentials/neon/communications/auth.yaml
+    neon_org_hint: Stawi Communications
