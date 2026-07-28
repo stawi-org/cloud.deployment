@@ -1,5 +1,4 @@
-# communications-smtp — Frame Cloud Run via modules/frame-cloudrun-app.
-
+# communications-smtp — email integration; SMTP secrets seeded OOB.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -10,7 +9,6 @@ provider "google" {
   region  = var.region
 }
 
-
 data "google_project" "this" {
   project_id = var.project_id
 }
@@ -20,8 +18,13 @@ locals {
   send_topic         = "notification-emailsmtp-send"
   send_ref           = "emailsmtp-send"
   push_oidc_audience = local.service_run_url
+  smtp_secret_ids = toset([
+    "smtp-server-host",
+    "smtp-server-port",
+    "smtp-server-access-key",
+    "smtp-server-secret-key",
+  ])
 }
-
 
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
@@ -47,20 +50,8 @@ module "frame" {
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-notification-emailsmtp"
 
-  # Secret shells — seed values via scripts/sync-cluster-secrets-to-gcp.sh (not in git).
-  extra_secret_ids  = toset([
-    "smtp-server-access-key",
-    "smtp-server-host",
-    "smtp-server-port",
-    "smtp-server-secret-key",
-  ])
-  extra_version_ids = toset([])
-  secret_env_extra = {
-    SMTP_SERVER_HOST = { secret = "smtp-server-host" }
-    SMTP_SERVER_PORT = { secret = "smtp-server-port" }
-    SMTP_SERVER_ACCESS_KEY = { secret = "smtp-server-access-key" }
-    SMTP_SERVER_SECRET_KEY = { secret = "smtp-server-secret-key" }
-  }
+  grant_oauth_signer_accessor = true
+
   create_default_events_topic = false
   push_oidc_audience          = local.push_oidc_audience
 
@@ -88,10 +79,26 @@ module "frame" {
     QUEUE_NOTIFICATION_EMAIL_DEQUEUE_URI  = "push://${local.send_ref}?protocol=gcppubsub"
   }
 
-  app_env = {
-    PROFILE_SERVICE_URI = "https://api.stawi.org/profile"
-    SETTINGS_SERVICE_URI = "https://api.stawi.org/settings"
-    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
-    TENANCY_SERVICE_URI = "https://api.stawi.org/tenancy"
+  secret_env_extra = {
+    SMTP_SERVER_HOST       = { secret = "smtp-server-host" }
+    SMTP_SERVER_PORT       = { secret = "smtp-server-port" }
+    SMTP_SERVER_ACCESS_KEY = { secret = "smtp-server-access-key" }
+    SMTP_SERVER_SECRET_KEY = { secret = "smtp-server-secret-key" }
   }
+
+  app_env = {
+    PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
+    SETTINGS_SERVICE_URI     = "https://api.stawi.org/settings"
+    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    TENANCY_SERVICE_URI      = "https://api.stawi.org/tenancy"
+  }
+}
+
+# Accessor on pre-seeded SMTP secrets (not created by tofu).
+resource "google_secret_manager_secret_iam_member" "smtp_accessor" {
+  for_each  = local.smtp_secret_ids
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.frame.runtime_service_account_email}"
 }
