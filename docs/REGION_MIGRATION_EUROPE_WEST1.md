@@ -127,13 +127,8 @@ Or commit refreshed origins and let the edge workflow deploy.
 
 ### 3e. Ship workflows (service repos)
 
-Update **antinvestor** `cloudrun-ship` callers:
-
-```text
-region: europe-west1
-```
-
-(was `europe-west9` in each service repo / org vars).
+Service-repo `release.yaml` ship jobs must use `region: europe-west1`
+(or omit region — `cloudrun-ship` defaults to west1 and **rejects** west9).
 
 ---
 

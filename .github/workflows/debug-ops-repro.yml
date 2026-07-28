@@ -55,7 +55,8 @@ jobs:
           IMG=$(gcloud run services describe "$SVC" --project="$PROJ" --region="$REG" \
             --format='value(spec.template.spec.containers[0].image)')
           echo "image=$IMG"
-          gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+          # Service images are public GHCR (not Artifact Registry).
+          gcloud auth configure-docker ghcr.io --quiet 2>/dev/null || true
           crane pull --platform linux/amd64 "$IMG" /tmp/svc.tar
           docker load -i /tmp/svc.tar | tee /tmp/load.out
           LOCAL_TAG=$(sed -n 's/^Loaded image: //p' /tmp/load.out | tail -1)
