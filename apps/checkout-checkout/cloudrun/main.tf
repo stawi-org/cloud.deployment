@@ -1,5 +1,4 @@
-# checkout-checkout — Frame Cloud Run via modules/frame-cloudrun-app.
-
+# checkout-checkout — on stawi-payments; signing secrets seeded OOB.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -10,6 +9,13 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  checkout_secret_ids = toset([
+    "checkout-signing-secret",
+    "checkout-internal-token",
+    "checkout-card-encryption-key",
+  ])
+}
 
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
@@ -35,25 +41,29 @@ module "frame" {
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-payment-checkout"
 
-  # Secret shells — seed values via scripts/sync-cluster-secrets-to-gcp.sh (not in git).
-  extra_secret_ids  = toset([
-    "checkout-card-encryption-key",
-    "checkout-internal-token",
-    "checkout-signing-secret",
-  ])
-  extra_version_ids = toset([])
+  grant_oauth_signer_accessor = true
+
   secret_env_extra = {
-    CHECKOUT_SIGNING_SECRET = { secret = "checkout-signing-secret" }
-    CHECKOUT_INTERNAL_TOKEN = { secret = "checkout-internal-token" }
+    CHECKOUT_SIGNING_SECRET      = { secret = "checkout-signing-secret" }
+    CHECKOUT_INTERNAL_TOKEN      = { secret = "checkout-internal-token" }
     CHECKOUT_CARD_ENCRYPTION_KEY = { secret = "checkout-card-encryption-key" }
   }
+
   app_env = {
     CHECKOUT_PUBLIC_BASE_URL = "https://pay.stawi.org"
-    PAYMENT_SERVICE_URI = "https://api.stawi.org/payment"
-    PROFILE_SERVICE_URI = "https://api.stawi.org/profile"
-    TENANCY_SERVICE_URI = "https://api.stawi.org/tenancy"
-    SECURELY_RUN_SERVICE = "true"
-    PROFILER_ENABLE = "false"
-    FRAME_DEBUG_ENDPOINTS = "true"
+    PAYMENT_SERVICE_URI      = "https://api.stawi.org/payment"
+    PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
+    TENANCY_SERVICE_URI      = "https://api.stawi.org/tenancy"
+    SECURELY_RUN_SERVICE     = "true"
+    PROFILER_ENABLE          = "false"
+    FRAME_DEBUG_ENDPOINTS    = "true"
   }
+}
+
+resource "google_secret_manager_secret_iam_member" "checkout_accessor" {
+  for_each  = local.checkout_secret_ids
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.frame.runtime_service_account_email}"
 }
