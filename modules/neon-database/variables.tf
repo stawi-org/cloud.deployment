@@ -66,7 +66,11 @@ variable "extensions" {
       - uuid-ossp, pgcrypto, pg_trgm, btree_gin, btree_gist, pg_stat_statements
       - timescaledb (Apache-2 features only; no compression)
       - postgis (and postgis_topology when needed)
-    Avoid pg_search on new Neon projects (deprecated for new installs as of 2026-03).
+      - vector (pgvector)
+      - lakebase_text (BM25 via lakebase_bm25; requires Lakebase Search enabled on the project)
+      - lakebase_vector (ANN; optional companion to lakebase_text)
+    Avoid pg_search on new Neon projects (deprecated for new installs as of 2026-03;
+    use lakebase_text for BM25 full-text search instead).
   EOT
   # Empty by default so existing apps are unchanged until they opt in.
   # Operations apps set this explicitly (see apps/operations-*/envs/*.tfvars).

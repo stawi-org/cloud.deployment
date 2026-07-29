@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME → Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
+  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME \u2192 Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west1",
   "gateway": {
@@ -13,7 +13,9 @@
     ],
     "expose_route_list": true,
     "cors": {
-      "allow_origins": ["*"],
+      "allow_origins": [
+        "*"
+      ],
       "allow_credentials": true,
       "notes": "Reflect any Origin so browser SPAs (e.g. opportunities.stawi.org) can call api.stawi.org with Authorization."
     },
@@ -38,7 +40,7 @@
       "hostname": "accounts.stawi.org",
       "origin": "https://identity-authentication-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Login UI. CF CNAME → Cloud Run.",
+      "notes": "Login UI. CF CNAME \u2192 Cloud Run.",
       "service": "identity-authentication"
     },
     {
@@ -46,7 +48,7 @@
       "hostname": "oauth2.stawi.org",
       "origin": "https://identity-oauth2-hydra-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "OIDC public. CF CNAME → Cloud Run.",
+      "notes": "OIDC public. CF CNAME \u2192 Cloud Run.",
       "service": "identity-oauth2-hydra"
     },
     {
@@ -54,7 +56,7 @@
       "hostname": "oauth2-w.stawi.org",
       "origin": "https://identity-oauth2-hydra-admin-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token.",
+      "notes": "Hydra admin (IAM). CF CNAME \u2192 Cloud Run; callers send Google ID token.",
       "service": "identity-oauth2-hydra-admin"
     },
     {
@@ -304,7 +306,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "AT SMS", "openapi_path": "/openapi.yaml" },
+      "docs": {
+        "enabled": false,
+        "title": "AT SMS",
+        "openapi_path": "/openapi.yaml"
+      },
       "notes": "Integration worker; enable with communications stack."
     },
     {
@@ -316,7 +322,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Email SMTP", "openapi_path": "/openapi.yaml" },
+      "docs": {
+        "enabled": false,
+        "title": "Email SMTP",
+        "openapi_path": "/openapi.yaml"
+      },
       "notes": "Integration worker; seed SMTP SM secrets first."
     },
     {
@@ -344,7 +354,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "M-Pesa", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "M-Pesa",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-stripe",
@@ -355,7 +369,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Stripe", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "Stripe",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-polar",
@@ -366,7 +384,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Polar", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "Polar",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-pawapay",
@@ -377,7 +399,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "PawaPay", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "PawaPay",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-flutterwave",
@@ -388,7 +414,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Flutterwave", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "Flutterwave",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-jenga",
@@ -399,7 +429,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Jenga", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "Jenga",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-airtel",
@@ -410,7 +444,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "Airtel", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "Airtel",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "payment-mtn",
@@ -421,7 +459,11 @@
       "strip_prefix": true,
       "enabled": false,
       "public": true,
-      "docs": { "enabled": false, "title": "MTN", "openapi_path": "/openapi.yaml" }
+      "docs": {
+        "enabled": false,
+        "title": "MTN",
+        "openapi_path": "/openapi.yaml"
+      }
     },
     {
       "id": "checkout",
@@ -437,7 +479,7 @@
         "title": "Checkout",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME → Cloud Run)."
+      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME \u2192 Cloud Run)."
     },
     {
       "id": "ledger",
@@ -470,6 +512,40 @@
         "openapi_path": "/openapi.yaml"
       },
       "notes": "Co-located with ledger on stawi-ledger; calls checkout/payment on stawi-payments via api.stawi.org."
+    },
+    {
+      "id": "opportunities",
+      "prefix": "/opportunities",
+      "service": "opportunities-api",
+      "project": "stawi-opportunities",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Opportunities",
+        "description": "Public opportunity search and detail (canonical path; replaces /jobs).",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Enable after Cloud Run apply. Canonical path /opportunities (not /jobs). Product Neon only; crawl stays on cluster."
+    },
+    {
+      "id": "matching",
+      "prefix": "/matching",
+      "service": "opportunities-matching",
+      "project": "stawi-opportunities",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Matching",
+        "description": "Candidate profiles, matches, CV, chat, billing webhooks.",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Enable after Cloud Run apply. Reuses profile/files/redirect/notification/payment/checkout."
     }
   ]
 }

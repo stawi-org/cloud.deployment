@@ -1,0 +1,41 @@
+# Required GCP Secret Manager secrets for opportunities domain (stawi-opportunities).
+# Product Cloud Run only (api + matching). Crawl stays on cluster — not listed here.
+
+project_hint: stawi-opportunities
+gcp_account: opportunities
+env: stawi-prod
+
+shared:
+  - id: hydra-webhook-psk
+    required: true
+    source_hints:
+      - "seeded OOB copy of identity hydra-webhook-psk"
+      - "frame module default oauth_signer_secret"
+
+apps:
+  opportunities-matching:
+    runtime_secrets:
+      - id: opportunities-matching-database-url
+        managed_by_tofu: true
+      - id: opportunities-matching-database-url-direct
+        managed_by_tofu: true
+      - id: hydra-webhook-psk
+        shared: true
+      - id: billing-webhook-secret
+        env: BILLING_WEBHOOK_SECRET
+        required: true
+        source_hints:
+          - "k8s: product-opportunities/billing-credentials-opportunities"
+      - id: checkout-internal-token
+        env: CHECKOUT_INTERNAL_TOKEN
+        required: true
+        source_hints:
+          - "must match checkout CHECKOUT_INTERNAL_TOKEN / checkout-signing-secret path used by pay.stawi.org"
+
+  opportunities-api:
+    runtime_secrets:
+      - id: opportunities-matching-database-url
+        shared: true
+        notes: "API attaches to matching product Neon; no second Neon project"
+      - id: hydra-webhook-psk
+        shared: true

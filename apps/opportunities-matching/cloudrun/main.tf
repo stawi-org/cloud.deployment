@@ -1,0 +1,137 @@
+# opportunities-matching — owns Neon product DB + product Pub/Sub topics.
+# Crawl pipeline remains on cluster. hydra-webhook-psk seeded OOB into
+# stawi-opportunities (copy of identity).
+
+provider "neon" {
+  api_key = var.neon_api_key
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+locals {
+  service_run_url    = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  push_oidc_audience = local.service_run_url
+
+  # Product async (replaces cluster NATS for matching-side work).
+  fanout_topic   = "opportunities-fanout"
+  cv_embed_topic = "opportunities-cv-embed"
+  events_ref     = "${var.app_name}-events"
+}
+
+module "frame" {
+  source = "../../../modules/frame-cloudrun-app"
+
+  app_name   = var.app_name
+  project_id = var.project_id
+  region     = var.region
+  platform   = var.platform
+  image      = var.image
+  labels     = var.labels
+
+  identity_project_id = var.identity_project_id
+  identity_region     = var.identity_region
+
+  neon_org_id              = var.neon_org_id
+  neon_region_id           = var.neon_region_id
+  neon_extensions          = var.neon_extensions
+  has_database             = var.has_database
+  container_port           = var.container_port
+  memory                   = var.memory
+  cpu                      = "1"
+  # Matching uses Frame DO_MIGRATION / argv "migrate" (not Frame setup plan).
+  migrate_args             = ["migrate"]
+  migrate_env = {
+    MIGRATION_PATH = "/migrations/0001"
+    DO_MIGRATION   = "true"
+  }
+  resource_path            = var.resource_path
+  requested_audience_paths = var.requested_audience_paths
+  # Hydra internal client_id from service-authentication greenfield seed.
+  oauth2_service_client_id = "opportunities-matching"
+
+  grant_oauth_signer_accessor = true
+  push_oidc_audience          = local.push_oidc_audience
+  use_http2                   = true
+  permissions_registration    = false
+  startup_probe_path          = "/healthz"
+  liveness_probe_path         = "/healthz"
+
+  # Default {app}-events plus product fan-out / CV embed topics.
+  create_default_events_topic = true
+  messaging_topics = {
+    fanout   = { name = local.fanout_topic }
+    cv_embed = { name = local.cv_embed_topic }
+  }
+  messaging_subscriptions = {
+    fanout = {
+      topic_key             = "fanout"
+      name                  = "${local.fanout_topic}-push"
+      push_endpoint         = "${local.service_run_url}/_frame/queue/${local.fanout_topic}"
+      enable_subscriber_iam = false
+      ack_deadline_seconds  = 300
+    }
+    cv_embed = {
+      topic_key             = "cv_embed"
+      name                  = "${local.cv_embed_topic}-push"
+      push_endpoint         = "${local.service_run_url}/_frame/queue/${local.cv_embed_topic}"
+      enable_subscriber_iam = false
+      ack_deadline_seconds  = 300
+    }
+  }
+
+  # Pre-seeded SM secrets (do not create via tofu — values already seeded OOB).
+  # hydra-webhook-psk is the default oauth_signer_secret (frame grants accessor).
+  secret_env_extra = {
+    BILLING_WEBHOOK_SECRET  = { secret = "billing-webhook-secret" }
+    CHECKOUT_INTERNAL_TOKEN = { secret = "checkout-internal-token" }
+  }
+
+  service_env_extra = {
+    # Path A fan-out (worker → this topic → matching consumer).
+    OPPORTUNITY_FANOUT_QUEUE_URI  = "push://${local.fanout_topic}?protocol=gcppubsub"
+    OPPORTUNITY_FANOUT_QUEUE_NAME = local.fanout_topic
+    MATCHING_FANOUT_ENABLED       = "true"
+    # CV embed stage (self-push).
+    CV_EMBED_QUEUE_URL  = "push://${local.cv_embed_topic}?protocol=gcppubsub"
+    CV_EMBED_QUEUE_NAME = local.cv_embed_topic
+    # Worker publish URI shape (document for cluster worker dual-DB).
+    MATCHING_FANOUT_PUBLISH_URL = "gcppubsub://${var.project_id}/${local.fanout_topic}"
+  }
+
+  app_env = {
+    # Reuse existing Stawi services — no duplicated responsibilities.
+    PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
+    TENANCY_SERVICE_URI      = "https://api.stawi.org/tenancy"
+    FILE_SERVICE_URI         = "https://api.stawi.org/files"
+    REDIRECT_SERVICE_URI     = "https://api.stawi.org/redirect"
+    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    BILLING_SERVICE_URI      = "https://api.stawi.org/payment"
+    CHECKOUT_SERVICE_URI     = "https://api.stawi.org/checkout"
+    CHECKOUT_PUBLIC_BASE_URL = "https://pay.stawi.org"
+    PUBLIC_SITE_URL          = "https://opportunities.stawi.org"
+    MATCHING_MIN_SCORE       = "0.45"
+    SECURELY_RUN_SERVICE     = "true"
+  }
+}
+
+# Accessor IAM for pre-seeded secrets (not module-owned).
+resource "google_secret_manager_secret_iam_member" "preseeded" {
+  for_each = toset([
+    "billing-webhook-secret",
+    "checkout-internal-token",
+  ])
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.frame.runtime_service_account_email}"
+}
+
+# Shared DB IAM for opportunities-api is granted from the API stack (SA exists
+# after that apply). Apply order: matching → api.
