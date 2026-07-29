@@ -546,6 +546,86 @@
         "openapi_path": "/openapi.yaml"
       },
       "notes": "Enable after Cloud Run apply. Reuses profile/files/redirect/notification/payment/checkout."
+    },
+    {
+      "id": "loans",
+      "prefix": "/loans",
+      "service": "finance-loans",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Loans",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech loans on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+    },
+    {
+      "id": "savings",
+      "prefix": "/savings",
+      "service": "finance-savings",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Savings",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech savings on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+    },
+    {
+      "id": "funding",
+      "prefix": "/funding",
+      "service": "finance-funding",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Funding",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech funding on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+    },
+    {
+      "id": "fintech-operations",
+      "prefix": "/operations",
+      "service": "finance-operations",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Fintech operations",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech operations API (not platform operations-* apps). Enable after apply + refresh-origins."
+    },
+    {
+      "id": "limits",
+      "prefix": "/limits",
+      "service": "finance-limits",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Limits",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech limits/policy engine on stawi-finance. Enable after apply + refresh-origins."
     }
   ]
 }

@@ -45,11 +45,11 @@ module "frame" {
   container_port           = var.container_port
   memory                   = var.memory
   cpu                      = "1"
-  # Matching uses Frame DO_MIGRATION / argv "migrate" (not Frame setup plan).
-  migrate_args             = ["migrate"]
+  # Frame setup plan: module sets DO_SETUP=true + default args ["setup"].
+  # MIGRATION_PATH is app-specific for the registered migrate step.
+  migrate_args = ["setup"]
   migrate_env = {
     MIGRATION_PATH = "/migrations/0001"
-    DO_MIGRATION   = "true"
   }
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths

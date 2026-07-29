@@ -1,6 +1,9 @@
 # Deploy: communications, payments, ledger (+ billing)
 
-Migrate cluster `communications` / `finance` workloads to **Cloud Run + Neon + Pub/Sub**.
+Migrate cluster `communications` and **payment/ledger** workloads to **Cloud Run + Neon + Pub/Sub**.
+
+Fintech (loans, savings, funding, operations, limits) is a separate domain — see
+[DEPLOY_FINANCE.md](DEPLOY_FINANCE.md) (`stawi-finance`).
 
 ## Project split (authoritative)
 

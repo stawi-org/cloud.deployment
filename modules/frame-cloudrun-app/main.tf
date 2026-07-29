@@ -178,7 +178,7 @@ locals {
     local.frame_oauth_env,
     {
       LOG_LEVEL             = "INFO"
-      # Prefer setup plan (argv ["setup"] or DO_SETUP) over legacy DO_MIGRATION.
+      # Setup Job: full registered plan (migrate/bootstrap/permissions/…).
       DO_SETUP              = "true"
       EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
       OTEL_TRACES_EXPORTER  = "none"
