@@ -1,6 +1,6 @@
 # finance-limits — Frame Cloud Run (fintech limits / policy engine).
 # oauth2 client_id service-limits is seeded by service-authentication tenancy.
-# hydra-webhook-psk must be seeded OOB into stawi-finance (copy of identity).
+# OAUTH2_SIGNER_API_KEY uses SM secret hydra-webhook-psk (historical name; remote JWT signer, not Hydra admin).
 
 provider "neon" {
   api_key = var.neon_api_key

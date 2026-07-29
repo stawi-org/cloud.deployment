@@ -72,13 +72,17 @@ variable "enable_keto_admin" {
 variable "oauth_signer_secret" {
   type        = string
   default     = "hydra-webhook-psk"
-  description = "SM secret id for OAUTH2_SIGNER_API_KEY; empty = omit signer secret"
+  # Historical secret id: same value protects authentication's remote JWT
+  # signer webhook (OAUTH2_SIGNER_API_KEY). Product apps do NOT call Hydra
+  # admin/webhooks — they call accounts…/webhook/sign/private-key-jwt so
+  # Frame can mint private_key_jwt client assertions. Empty = omit signer.
+  description = "SM secret id for OAUTH2_SIGNER_API_KEY (remote private_key_jwt signer). Default name hydra-webhook-psk is historical; empty omits the secret."
 }
 
 variable "grant_oauth_signer_accessor" {
   type        = bool
   default     = true
-  description = "Grant runtime SA secretAccessor on oauth_signer_secret (when not module-owned)"
+  description = "Grant runtime SA secretAccessor on oauth_signer_secret (when not module-owned). Required for S2S OAuth via authentication JWT signer."
 }
 
 # ---------------------------------------------------------------------------
