@@ -178,3 +178,25 @@ Wire `cloudrun-ship` in the fintech monorepo to project `stawi-finance`
 - [GCP_BOOTSTRAP.md](GCP_BOOTSTRAP.md) / [NEON_BOOTSTRAP.md](NEON_BOOTSTRAP.md)
 - [FRAME_CLOUDRUN_APP.md](FRAME_CLOUDRUN_APP.md)
 - [DEPLOY_PAYMENTS_LEDGER_COMMS.md](DEPLOY_PAYMENTS_LEDGER_COMMS.md)
+
+
+## Follow-ups / ops notes
+
+### Permission manifests
+Setup Jobs run `["setup","migrate"]` only. The `permissions` step POSTs to
+`https://api.stawi.org/tenancy/_internal/register/permissions` and requires a
+service JWT with the **`internal`** role (`IsInternalSystem`). Until Hydra/tenancy
+service-account clients for `service-loans|savings|funding|operations|limits`
+mint that claim, registration returns **403**. Re-enable with:
+
+```hcl
+migrate_args             = ["setup"]
+permissions_registration = true
+```
+
+### Health probes
+Frame exposes **`/readyz`** and **`/livez`** (not `/healthz`). Apps set those paths.
+
+### Edge
+Routes under `api.stawi.org` for `/loans`, `/savings`, `/funding`, `/operations`,
+`/limits` are enabled after `npm run refresh-origins` against `stawi-finance`.

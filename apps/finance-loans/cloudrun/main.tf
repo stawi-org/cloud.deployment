@@ -38,6 +38,8 @@ module "frame" {
 
   grant_oauth_signer_accessor = true
   permissions_registration    = false  # enable after service-bot can POST tenancy register
+  startup_probe_path         = "/readyz"
+  liveness_probe_path        = "/livez"
 
   app_env = {
     PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
