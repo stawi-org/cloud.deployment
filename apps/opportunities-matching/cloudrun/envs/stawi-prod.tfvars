@@ -1,4 +1,4 @@
-image         = "ghcr.io/stawi-opportunities/opportunities-matching:v8.0.210"
+image         = "ghcr.io/stawi-opportunities/opportunities-matching:v8.0.211"
 container_port = 8080
 resource_path = "/matching"
 memory        = "1Gi"

@@ -1,4 +1,4 @@
-image          = "ghcr.io/stawi-opportunities/opportunities-api:v8.0.210"
+image          = "ghcr.io/stawi-opportunities/opportunities-api:v8.0.211"
 container_port = 8080
 # Canonical public path (replaces /jobs).
 resource_path  = "/opportunities"
