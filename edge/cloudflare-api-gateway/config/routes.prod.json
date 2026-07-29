@@ -518,9 +518,9 @@
       "prefix": "/opportunities",
       "service": "opportunities-api",
       "project": "stawi-opportunities",
-      "origin": "",
+      "origin": "https://opportunities-api-f6yrcb5eta-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
@@ -535,9 +535,9 @@
       "prefix": "/matching",
       "service": "opportunities-matching",
       "project": "stawi-opportunities",
-      "origin": "",
+      "origin": "https://opportunities-matching-f6yrcb5eta-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
