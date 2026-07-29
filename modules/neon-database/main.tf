@@ -39,6 +39,7 @@ resource "neon_database" "app" {
 #
 # Neon supports many extensions (timescaledb Apache-2, postgis, uuid-ossp, …).
 # pg_search is deprecated on Neon for new projects (as of 2026-03) — avoid.
+# Prefer lakebase_text for BM25 (requires Lakebase Search enabled on the project).
 #
 # Requires `psql` on the machine running tofu apply (CI installs
 # postgresql-client). Extensions are applied on the direct (non-pooler)
