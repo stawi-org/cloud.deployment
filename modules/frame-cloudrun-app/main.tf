@@ -29,6 +29,9 @@ locals {
     startswith(var.app_name, "checkout-") ? "/${trimprefix(var.app_name, "checkout-")}" :
     startswith(var.app_name, "billing-") ? "/${trimprefix(var.app_name, "billing-")}" :
     startswith(var.app_name, "ledger-") ? "/${trimprefix(var.app_name, "ledger-")}" :
+    # Fintech domain apps: finance-loans → /loans (path gateway; not /finance-loans).
+    startswith(var.app_name, "finance-") ? "/${trimprefix(var.app_name, "finance-")}" :
+    startswith(var.app_name, "opportunities-") ? "/${trimprefix(var.app_name, "opportunities-")}" :
     "/${var.app_name}"
   )
   resource_path = var.resource_path != "" ? var.resource_path : local.default_resource_path
@@ -45,6 +48,7 @@ locals {
 
   # Hydra SA clients use colony IDs (service-profile, service-devices, …),
   # not Cloud Run app names (identity-profile, platform-devices).
+  # Hydra SA clients are colony-era service-* ids (service-loans, service-limits, …).
   default_oauth2_service_client_id = (
     startswith(var.app_name, "identity-") ? "service-${trimprefix(var.app_name, "identity-")}" :
     startswith(var.app_name, "platform-") ? "service-${trimprefix(var.app_name, "platform-")}" :
@@ -54,6 +58,8 @@ locals {
     startswith(var.app_name, "checkout-") ? "service-${trimprefix(var.app_name, "checkout-")}" :
     startswith(var.app_name, "billing-") ? "service-${trimprefix(var.app_name, "billing-")}" :
     startswith(var.app_name, "ledger-") ? "service-${trimprefix(var.app_name, "ledger-")}" :
+    startswith(var.app_name, "finance-") ? "service-${trimprefix(var.app_name, "finance-")}" :
+    startswith(var.app_name, "opportunities-") ? "service-${trimprefix(var.app_name, "opportunities-")}" :
     var.app_name
   )
   oauth2_service_client_id = var.oauth2_service_client_id != "" ? var.oauth2_service_client_id : local.default_oauth2_service_client_id

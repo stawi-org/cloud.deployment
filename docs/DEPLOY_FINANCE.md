@@ -58,20 +58,22 @@ export API_KEY=napi_xxx
 4. Merge bootstrap PRs so `credentials/gcp/finance/` and
    `credentials/neon/finance/auth.yaml` exist on `main`.
 5. Repo secrets: `R2_*` + `SOPS_AGE_KEY`.
-6. Identity live (Hydra/Keto). Seed **`hydra-webhook-psk`** into
-   `stawi-finance` Secret Manager (same value as identity):
+6. Identity live (Hydra public + authentication JWT signer). Product apps do
+   **not** call Hydra admin. They use Frame `private_key_jwt` via authentication’s
+   remote signer (`accounts…/webhook/sign/private-key-jwt`). The module injects
+   `OAUTH2_SIGNER_API_KEY` from Secret Manager id **`hydra-webhook-psk`**
+   (historical name; same value as identity). Seed once into `stawi-finance`:
 
 ```bash
-# After first identity secret exists:
 gcloud secrets versions access latest --secret=hydra-webhook-psk --project=stawi-identity \
   | gcloud secrets create hydra-webhook-psk --project=stawi-finance --data-file=-
-# or add-version if the secret already exists
+# or: gcloud secrets versions add hydra-webhook-psk --project=stawi-finance --data-file=-
 ```
 
-7. Hydra OAuth clients `service-loans`, `service-savings`, `service-funding`,
-   `service-operations`, `service-limits` must exist (tenancy seeds / greenfield).
-   `service-limits` is documented in authentication tenancy migration
-   `20260420_service_limits.sql`.
+7. Hydra OAuth **clients** (not the webhook PSK) `service-loans`, `service-savings`,
+   `service-funding`, `service-operations`, `service-limits` must exist
+   (tenancy seeds / greenfield). `service-limits` is documented in authentication
+   tenancy migration `20260420_service_limits.sql`.
 
 ## Apply order
 

@@ -1,6 +1,6 @@
 # finance-operations — Frame Cloud Run (fintech operations).
 # Path /operations is the fintech ops API (not operations-* platform apps).
-# hydra-webhook-psk must be seeded OOB into stawi-finance (copy of identity).
+# OAUTH2_SIGNER_API_KEY uses SM secret hydra-webhook-psk (historical name; remote JWT signer, not Hydra admin).
 
 provider "neon" {
   api_key = var.neon_api_key
