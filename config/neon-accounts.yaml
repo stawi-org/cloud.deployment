@@ -106,3 +106,15 @@ accounts:
     sensitivity: medium
     sops_auth_path: credentials/neon/opportunities/auth.yaml
     neon_org_hint: Stawi Opportunities
+  finance:
+    description: Neon organization for finance domain (auto-registered by bootstrap-neon-account.sh)
+    owners:
+      - platform
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - finance-
+    sensitivity: medium
+    sops_auth_path: credentials/neon/finance/auth.yaml
+    neon_org_hint: Stawi Finance
