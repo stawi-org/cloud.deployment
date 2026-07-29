@@ -3,95 +3,106 @@ accounts:
   identity:
     description: Identity domain Neon organization
     owners:
-    - identity-team
+      - identity-team
     neon_org_hint: Stawi Identity
     neon_org_id: org-rapid-mountain-41505493
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - identity-
+      - identity-
     sensitivity: critical
     sops_auth_path: credentials/neon/identity/auth.yaml
   notifications:
     description: Notifications domain Neon organization
     owners:
-    - communications-team
+      - communications-team
     neon_org_hint: Stawi Notifications
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes: []
     sensitivity: high
   payments:
     description: Payments domain Neon (payment core, integrations, checkout on stawi-payments)
     owners:
-    - finance-team
+      - finance-team
     neon_org_hint: Stawi Payments
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - payment-
-    - checkout-
+      - payment-
+      - checkout-
     sensitivity: critical
     sops_auth_path: credentials/neon/payments/auth.yaml
   ledger:
     description: Ledger + billing Neon organization (GCP stawi-ledger)
     owners:
-    - platform
+      - platform
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - ledger-
+      - ledger-
     sensitivity: critical
     sops_auth_path: credentials/neon/ledger/auth.yaml
     neon_org_hint: Stawi Ledger
   platform:
-    description: Shared platform Neon organization (devices, settings, geolocation,
-      files)
+    description: Shared platform Neon organization (devices, settings, geolocation, files)
     owners:
-    - platform
+      - platform
     neon_org_hint: Stawi Platform
     neon_org_id: org-calm-cell-68997035
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - platform-
+      - platform-
     sensitivity: medium
     sops_auth_path: credentials/neon/platform/auth.yaml
   labs:
     description: Experimental Neon organization; no production customer data
     owners:
-    - platform
+      - platform
     neon_org_hint: Stawi Labs
     allowed_deploy_envs:
-    - stawi-dev
+      - stawi-dev
     allowed_app_prefixes: []
     sensitivity: low
   operations:
     description: Neon organization for operations domain (auto-registered by bootstrap-neon-account.sh)
     owners:
-    - platform
+      - platform
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - operations-
+      - operations-
     sensitivity: medium
     sops_auth_path: credentials/neon/operations/auth.yaml
     neon_org_hint: Stawi Operations
   communications:
     description: Neon organization for communications domain (auto-registered by bootstrap-neon-account.sh)
     owners:
-    - platform
+      - platform
     allowed_deploy_envs:
-    - stawi-dev
-    - stawi-prod
+      - stawi-dev
+      - stawi-prod
     allowed_app_prefixes:
-    - communications-
+      - communications-
     sensitivity: medium
     sops_auth_path: credentials/neon/communications/auth.yaml
     neon_org_hint: Stawi Communications
+  opportunities:
+    description: Neon organization for opportunities domain (auto-registered by bootstrap-neon-account.sh)
+    owners:
+      - platform
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - opportunities-
+    sensitivity: medium
+    sops_auth_path: credentials/neon/opportunities/auth.yaml
+    neon_org_hint: Stawi Opportunities
