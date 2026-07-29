@@ -101,14 +101,46 @@ neon_extensions = [
 
 Avoid: `pg_search`, `vectorscale`, crawl hypertables on Neon.
 
+## Full cutover checklist
+
+### Vault (cluster dual-write)
+
+```bash
+# From SM (operator):
+gcloud secrets versions access latest \
+  --secret=opportunities-matching-database-url \
+  --project=stawi-opportunities
+
+# Seed Vault path used by ExternalSecret product-neon-credentials-opportunities:
+#   stawi/product-opportunities/common/product-neon
+#   product_database_url = <pooled Neon URL>
+```
+
+### Worker
+
+Cluster workers set `PRODUCT_DATABASE_URL` + `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout` + `GOOGLE_CLOUD_PROJECT=stawi-opportunities`.
+
+Grant GKE worker SA (or node SA) `roles/pubsub.publisher` on project `stawi-opportunities` for fan-out.
+
+### Lakebase Search
+
+1. Neon console → project → enable **Lakebase Search**.
+2. Re-apply matching (or `CREATE EXTENSION lakebase_text`) and re-run migrate job.
+3. Confirm `opportunities_search_bm25` index exists; API ranks with lakebase BM25.
+
+### Cluster customer surface
+
+- `opportunities-api` / `opportunities-matching` Helm `replicaCount: 0`
+- Cluster HTTPRoutes for `/jobs` and `/matching` have empty `parentRefs` (detached)
+
 ## Verification gates
 
-1. Matching Ready; product migrations applied; `lakebase_text` present.
-2. API Ready; `SEARCH_BACKEND=lakebase_text`; search returns BM25 hits after data.
+1. Matching Ready; product migrations applied; `lakebase_text` present when Lakebase Search enabled.
+2. API Ready; `SEARCH_BACKEND=lakebase_text`; search returns ranked hits after data.
 3. Worker dual-DB: one crawl → row in Neon `opportunities`.
-4. SPA: `/matching/me/*` + discovery via `/opportunities`.
+4. SPA: `/matching/me/*` + discovery via `/opportunities` (not `/jobs`).
 5. Neon has **no** `job_ingest_queue` / `url_frontier`.
-6. Cluster API + matching scaled to zero after edge cutover.
+6. Cluster API + matching scaled to zero; cluster gateway routes detached.
 
 ## Rollback
 

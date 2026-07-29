@@ -1,14 +1,14 @@
 # GHCR packages are private; Cloud Run pulls from project AR mirror.
-image = "europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/opportunities-matching:v8.0.211"
+image = "europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/opportunities-matching:v8.0.213"
 container_port = 8080
 resource_path = "/matching"
 memory        = "1Gi"
 has_database  = true
 # Product Neon: high-value data only. lakebase_text replaces pg_search.
 # lakebase_vector optional after Lakebase Search is enabled on the project.
-# lakebase_text requires Lakebase Search enabled on the Neon project first.
-# Applied in a follow-up once CREATE EXTENSION lakebase_text succeeds; until
-# then API SEARCH_BACKEND falls back if BM25 unavailable.
+# lakebase_text: requires Lakebase Search enabled on the Neon project
+# (console/API). CREATE EXTENSION is soft-failed by migrate SQL if missing;
+# API then ranks with ts_rank until BM25 index exists.
 neon_extensions = [
   "uuid-ossp",
   "pg_stat_statements",
@@ -17,6 +17,7 @@ neon_extensions = [
   "btree_gist",
   "vector",
   "timescaledb",
+  "lakebase_text",
 ]
 requested_audience_paths = [
   "/profile",
