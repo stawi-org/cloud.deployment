@@ -30,14 +30,14 @@ module "frame" {
   has_database             = var.has_database
   container_port           = var.container_port
   memory                   = var.memory
-  migrate_args             = var.migrate_args
-  migrate_execute          = true  # first-cutover setup plan
+  migrate_args             = ["setup", "migrate"]  # permissions step needs tenancy OAuth; register later
+  migrate_execute          = false
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-limits"
 
   grant_oauth_signer_accessor = true
-  permissions_registration    = true
+  permissions_registration    = false  # enable after service-bot can POST tenancy register
 
   app_env = {
     PROFILE_SERVICE_URI                 = "https://api.stawi.org/profile"
