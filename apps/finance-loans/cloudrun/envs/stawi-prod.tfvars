@@ -1,0 +1,7 @@
+image                    = "ghcr.io/antinvestor/service-fintech-loans:v1.96.20"
+resource_path            = "/loans"
+has_database             = true
+memory                   = "512Mi"
+requested_audience_paths = ["/profile", "/tenancy", "/operations", "/ledger", "/payment", "/notification"]
+public_hostname          = ""
+neon_extensions          = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "btree_gist"]

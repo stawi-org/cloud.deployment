@@ -1,0 +1,13 @@
+name: finance-operations
+owners:
+  - platform
+  - finance-team
+envs:
+  - stawi-prod
+gcp:
+  account: finance
+neon:
+  account: finance
+runtime: cloudrun
+domain: finance
+version: 1

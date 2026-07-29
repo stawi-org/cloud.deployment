@@ -265,9 +265,8 @@ variable "migrate_args" {
   type        = list(string)
   # Frame setup plan: argv "setup" with no task list runs every registered step
   # (migrate, bootstrap, permissions, verify, …) in registration order.
-  # Prefer this over legacy ["migrate"] (DO_MIGRATION well-known subset).
   default     = ["setup"]
-  description = "Setup Job argv. Default [\"setup\"] runs the full registered plan. Use [\"setup\",\"migrate\",\"permissions\"] for an explicit subset; legacy [\"migrate\"] still works."
+  description = "Setup Job argv. Default [\"setup\"] runs the full registered plan (DO_SETUP=true is set by the module). Use [\"setup\",\"migrate\",\"permissions\"] for an explicit subset only."
 }
 
 variable "migrate_env" {
