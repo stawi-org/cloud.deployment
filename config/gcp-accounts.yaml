@@ -197,3 +197,19 @@ accounts:
           managed-by: cloud-deployment
           domain: ledger
           environment: prod
+  opportunities:
+    description: GCP account opportunities (auto-registered by bootstrap-gcp-account.sh)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-prod:
+        project_id: stawi-opportunities
+        region: europe-west1
+        workload_identity_provider: projects/386478050924/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-opportunities.iam.gserviceaccount.com
+        sops_auth_path: credentials/gcp/opportunities/stawi-prod/auth.yaml
+        labels:
+          managed-by: cloud-deployment
+          domain: opportunities
+          environment: prod
