@@ -162,7 +162,7 @@
       "project": "stawi-platform",
       "origin": "https://platform-chat-agent-PLACEHOLDER.run.app",
       "strip_prefix": true,
-      "enabled": true,
+      "enabled": false,
       "public": true,
       "docs": {
         "enabled": true,
@@ -170,7 +170,7 @@
         "description": "Context-driven conversational data collection (placement intake, opportunity side-chat).",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Origin set after first Cloud Run apply. Matching S2S audience /chat-agent."
+      "notes": "Disabled until platform-chat-agent Cloud Run ship sets real origin; re-enable via refresh-origins after ship."
     },
     {
       "id": "geolocation",
