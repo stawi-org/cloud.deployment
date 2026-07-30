@@ -109,6 +109,40 @@ GCP push → POST /_frame/queue/{app}-events  (OIDC as runtime SA)
 
 Migrate jobs always use `EVENTS_QUEUE_URL=mem://frame.events.migrate`.
 
+## Setup vs runtime (hard split)
+
+Frame services have **two process modes**. Do not blur them with ad-hoc
+scripts, one-shot curls, or runtime “bootstrap on start” paths.
+
+| Mode | How it runs | Allowed work |
+|------|-------------|--------------|
+| **Setup** | Cloud Run **Job** `argv = ["setup"]`, `DO_SETUP=true` | One-time: DB migrate, permission manifest POST, other setup steps |
+| **Runtime** | Cloud Run **Service** | HTTP/RPC requests + **queue consumers** (and in-process reapers that process domain state) |
+
+**Rules**
+
+1. **Setup is the only place for one-time config** — schema migrations and
+   `permissions` registration live in Frame’s setup plan
+   (`ShouldRunSetup` → `RunSetupForProcess`).  
+2. **Runtime never re-registers permissions or migrates.**  
+   `WithPermissionRegistration` is wired only on the setup early-return path.  
+3. **Deploy path:** ship image → Job execute (`setup`) → Service revision.  
+   CI `cloudrun-ship` already does job image + execute + service update.  
+4. **Do not** use service PreStart / random goroutines for migrate or tenancy
+   registration. Operational recovery is **re-run the setup Job**, not
+   hand-rolled POSTs.
+5. **One permission owner per namespace** — the service JWT SA name/client must
+   own that namespace; multi-service binaries register only their owner
+   descriptor in setup (e.g. limits admin, not field under identity).
+
+**Deploy module knobs**
+
+```hcl
+migrate_args             = ["setup"]   # full plan: migrate + permissions + …
+permissions_registration = true        # injects PERMISSIONS_REGISTRATION_URL + /tenancy audience
+migrate_execute          = false       # ship workflow / ops execute; not every tofu apply
+```
+
 ### Tenancy migrate + Keto (service-bot bootstrap)
 
 Tenancy `migrate` does more than schema: after DB migrate it writes root/service-bot
