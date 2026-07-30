@@ -26,7 +26,7 @@
 | frontier-worker | URL frontier claims |
 | worker-core / validate / publish | Pipeline stages (NATS JetStream) |
 | writer / materializer | Persist + side effects |
-| NATS + CNPG | Job queue + **crawl ledger only** |
+| NATS | Job queues only (no cluster Postgres) |
 
 Workers use **`DATABASE_URL` → Neon** (same secret as Cloud Run matching).  
 Optional `PRODUCT_DATABASE_URL` may point at the same URL for dual-DB-aware code.  
@@ -40,7 +40,9 @@ Fan-out: `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunitie
 | sources, recipes, crawl_runs, url_frontier | long-running crawl/worker pods |
 | job_ingest_queue, pipeline_variants ledger | |
 
-Search uses **`lakebase_text`** (BM25), **not** `pg_search`. CNPG for this namespace is **suspended / unused**.## Path migration
+Search uses **`lakebase_text`** (BM25), **not** `pg_search`. CNPG for this namespace is **suspended / unused**.
+
+## Path migration
 
 | Old | New (canonical) |
 |-----|-----------------|
