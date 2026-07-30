@@ -33,7 +33,7 @@ module "frame" {
   migrate_execute          = false
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
-  # Matches Hydra client from cluster HelmRelease name service-loans.
+  # Matches Hydra client from cluster cluster release name service-loans.
   oauth2_service_client_id = "service-loans"
 
   grant_oauth_signer_accessor = true
