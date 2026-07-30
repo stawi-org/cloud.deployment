@@ -1,7 +1,7 @@
 # Deploy opportunities (Cloud Run product + cluster crawl jobs)
 
-**Product DB = Neon only** (no pressure to host catalog databases on the cluster).  
-**Crawl / pipeline jobs = Kubernetes** (`product-opportunities`) for long-running workers.
+**All opportunities Postgres = Neon** (product catalog **and** crawl/pipeline state).  
+**Crawl / pipeline jobs = Kubernetes** (`product-opportunities`) for long-running workers only — **no CNPG**.
 
 | Plane | Account key | Project / org |
 |-------|-------------|----------------|
@@ -28,19 +28,19 @@
 | writer / materializer | Persist + side effects |
 | NATS + CNPG | Job queue + **crawl ledger only** |
 
-Workers dual-write product rows via `PRODUCT_DATABASE_URL` (Neon) and fan out to matching with  
-`MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`.
+Workers use **`DATABASE_URL` → Neon** (same secret as Cloud Run matching).  
+Optional `PRODUCT_DATABASE_URL` may point at the same URL for dual-DB-aware code.  
+Fan-out: `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`.
 
-## Data split (cost / ops)
+## Data (single Neon project)
 
-| Neon product (high value — **not** on cluster) | CNPG crawl (cluster job state only) |
-|------------------------------------------------|-------------------------------------|
-| opportunities catalog, companies, flags | sources, recipes, crawl_runs |
-| candidates, matches, placement, saved jobs | url_frontier, host_state |
-| billing entitlement cache / checkouts | job_ingest_queue, pipeline_variants ledger |
+| On Neon (product + crawl) | On cluster (not Postgres) |
+|---------------------------|---------------------------|
+| catalog, companies, flags, candidates, matches | NATS JetStream job queues |
+| sources, recipes, crawl_runs, url_frontier | long-running crawl/worker pods |
+| job_ingest_queue, pipeline_variants ledger | |
 
-Search on Neon uses **`lakebase_text`** (BM25), **not** `pg_search`.
-## Path migration
+Search uses **`lakebase_text`** (BM25), **not** `pg_search`. CNPG for this namespace is **suspended / unused**.## Path migration
 
 | Old | New (canonical) |
 |-----|-----------------|
@@ -132,12 +132,13 @@ gcloud secrets versions access latest \
 1. Keep **api/matching** `replicaCount: 0` on cluster; product traffic stays Cloud Run.
 2. Run crawl plane at floor `replicaCount: 1` (crawler, frontier, workers, writer, materializer).
 3. Unpause KEDA JetStream ScaledObjects for those jobs (`minReplicaCount: 1`); leave api/matching KEDA paused.
-4. Env: `DATABASE_URL` → CNPG pooler (crawl); `PRODUCT_DATABASE_URL` → Neon;  
+4. Env: `DATABASE_URL` (and `PRODUCT_DATABASE_URL` if set) from secret  
+   `product-neon-credentials-opportunities` → **Neon**;  
    `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`;  
    `GOOGLE_CLOUD_PROJECT=stawi-opportunities`.
 5. Grant worker SA (or node SA) `roles/pubsub.publisher` on `stawi-opportunities`.
 
-Jobs process only after Flux has reconciled HelmReleases + CNPG + NATS and the Neon secret exists.
+Jobs process after Flux reconciles HelmReleases + **NATS** and the Neon secret exists (**no CNPG**).
 ### Lakebase Search
 
 1. Neon console → project → enable **Lakebase Search**.
