@@ -182,6 +182,14 @@ Wire `cloudrun-ship` in the fintech monorepo to project `stawi-finance`
 
 ## Follow-ups / ops notes
 
+### Bootstrap model
+One-time work is **only** the Cloud Run setup Job (`migrate_args = ["setup"]`).
+Runtime services handle API traffic and queues — they do not migrate or
+publish permission manifests on start. After a release, rely on
+`cloudrun-ship` (job execute then service) or re-run
+`gcloud run jobs execute finance-*-migrate`. See
+[FRAME_CLOUDRUN_APP.md](FRAME_CLOUDRUN_APP.md#setup-vs-runtime-hard-split).
+
 ### Permission manifests
 Setup Jobs use `migrate_args = ["setup"]` with `permissions_registration = true`.
 The `permissions` step POSTs to
