@@ -27,7 +27,7 @@ module "frame" {
   neon_region_id = var.neon_region_id
 
   resource_path            = "/chat-agent"
-  requested_audience_paths = ["/profile", "/tenancy"]
+  requested_audience_paths = ["/profile", "/tenancy", "/notification"]
   # Hydra client id registered for S2S callers (matching uses this audience).
   oauth2_service_client_id = "platform-chat-agent"
 
@@ -44,6 +44,9 @@ module "frame" {
 
   app_env = {
     SECURELY_RUN_SERVICE = "true"
+    # Omnichannel: assistant replies on non-web sessions go through Notification.
+    NOTIFICATION_SERVICE_URI                      = "https://api.stawi.org/notification"
+    NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
     # Inference is optional; evidence-only mode works without it.
     # Seed secrets in SM and map via secret_env_extra when ready:
     # INFERENCE_API_KEY → inference-api-key

@@ -26,5 +26,11 @@ Product-agnostic conversational **data-collection** service (Frame app from
 | `INFERENCE_BASE_URL` | OpenAI-compatible LLM root (optional) |
 | `INFERENCE_API_KEY` | Bearer for inference |
 | `INFERENCE_MODEL` | Default instruct model |
+| `NOTIFICATION_SERVICE_URI` | Notification endpoint for omnichannel reply delivery |
+| `NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH` | SPIFFE path for S2S to notification |
+
+ChatAgent is **channel-agnostic**: bind a session with `ChannelBinding`
+(SMS / WhatsApp / email / push / in-app / USSD) and assistant replies are
+queued on Notification.Send. Web sessions omit the binding and use RPC only.
 
 Ship via service-profile release tag → `cloudrun-ship` job `ship-platform-chat-agent`.
