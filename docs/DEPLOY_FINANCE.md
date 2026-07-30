@@ -190,7 +190,7 @@ service JWT (`roles` under JWT `ext` must include **`internal`**).
 
 **Identity dependency:** `identity-tenancy` (and authentication) must run Frame
 **≥ v2.1.1** so `GetRoles()` accepts `ext.roles` as a JSON array. Pin
-`service-authentication-tenancy:v1.54.60` (Frame v2.1.3). **Do not** deploy
+`service-authentication-tenancy:v1.54.63` (Frame v2.1.3). **Do not** deploy
 `v1.54.62` (Frame v2.1.0) — it only accepted comma-separated string roles and
 returned **403** `internal service-account token is required` for every SA.
 
@@ -198,9 +198,13 @@ returned **403** `internal service-account token is required` for every SA.
 Hydra client `audience` list (tenancy sync + auth-contract grants). Missing
 entries fail token mint with `Requested audience '…' has not been whitelisted`.
 
-**`service_limits`:** setup may log
-`no service_permissions extension on descriptor; skipping` until limits protos
-declare `service_permissions` (namespace not registered until then).
+**`service_limits`:** register permissions from `LimitsAdminService` only (it
+owns `service_permissions`). Do not also register `LimitsService` or the setup
+step is overwritten and skipped (see service-fintech PR #297).
+
+**Signer PSK:** every project’s `hydra-webhook-psk` SM secret must match
+`identity-authentication` `HYDRA_WEBHOOK_API_PSK` or setup permission mints
+fail with signer **401 unauthorised**.
 
 ### Health probes
 Frame exposes **`/readyz`** and **`/livez`** (not `/healthz`). Apps set those paths.
