@@ -1,46 +1,59 @@
-# Deploy opportunities (Cloud Run product + cluster crawl jobs)
+# Deploy opportunities (Cloud Run product + cluster crawl)
 
-**All opportunities Postgres = Neon** (product catalog **and** crawl/pipeline state).  
-**Crawl / pipeline jobs = Kubernetes** (`product-opportunities`) for long-running workers only — **no CNPG**.
+**Split databases (locked):**
 
-| Plane | Account key | Project / org |
-|-------|-------------|----------------|
-| GCP | `opportunities` | `stawi-opportunities` (europe-west1) |
-| Neon | `opportunities` | org via `bootstrap-neon-account.sh` (SOPS present) |
+| Plane | Runtime | Database | Owner |
+|-------|---------|----------|-------|
+| Product | Cloud Run | **Neon product** | matching migrations |
+| Crawl / ingest | Cluster `product-opportunities` | **CNPG crawl** | crawler migrations |
+
+Shared surfaces only: worker dual-DB catalog write + Pub/Sub fan-out. See design spec and cluster cutover notes.
+
+| Account | Project / org |
+|---------|----------------|
+| GCP `opportunities` | `stawi-opportunities` (europe-west1) |
+| Neon `opportunities` | product project via matching module |
 
 **Spec:** [superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md](superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md)  
-**Cluster cutover notes:** `deployment.manifests` `namespaces/product-opportunities/common/CUTOVER_CLOUD_RUN.md`
+**Cluster:** `deployment.manifests` `namespaces/product-opportunities/common/CUTOVER_CLOUD_RUN.md`  
+**App DB contract:** `stawi.opportunities` `docs/ops/db-boundaries.md`
 
 ## Applications (Cloud Run — product)
 
-| App directory | Role | Neon | Public path |
-|---------------|------|------|-------------|
-| `opportunities-matching` | Candidates, matches, CV/chat, billing webhooks; **owns product Neon** | yes (owner) | `/matching` |
-| `opportunities-api` | Public search + detail; **no second Neon project** | attaches matching URL | **`/opportunities`** |
+| App directory | Role | Neon | Public path | Image pin (prod) |
+|---------------|------|------|-------------|------------------|
+| `opportunities-matching` | Candidates, matches, CV/chat, billing webhooks; **owns product Neon** | yes (owner) | `/matching` | `v8.0.211` (latest AR) |
+| `opportunities-api` | Public search + detail; attaches matching DB secret | shared | **`/opportunities`** | `v8.0.213` |
 
-## Cluster job plane (not Cloud Run)
+## Cluster job plane (crawl only)
 
-| Workload | Role |
-|----------|------|
-| crawler | Source crawl / schedule |
-| frontier-worker | URL frontier claims |
-| worker-core / validate / publish | Pipeline stages (NATS JetStream) |
-| writer / materializer | Persist + side effects |
-| NATS | Job queues only (no cluster Postgres) |
+| Workload | Role | Database |
+|----------|------|----------|
+| crawler | Sources, schedules, structured crawl, admit/enqueue | CNPG only |
+| frontier-worker | URL frontier claim/fetch | CNPG only |
+| worker | Drain `job_ingest_queue` → product catalog write | **dual:** CNPG + Neon |
+| NATS | Wake-ups / control (not job SoT) | — |
 
-Workers use **`DATABASE_URL` → Neon** (same secret as Cloud Run matching).  
-Optional `PRODUCT_DATABASE_URL` may point at the same URL for dual-DB-aware code.  
-Fan-out: `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`.
+**Do not deploy on cluster:** api, matching, materializer, writer, worker-core/validate/publish.
 
-## Data (single Neon project)
+### Worker env (required in prod)
 
-| On Neon (product + crawl) | On cluster (not Postgres) |
-|---------------------------|---------------------------|
-| catalog, companies, flags, candidates, matches | NATS JetStream job queues |
-| sources, recipes, crawl_runs, url_frontier | long-running crawl/worker pods |
-| job_ingest_queue, pipeline_variants ledger | |
+```text
+DATABASE_URL              → CNPG pooler (crawl queue claim/ack)
+PRODUCT_DATABASE_URL      → Neon product (catalog)
+MATCHING_FANOUT_QUEUE_URL → gcppubsub://stawi-opportunities/opportunities-fanout
+GOOGLE_CLOUD_PROJECT      → stawi-opportunities
+```
 
-Search uses **`lakebase_text`** (BM25), **not** `pg_search`. CNPG for this namespace is **suspended / unused**.
+## Data split
+
+| On Neon (product) | On CNPG (crawl) |
+|-------------------|-----------------|
+| catalog, companies, flags | sources, recipes, crawl_runs, host_state |
+| candidates, matches, applications | url_frontier, job_ingest_queue |
+| billing entitlement cache | crawl_jobs, job_ingest_events |
+
+Search on Neon uses **`lakebase_text`** (BM25), not `pg_search`.
 
 ## Path migration
 
@@ -50,28 +63,23 @@ Search uses **`lakebase_text`** (BM25), **not** `pg_search`. CNPG for this names
 | OAuth resource `/jobs` | **`/opportunities`** |
 | `/matching` | `/matching` (unchanged) |
 
-Temporary 308 `/jobs` → `/opportunities` may be used during SPA cutover; remove after greenfield soak.
-
 ## Prerequisites
 
-1. GCP + Neon onboard for `opportunities` (merged).
-2. **Lakebase Search** enabled on the Neon product project (console/API) so `CREATE EXTENSION lakebase_text` succeeds.
-3. Cross-project: deploy SA can read identity Hydra/Keto if required by module.
-4. Seed SM in `stawi-opportunities`:
-   - `hydra-webhook-psk` (copy from identity)
-   - `billing-webhook-secret`
-   - `checkout-internal-token` (must match checkout)
-5. Images: `ghcr.io/stawi-opportunities/opportunities-{api,matching}:vX.Y.Z` (public GHCR).
+1. GCP + Neon onboard for `opportunities`.
+2. Lakebase Search enabled on the Neon product project when using BM25.
+3. Seed SM: `hydra-webhook-psk`, `billing-webhook-secret`, `checkout-internal-token`.
+4. Cluster: CNPG ready; secret `product-neon-credentials-opportunities` for worker.
+5. Images: GHCR `ghcr.io/stawi-opportunities/opportunities-{api,matching,crawler,worker,frontier-worker}:vX.Y.Z`.
 
 ## Apply order
 
 ```text
 1. identity (Hydra/Keto) already live
-2. opportunities-matching   # Neon + migrations + Pub/Sub + secrets shells
-3. opportunities-api        # shared DB IAM + edge
-4. Enable edge routes in routes.prod.json (origin after apply)
-5. Cluster worker: CRAWL_DATABASE_URL + PRODUCT_DATABASE_URL + MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout
-6. Smoke gates → remove cluster HTTPRoutes /jobs + /matching → scale cluster api/matching to 0
+2. opportunities-matching   # Neon + product migrations + Pub/Sub
+3. opportunities-api        # shared DB secret + edge /opportunities
+4. Cluster CNPG + NATS
+5. Crawler migrate (CNPG) + crawler/frontier/worker dual-DB
+6. Smoke gates
 ```
 
 ```bash
@@ -100,8 +108,6 @@ gh workflow run app-apply.yml -f app=opportunities-api -f env=stawi-prod
 | `opportunities-fanout` | Path A: worker → matching after embed |
 | `opportunities-cv-embed` | CV embed stage push |
 
-Cluster worker publish: `gcppubsub://stawi-opportunities/opportunities-fanout`.
-
 ## Extensions (product Neon)
 
 ```hcl
@@ -112,55 +118,18 @@ neon_extensions = [
 ]
 ```
 
-Avoid: `pg_search`, `vectorscale`, crawl hypertables on Neon.
-
-## Full cutover checklist
-
-### Vault (cluster dual-write)
-
-```bash
-# From SM (operator):
-gcloud secrets versions access latest \
-  --secret=opportunities-matching-database-url \
-  --project=stawi-opportunities
-
-# Seed Vault path used by ExternalSecret product-neon-credentials-opportunities:
-#   stawi/product-opportunities/common/product-neon
-#   product_database_url = <pooled Neon URL>
-```
-
-### Worker / crawl jobs (cluster)
-
-1. Keep **api/matching** `replicaCount: 0` on cluster; product traffic stays Cloud Run.
-2. Run crawl plane at floor `replicaCount: 1` (crawler, frontier, workers, writer, materializer).
-3. Unpause KEDA JetStream ScaledObjects for those jobs (`minReplicaCount: 1`); leave api/matching KEDA paused.
-4. Env: `DATABASE_URL` (and `PRODUCT_DATABASE_URL` if set) from secret  
-   `product-neon-credentials-opportunities` → **Neon**;  
-   `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`;  
-   `GOOGLE_CLOUD_PROJECT=stawi-opportunities`.
-5. Grant worker SA (or node SA) `roles/pubsub.publisher` on `stawi-opportunities`.
-
-Jobs process after Flux reconciles HelmReleases + **NATS** and the Neon secret exists (**no CNPG**).
-### Lakebase Search
-
-1. Neon console → project → enable **Lakebase Search**.
-2. Re-apply matching (or `CREATE EXTENSION lakebase_text`) and re-run migrate job.
-3. Confirm `opportunities_search_bm25` index exists; API ranks with lakebase BM25.
-
-### Cluster customer surface
-
-- `opportunities-api` / `opportunities-matching` Helm `replicaCount: 0`
-- Cluster HTTPRoutes for `/jobs` and `/matching` have empty `parentRefs` (detached)
+Avoid: `pg_search`, crawl queue tables on Neon.
 
 ## Verification gates
 
-1. Matching Ready; product migrations applied; `lakebase_text` present when Lakebase Search enabled.
-2. API Ready; `SEARCH_BACKEND=lakebase_text`; search returns ranked hits after data.
-3. Worker dual-DB: one crawl → row in Neon `opportunities`.
-4. SPA: `/matching/me/*` + discovery via `/opportunities` (not `/jobs`).
-5. Neon has **no** `job_ingest_queue` / `url_frontier`.
-6. Cluster API + matching scaled to zero; cluster gateway routes detached.
+1. Matching Ready; product migrations applied.
+2. API Ready; search returns ranked hits when data present.
+3. Worker dual-DB log line; one crawl → row in Neon `opportunities`.
+4. SPA: `/matching/me/*` + discovery via `/opportunities`.
+5. Neon has **no** crawl SoT requirement for `job_ingest_queue` / `url_frontier`.
+6. Cluster runs only crawler + frontier-worker + worker (+ CNPG + NATS).
 
 ## Rollback
 
-Before scale-to-zero: re-point edge to cluster gateway. After: treat Neon product as forward-only (greenfield).
+Before scale-to-zero of cluster product surface: already on Cloud Run.  
+Crawl rollback: keep CNPG; pause schedules via crawler admin.
