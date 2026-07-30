@@ -9,16 +9,6 @@ provider "google" {
   region  = var.region
 }
 
-resource "random_password" "dek_aes" {
-  length  = 32
-  special = false
-}
-
-resource "random_password" "dek_hmac" {
-  length  = 32
-  special = false
-}
-
 locals {
   is_prod  = var.platform == "stawi-prod"
   api_base = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
@@ -45,21 +35,16 @@ module "frame" {
   enable_keto_admin        = false
   min_instance_count       = 1
 
+  # DEK secret *containers* only — versions are seeded out-of-band from colony
+  # (config.go defaults / vault stawi/identity/default/dek-keys). Do not put these
+  # in extra_version_ids: tofu random keys previously overwrote the real DEK.
   extra_secret_ids = toset([
     "identity-profile-dek-key-id",
     "identity-profile-dek-aes-key",
     "identity-profile-dek-hmac-key",
   ])
-  extra_version_ids = toset([
-    "identity-profile-dek-key-id",
-    "identity-profile-dek-aes-key",
-    "identity-profile-dek-hmac-key",
-  ])
-  extra_secret_values = {
-    "identity-profile-dek-key-id"   = "contacts-dek-cloud"
-    "identity-profile-dek-aes-key"  = base64encode(random_password.dek_aes.result)
-    "identity-profile-dek-hmac-key" = base64encode(random_password.dek_hmac.result)
-  }
+  extra_version_ids   = toset([])
+  extra_secret_values = {}
   secret_env_extra = {
     DEK_LOOKUP_TOKEN            = { secret = "identity-profile-dek-hmac-key" }
     DEK_ACTIVE_KEY_ID           = { secret = "identity-profile-dek-key-id" }
