@@ -1,5 +1,5 @@
 # Required GCP Secret Manager secrets for opportunities domain (stawi-opportunities).
-# Product Cloud Run only (api + matching). Crawl stays on cluster — not listed here.
+# Two Neon projects: product (matching) + crawl (crawler).
 
 project_hint: stawi-opportunities
 gcp_account: opportunities
@@ -17,8 +17,10 @@ apps:
     runtime_secrets:
       - id: opportunities-matching-database-url
         managed_by_tofu: true
+        notes: "product Neon (pooled)"
       - id: opportunities-matching-database-url-direct
         managed_by_tofu: true
+        notes: "product Neon (direct; migrate)"
       - id: hydra-webhook-psk
         shared: true
       - id: billing-webhook-secret
@@ -30,12 +32,21 @@ apps:
         env: CHECKOUT_INTERNAL_TOKEN
         required: true
         source_hints:
-          - "must match checkout CHECKOUT_INTERNAL_TOKEN / checkout-signing-secret path used by pay.stawi.org"
+          - "must match checkout CHECKOUT_INTERNAL_TOKEN"
 
   opportunities-api:
     runtime_secrets:
       - id: opportunities-matching-database-url
         shared: true
-        notes: "API attaches to matching product Neon; no second Neon project"
+        notes: "API attaches to matching product Neon; no second product project"
       - id: hydra-webhook-psk
         shared: true
+
+  opportunities-crawler:
+    runtime_secrets:
+      - id: opportunities-crawler-database-url
+        managed_by_tofu: true
+        notes: "crawl Neon (pooled); seed to k8s crawl-neon-credentials-opportunities"
+      - id: opportunities-crawler-database-url-direct
+        managed_by_tofu: true
+        notes: "crawl Neon (direct; migrate Job)"
