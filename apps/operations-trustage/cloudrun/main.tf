@@ -46,6 +46,8 @@ module "frame" {
   migrate_args             = var.migrate_args
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
+  # Greenfield Hydra client id is "trustage" (not service-trustage).
+  oauth2_service_client_id = "trustage"
 
   min_instance_count = 1
   push_oidc_audience = local.push_oidc_audience

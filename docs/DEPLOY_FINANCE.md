@@ -183,20 +183,38 @@ Wire `cloudrun-ship` in the fintech monorepo to project `stawi-finance`
 ## Follow-ups / ops notes
 
 ### Permission manifests
-Setup Jobs run `["setup","migrate"]` only. The `permissions` step POSTs to
-`https://api.stawi.org/tenancy/_internal/register/permissions` and requires a
-service JWT with the **`internal`** role (`IsInternalSystem`). Until Hydra/tenancy
-service-account clients for `service-loans|savings|funding|operations|limits`
-mint that claim, registration returns **403**. Re-enable with:
+Setup Jobs use `migrate_args = ["setup"]` with `permissions_registration = true`.
+The `permissions` step POSTs to
+`https://api.stawi.org/tenancy/_internal/register/permissions` with a
+service JWT (`roles` under JWT `ext` must include **`internal`**).
 
-```hcl
-migrate_args             = ["setup"]
-permissions_registration = true
-```
+**Identity dependency:** `identity-tenancy` (and authentication) must run Frame
+**≥ v2.1.1** so `GetRoles()` accepts `ext.roles` as a JSON array. Pin
+`service-authentication-tenancy:v1.54.63` (Frame v2.1.3). **Do not** deploy
+`v1.54.62` (Frame v2.1.0) — it only accepted comma-separated string roles and
+returned **403** `internal service-account token is required` for every SA.
+
+**Hydra audiences:** every path in `OAUTH2_REQUESTED_AUDIENCES` must be on the
+Hydra client `audience` list (tenancy sync + auth-contract grants). Missing
+entries fail token mint with `Requested audience '…' has not been whitelisted`.
+
+**`service_limits`:** register permissions from `LimitsAdminService` only (it
+owns `service_permissions`). Do not also register `LimitsService` or the setup
+step is overwritten and skipped (see service-fintech PR #297).
+
+**Signer PSK:** every project’s `hydra-webhook-psk` SM secret must match
+`identity-authentication` `HYDRA_WEBHOOK_API_PSK` or setup permission mints
+fail with signer **401 unauthorised**.
 
 ### Health probes
 Frame exposes **`/readyz`** and **`/livez`** (not `/healthz`). Apps set those paths.
 
 ### Edge
 Routes under `api.stawi.org` for `/loans`, `/savings`, `/funding`, `/operations`,
-`/limits` are enabled after `npm run refresh-origins` against `stawi-finance`.
+`/limits` are enabled (`routes.prod.json`) after `npm run refresh-origins` against
+`stawi-finance`.
+
+### Cluster drain
+Flux kustomizations for finance app workloads are **`suspend: true`** in
+`deployment.manifests/namespaces/finance/kustomization_provider.yaml`. CNPG + NATS
+remain registered until data migration is complete.

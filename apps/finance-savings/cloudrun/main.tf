@@ -29,14 +29,14 @@ module "frame" {
   has_database             = var.has_database
   container_port           = var.container_port
   memory                   = var.memory
-  migrate_args             = ["setup", "migrate"]  # permissions step needs tenancy OAuth; register later
+  migrate_args             = ["setup"]
   migrate_execute          = false
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-savings"
 
   grant_oauth_signer_accessor = true
-  permissions_registration    = false  # enable after service-bot can POST tenancy register
+  permissions_registration    = true
   startup_probe_path         = "/readyz"
   liveness_probe_path        = "/livez"
 
