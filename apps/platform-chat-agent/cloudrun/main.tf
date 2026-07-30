@@ -28,8 +28,9 @@ module "frame" {
 
   resource_path            = "/chat-agent"
   requested_audience_paths = ["/profile", "/tenancy", "/notification"]
-  # Hydra client id registered for S2S callers (matching uses this audience).
-  oauth2_service_client_id = "platform-chat-agent"
+  # Colony-era Hydra SA client id (service-chat-agent), not the Cloud Run app name.
+  # Default frame mapping platform-* → service-* would also yield this; set explicitly.
+  oauth2_service_client_id = "service-chat-agent"
 
   # Frame setup plan migrates chat_contexts / chat_sessions / chat_messages.
   migrate_args = ["setup"]
