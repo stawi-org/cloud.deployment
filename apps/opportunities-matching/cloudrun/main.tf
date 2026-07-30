@@ -19,10 +19,14 @@ locals {
   service_run_url    = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
   push_oidc_audience = local.service_run_url
 
-  # Product async (replaces cluster NATS for matching-side work).
-  fanout_topic   = "opportunities-fanout"
-  cv_embed_topic = "opportunities-cv-embed"
-  events_ref     = "${var.app_name}-events"
+  # Product async via GCP Pub/Sub (cluster worker + Cloud Run matching).
+  fanout_topic        = "opportunities-fanout"
+  cv_embed_topic      = "opportunities-cv-embed"
+  worker_embed_topic  = "opportunities-worker-embed"
+  worker_embed_sub    = "opportunities-worker-embed-pull"
+  events_ref          = "${var.app_name}-events"
+  # OCI cluster worker SA (JSON key in k8s secret gcp-sa-opportunities-worker).
+  cluster_worker_sa   = "opportunities-cluster-worker@${var.project_id}.iam.gserviceaccount.com"
 }
 
 module "frame" {
@@ -63,11 +67,12 @@ module "frame" {
   startup_probe_path          = "/healthz"
   liveness_probe_path         = "/healthz"
 
-  # Default {app}-events plus product fan-out / CV embed topics.
+  # Default {app}-events plus product fan-out / CV embed / worker-embed topics.
   create_default_events_topic = true
   messaging_topics = {
-    fanout   = { name = local.fanout_topic }
-    cv_embed = { name = local.cv_embed_topic }
+    fanout       = { name = local.fanout_topic }
+    cv_embed     = { name = local.cv_embed_topic }
+    worker_embed = { name = local.worker_embed_topic }
   }
   messaging_subscriptions = {
     fanout = {
@@ -82,6 +87,13 @@ module "frame" {
       name                  = "${local.cv_embed_topic}-push"
       push_endpoint         = "${local.service_run_url}/_frame/queue/${local.cv_embed_topic}"
       enable_subscriber_iam = false
+      ack_deadline_seconds  = 300
+    }
+    # Cluster worker pull subscription (OCI has no Workload Identity).
+    worker_embed = {
+      topic_key             = "worker_embed"
+      name                  = local.worker_embed_sub
+      enable_subscriber_iam = true
       ack_deadline_seconds  = 300
     }
   }
@@ -101,8 +113,10 @@ module "frame" {
     # CV embed stage (self-push).
     CV_EMBED_QUEUE_URL  = "push://${local.cv_embed_topic}?protocol=gcppubsub"
     CV_EMBED_QUEUE_NAME = local.cv_embed_topic
-    # Worker publish URI shape (document for cluster worker dual-DB).
-    MATCHING_FANOUT_PUBLISH_URL = "gcppubsub://${var.project_id}/${local.fanout_topic}"
+    # Cluster worker URIs (document for product-opportunities Helm).
+    MATCHING_FANOUT_PUBLISH_URL     = "gcppubsub://${var.project_id}/${local.fanout_topic}"
+    WORKER_EMBED_PUBLISH_URL        = "gcppubsub://${var.project_id}/${local.worker_embed_topic}"
+    WORKER_EMBED_SUBSCRIBE_URL      = "gcppubsub://${var.project_id}/${local.worker_embed_sub}"
   }
 
   app_env = {
@@ -138,3 +152,35 @@ resource "google_secret_manager_secret_iam_member" "preseeded" {
 
 # Shared DB IAM for opportunities-api is granted from the API stack (SA exists
 # after that apply). Apply order: matching → api.
+
+# ---------------------------------------------------------------------------
+# Cluster worker (OCI) — Pub/Sub for critical async path
+# ---------------------------------------------------------------------------
+# JSON key lives in k8s secret gcp-sa-opportunities-worker (key.json).
+# Topics: fanout (publish only), worker-embed (publish + pull subscribe).
+
+data "google_service_account" "cluster_worker" {
+  account_id = "opportunities-cluster-worker"
+  project    = var.project_id
+}
+
+resource "google_pubsub_topic_iam_member" "cluster_worker_fanout_publish" {
+  project = var.project_id
+  topic   = local.fanout_topic
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${data.google_service_account.cluster_worker.email}"
+}
+
+resource "google_pubsub_topic_iam_member" "cluster_worker_embed_publish" {
+  project = var.project_id
+  topic   = local.worker_embed_topic
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${data.google_service_account.cluster_worker.email}"
+}
+
+resource "google_pubsub_subscription_iam_member" "cluster_worker_embed_subscribe" {
+  project      = var.project_id
+  subscription = local.worker_embed_sub
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:${data.google_service_account.cluster_worker.email}"
+}
