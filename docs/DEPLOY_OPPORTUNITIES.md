@@ -1,34 +1,45 @@
-# Deploy opportunities (Cloud Run product + cluster crawl)
+# Deploy opportunities (Cloud Run product + cluster crawl jobs)
 
-Customer-facing **discovery** and **matching** move to Cloud Run + Neon.  
-**Crawl / ingest** remains on the Kubernetes cluster (CNPG + NATS).
+**Product DB = Neon only** (no pressure to host catalog databases on the cluster).  
+**Crawl / pipeline jobs = Kubernetes** (`product-opportunities`) for long-running workers.
 
 | Plane | Account key | Project / org |
 |-------|-------------|----------------|
 | GCP | `opportunities` | `stawi-opportunities` (europe-west1) |
 | Neon | `opportunities` | org via `bootstrap-neon-account.sh` (SOPS present) |
 
-**Spec:** [superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md](superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md)
+**Spec:** [superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md](superpowers/specs/2026-07-29-opportunities-cloudrun-neon-design.md)  
+**Cluster cutover notes:** `deployment.manifests` `namespaces/product-opportunities/common/CUTOVER_CLOUD_RUN.md`
 
-## Applications (Cloud Run)
+## Applications (Cloud Run — product)
 
 | App directory | Role | Neon | Public path |
 |---------------|------|------|-------------|
 | `opportunities-matching` | Candidates, matches, CV/chat, billing webhooks; **owns product Neon** | yes (owner) | `/matching` |
 | `opportunities-api` | Public search + detail; **no second Neon project** | attaches matching URL | **`/opportunities`** |
 
-**Not Cloud Run:** crawler, frontier-worker, worker-*, writer, materializer, NATS.
+## Cluster job plane (not Cloud Run)
 
-## Data split (cost)
+| Workload | Role |
+|----------|------|
+| crawler | Source crawl / schedule |
+| frontier-worker | URL frontier claims |
+| worker-core / validate / publish | Pipeline stages (NATS JetStream) |
+| writer / materializer | Persist + side effects |
+| NATS + CNPG | Job queue + **crawl ledger only** |
 
-| Neon product (high value) | CNPG crawl (cluster) |
-|---------------------------|----------------------|
+Workers dual-write product rows via `PRODUCT_DATABASE_URL` (Neon) and fan out to matching with  
+`MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`.
+
+## Data split (cost / ops)
+
+| Neon product (high value — **not** on cluster) | CNPG crawl (cluster job state only) |
+|------------------------------------------------|-------------------------------------|
 | opportunities catalog, companies, flags | sources, recipes, crawl_runs |
 | candidates, matches, placement, saved jobs | url_frontier, host_state |
-| billing entitlement cache / checkouts | job_ingest_queue, ingest events |
+| billing entitlement cache / checkouts | job_ingest_queue, pipeline_variants ledger |
 
 Search on Neon uses **`lakebase_text`** (BM25), **not** `pg_search`.
-
 ## Path migration
 
 | Old | New (canonical) |
@@ -116,12 +127,17 @@ gcloud secrets versions access latest \
 #   product_database_url = <pooled Neon URL>
 ```
 
-### Worker
+### Worker / crawl jobs (cluster)
 
-Cluster workers set `PRODUCT_DATABASE_URL` + `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout` + `GOOGLE_CLOUD_PROJECT=stawi-opportunities`.
+1. Keep **api/matching** `replicaCount: 0` on cluster; product traffic stays Cloud Run.
+2. Run crawl plane at floor `replicaCount: 1` (crawler, frontier, workers, writer, materializer).
+3. Unpause KEDA JetStream ScaledObjects for those jobs (`minReplicaCount: 1`); leave api/matching KEDA paused.
+4. Env: `DATABASE_URL` → CNPG pooler (crawl); `PRODUCT_DATABASE_URL` → Neon;  
+   `MATCHING_FANOUT_QUEUE_URL=gcppubsub://stawi-opportunities/opportunities-fanout`;  
+   `GOOGLE_CLOUD_PROJECT=stawi-opportunities`.
+5. Grant worker SA (or node SA) `roles/pubsub.publisher` on `stawi-opportunities`.
 
-Grant GKE worker SA (or node SA) `roles/pubsub.publisher` on project `stawi-opportunities` for fan-out.
-
+Jobs process only after Flux has reconciled HelmReleases + CNPG + NATS and the Neon secret exists.
 ### Lakebase Search
 
 1. Neon console → project → enable **Lakebase Search**.
