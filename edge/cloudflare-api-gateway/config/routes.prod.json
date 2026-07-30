@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME → Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
+  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME \u2192 Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west1",
   "gateway": {
@@ -40,7 +40,7 @@
       "hostname": "accounts.stawi.org",
       "origin": "https://identity-authentication-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Login UI. CF CNAME → Cloud Run.",
+      "notes": "Login UI. CF CNAME \u2192 Cloud Run.",
       "service": "identity-authentication"
     },
     {
@@ -48,7 +48,7 @@
       "hostname": "oauth2.stawi.org",
       "origin": "https://identity-oauth2-hydra-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "OIDC public. CF CNAME → Cloud Run.",
+      "notes": "OIDC public. CF CNAME \u2192 Cloud Run.",
       "service": "identity-oauth2-hydra"
     },
     {
@@ -56,7 +56,7 @@
       "hostname": "oauth2-w.stawi.org",
       "origin": "https://identity-oauth2-hydra-admin-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token.",
+      "notes": "Hydra admin (IAM). CF CNAME \u2192 Cloud Run; callers send Google ID token.",
       "service": "identity-oauth2-hydra-admin"
     },
     {
@@ -154,6 +154,23 @@
         "title": "Settings",
         "openapi_path": "/openapi.yaml"
       }
+    },
+    {
+      "id": "chat-agent",
+      "prefix": "/chat-agent",
+      "service": "platform-chat-agent",
+      "project": "stawi-platform",
+      "origin": "https://platform-chat-agent-PLACEHOLDER.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Chat Agent",
+        "description": "Context-driven conversational data collection (placement intake, opportunity side-chat).",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Origin set after first Cloud Run apply. Matching S2S audience /chat-agent."
     },
     {
       "id": "geolocation",
@@ -479,7 +496,7 @@
         "title": "Checkout",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME → Cloud Run)."
+      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME \u2192 Cloud Run)."
     },
     {
       "id": "ledger",

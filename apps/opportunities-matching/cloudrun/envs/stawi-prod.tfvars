@@ -27,5 +27,6 @@ requested_audience_paths = [
   "/notification",
   "/payment",
   "/checkout",
+  "/chat-agent",
 ]
 public_hostname = ""

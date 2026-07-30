@@ -118,6 +118,9 @@ module "frame" {
     PUBLIC_SITE_URL          = "https://opportunities.stawi.org"
     MATCHING_MIN_SCORE       = "0.45"
     SECURELY_RUN_SERVICE     = "true"
+    # Platform chat-agent: structured intake + opportunity side-chat.
+    CHAT_AGENT_SERVICE_URI   = "https://api.stawi.org/chat-agent"
+    CHAT_AGENT_ENABLED       = "true"
   }
 }
 
