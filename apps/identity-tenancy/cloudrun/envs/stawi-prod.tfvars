@@ -1,7 +1,7 @@
 # Bootstrap pin (public GHCR). Routine rolls via cloudrun-ship.
 # v1.54.63 = Frame v2.1.3 (parses ext.roles JSON arrays; required for SA IsInternalSystem).
 # Do not pin v1.54.62 (Frame v2.1.0) — GetRoles ignored array roles → permissions 403.
-image = "ghcr.io/antinvestor/service-authentication-tenancy:v1.54.63"
+image = "ghcr.io/antinvestor/service-authentication-tenancy:v1.54.66"
 
 # Public surface is the path gateway only (no tenancy.stawi.org host).
 # Leave empty → defaults to https://api.stawi.org/tenancy (custom_audiences + PUBLIC_BASE_URL).
