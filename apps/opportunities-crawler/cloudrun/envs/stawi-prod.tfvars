@@ -1,6 +1,5 @@
-# Crawl Neon ownership. Mirror GHCR → AR before first apply if needed:
-#   gcloud artifacts docker tags list .../ghcr-mirror/opportunities-crawler
-image = "europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/opportunities-crawler:v8.0.211"
+# Crawl Neon ownership. Public GHCR — Cloud Run pulls ghcr.io directly.
+image = "ghcr.io/stawi-opportunities/opportunities-crawler:v8.0.211"
 container_port = 8080
 resource_path  = ""
 memory         = "512Mi"

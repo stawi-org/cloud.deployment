@@ -24,9 +24,11 @@ Shared surfaces only: worker dual-DB catalog write + Pub/Sub fan-out.
 
 | App directory | Role | Neon | Public path | Image pin (prod) |
 |---------------|------|------|-------------|------------------|
-| `opportunities-matching` | Candidates, matches, CV/chat, billing; **owns product Neon** | product | `/matching` | `v8.0.215` |
-| `opportunities-api` | Public search + detail; attaches **product** Neon | product (shared) | **`/opportunities`** | `v8.0.214` |
-| `opportunities-crawler` | **Owns crawl Neon** + migrate Job; service min=0 | crawl | none (private) | `v8.0.211` |
+| `opportunities-matching` | Candidates, matches, CV/chat, billing; **owns product Neon** | product | `/matching` | `ghcr.io/stawi-opportunities/opportunities-matching:v8.0.215` |
+| `opportunities-api` | Public search + detail; attaches **product** Neon | product (shared) | **`/opportunities`** | `ghcr.io/stawi-opportunities/opportunities-api:v8.0.214` |
+| `opportunities-crawler` | **Owns crawl Neon** + migrate Job; service min=0 | crawl | none (private) | `ghcr.io/stawi-opportunities/opportunities-crawler:v8.0.211` |
+
+Images are **public GHCR** (`ghcr.io/stawi-opportunities/...`). Do not pin Artifact Registry `ghcr-mirror` paths.
 
 ### Cluster job plane (uses crawl Neon)
 
