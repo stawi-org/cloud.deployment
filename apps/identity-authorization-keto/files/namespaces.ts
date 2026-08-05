@@ -1934,3 +1934,460 @@ class service_ocr implements Namespace {
       this.related.granted_ocr_status_view.includes(ctx.subject),
   }
 }
+
+class commerce_shop implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: profile_user[]
+
+    granted_shop_view: profile_user[]
+    granted_shop_update: profile_user[]
+    granted_products_view: profile_user[]
+    granted_products_manage: profile_user[]
+    granted_orders_view: profile_user[]
+    granted_orders_manage: profile_user[]
+    granted_fulfilment_view: profile_user[]
+    granted_fulfilment_manage: profile_user[]
+    granted_price_list_view: profile_user[]
+    granted_price_list_manage: profile_user[]
+    granted_customer_price_override: profile_user[]
+    granted_discount_manage: profile_user[]
+    granted_discount_approve: profile_user[]
+  }
+
+  permits = {
+    // --- View permits: any role on the shop (incl. viewer/member) ---
+    shop_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shop_view.includes(ctx.subject),
+
+    products_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_products_view.includes(ctx.subject),
+
+    orders_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_orders_view.includes(ctx.subject),
+
+    fulfilment_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_fulfilment_view.includes(ctx.subject),
+
+    price_list_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_price_list_view.includes(ctx.subject),
+
+    // --- Manage permits: owner/admin/operator (operational roles) ---
+    shop_update: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shop_update.includes(ctx.subject),
+
+    products_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_products_manage.includes(ctx.subject),
+
+    orders_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_orders_manage.includes(ctx.subject),
+
+    fulfilment_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_fulfilment_manage.includes(ctx.subject),
+
+    price_list_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_price_list_manage.includes(ctx.subject),
+
+    // --- Sensitive permits: owner/admin only ---
+    customer_price_override: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_customer_price_override.includes(ctx.subject),
+
+    discount_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_discount_manage.includes(ctx.subject),
+
+    discount_approve: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_discount_approve.includes(ctx.subject),
+  }
+}
+
+class service_commerce implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_shop_view: (profile_user | service_commerce)[]
+    granted_shop_create: (profile_user | service_commerce)[]
+    granted_shop_update: (profile_user | service_commerce)[]
+    granted_product_view: (profile_user | service_commerce)[]
+    granted_product_manage: (profile_user | service_commerce)[]
+    granted_cart_view: (profile_user | service_commerce)[]
+    granted_cart_manage: (profile_user | service_commerce)[]
+    granted_order_view: (profile_user | service_commerce)[]
+    granted_order_manage: (profile_user | service_commerce)[]
+    granted_fulfilment_view: (profile_user | service_commerce)[]
+    granted_fulfilment_manage: (profile_user | service_commerce)[]
+  }
+
+  permits = {
+    shop_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_shop_view.includes(ctx.subject),
+
+    shop_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shop_create.includes(ctx.subject),
+
+    shop_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shop_update.includes(ctx.subject),
+
+    product_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_product_view.includes(ctx.subject),
+
+    product_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_product_manage.includes(ctx.subject),
+
+    cart_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_cart_view.includes(ctx.subject),
+
+    cart_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_cart_manage.includes(ctx.subject),
+
+    order_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_order_view.includes(ctx.subject),
+
+    order_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_order_manage.includes(ctx.subject),
+
+    fulfilment_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_fulfilment_view.includes(ctx.subject),
+
+    fulfilment_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_fulfilment_manage.includes(ctx.subject),
+  }
+}
+
+class procurement_property implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: profile_user[]
+
+    granted_property_view: profile_user[]
+    granted_property_update: profile_user[]
+    granted_purchase_order_manage: profile_user[]
+    granted_purchase_order_property_view: profile_user[]
+    granted_goods_receipt_manage: profile_user[]
+    granted_goods_receipt_view: profile_user[]
+  }
+
+  permits = {
+    // --- View permits: any role on the property ---
+    property_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_property_view.includes(ctx.subject),
+
+    purchase_order_property_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_purchase_order_property_view.includes(ctx.subject),
+
+    goods_receipt_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_view.includes(ctx.subject),
+
+    // --- Manage permits: owner/admin/operator ---
+    property_update: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_property_update.includes(ctx.subject),
+
+    purchase_order_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_purchase_order_manage.includes(ctx.subject),
+
+    goods_receipt_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_manage.includes(ctx.subject),
+  }
+}
+
+class service_procurement implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_supplier_view: (profile_user | service_procurement)[]
+    granted_supplier_manage: (profile_user | service_procurement)[]
+    granted_purchase_order_view: (profile_user | service_procurement)[]
+    granted_purchase_order_create: (profile_user | service_procurement)[]
+    granted_purchase_order_submit: (profile_user | service_procurement)[]
+    granted_purchase_order_cancel: (profile_user | service_procurement)[]
+    granted_goods_receipt_view: (profile_user | service_procurement)[]
+    granted_goods_receipt_create: (profile_user | service_procurement)[]
+  }
+
+  permits = {
+    supplier_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_supplier_view.includes(ctx.subject),
+
+    supplier_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_supplier_manage.includes(ctx.subject),
+
+    purchase_order_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_purchase_order_view.includes(ctx.subject),
+
+    purchase_order_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_purchase_order_create.includes(ctx.subject),
+
+    purchase_order_submit: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_purchase_order_submit.includes(ctx.subject),
+
+    purchase_order_cancel: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_purchase_order_cancel.includes(ctx.subject),
+
+    goods_receipt_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_view.includes(ctx.subject),
+
+    goods_receipt_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_create.includes(ctx.subject),
+  }
+}
+
+class service_property implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_property_type_view: (profile_user | service_property)[]
+    granted_property_type_manage: (profile_user | service_property)[]
+    granted_locality_manage: (profile_user | service_property)[]
+    granted_property_view: (profile_user | service_property)[]
+    granted_property_manage: (profile_user | service_property)[]
+    granted_property_subscription_view: (profile_user | service_property)[]
+    granted_property_subscription_manage: (profile_user | service_property)[]
+  }
+
+  permits = {
+    property_type_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_property_type_view.includes(ctx.subject),
+
+    property_type_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_property_type_manage.includes(ctx.subject),
+
+    locality_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_locality_manage.includes(ctx.subject),
+
+    property_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_property_view.includes(ctx.subject),
+
+    property_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_property_manage.includes(ctx.subject),
+
+    property_subscription_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_property_subscription_view.includes(ctx.subject),
+
+    property_subscription_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_property_subscription_manage.includes(ctx.subject),
+  }
+}
