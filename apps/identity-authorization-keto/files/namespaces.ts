@@ -80,6 +80,7 @@ class service_billing implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_catalog_view: (profile_user | service_billing)[]
     granted_catalog_manage: (profile_user | service_billing)[]
@@ -95,6 +96,7 @@ class service_billing implements Namespace {
     granted_invoice_view: (profile_user | service_billing)[]
     granted_invoice_manage: (profile_user | service_billing)[]
     granted_payment_record: (profile_user | service_billing)[]
+    granted_payment_collect: (profile_user | service_billing)[]
     granted_credit_view: (profile_user | service_billing)[]
     granted_credit_manage: (profile_user | service_billing)[]
     granted_discount_view: (profile_user | service_billing)[]
@@ -107,27 +109,32 @@ class service_billing implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_catalog_view.includes(ctx.subject),
 
     catalog_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_catalog_manage.includes(ctx.subject),
 
     plan_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_plan_manage.includes(ctx.subject),
 
     component_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_component_manage.includes(ctx.subject),
 
     tier_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_tier_manage.includes(ctx.subject),
 
     subscription_view: (ctx: Context): boolean =>
@@ -135,18 +142,21 @@ class service_billing implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_subscription_view.includes(ctx.subject),
 
     subscription_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_subscription_manage.includes(ctx.subject),
 
     usage_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_usage_view.includes(ctx.subject),
 
@@ -154,18 +164,21 @@ class service_billing implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_usage_ingest.includes(ctx.subject),
 
     billing_run_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_billing_run_view.includes(ctx.subject),
 
     billing_run_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_billing_run_manage.includes(ctx.subject),
 
     invoice_view: (ctx: Context): boolean =>
@@ -173,41 +186,55 @@ class service_billing implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_invoice_view.includes(ctx.subject),
 
     invoice_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_invoice_manage.includes(ctx.subject),
 
     payment_record: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_record.includes(ctx.subject),
+
+    payment_collect: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payment_collect.includes(ctx.subject),
 
     credit_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_credit_view.includes(ctx.subject),
 
     credit_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_credit_manage.includes(ctx.subject),
 
     discount_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_discount_view.includes(ctx.subject),
 
     discount_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_discount_manage.includes(ctx.subject),
   }
 }
@@ -816,6 +843,7 @@ class service_ledger implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_ledger_view: (profile_user | service_ledger)[]
     granted_ledger_manage: (profile_user | service_ledger)[]
@@ -823,9 +851,6 @@ class service_ledger implements Namespace {
     granted_account_manage: (profile_user | service_ledger)[]
     granted_transaction_view: (profile_user | service_ledger)[]
     granted_transaction_manage: (profile_user | service_ledger)[]
-    granted_book_view: (profile_user | service_ledger)[]
-    granted_book_manage: (profile_user | service_ledger)[]
-    granted_report_view: (profile_user | service_ledger)[]
   }
 
   permits = {
@@ -834,12 +859,14 @@ class service_ledger implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_ledger_view.includes(ctx.subject),
 
     ledger_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_ledger_manage.includes(ctx.subject),
 
     account_view: (ctx: Context): boolean =>
@@ -847,12 +874,14 @@ class service_ledger implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_account_view.includes(ctx.subject),
 
     account_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_account_manage.includes(ctx.subject),
 
     transaction_view: (ctx: Context): boolean =>
@@ -860,6 +889,7 @@ class service_ledger implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_transaction_view.includes(ctx.subject),
 
@@ -867,28 +897,8 @@ class service_ledger implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_transaction_manage.includes(ctx.subject),
-
-    book_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_book_view.includes(ctx.subject),
-
-    book_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.granted_book_manage.includes(ctx.subject),
-
-    report_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_report_view.includes(ctx.subject),
   }
 }
 
@@ -1249,6 +1259,7 @@ class service_payment implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_payment_send: (profile_user | service_payment)[]
     granted_payment_receive: (profile_user | service_payment)[]
@@ -1266,12 +1277,14 @@ class service_payment implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_send.includes(ctx.subject),
 
     payment_receive: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_receive.includes(ctx.subject),
 
     payment_search: (ctx: Context): boolean =>
@@ -1279,6 +1292,7 @@ class service_payment implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_payment_search.includes(ctx.subject),
 
@@ -1287,35 +1301,41 @@ class service_payment implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_payment_status_view.includes(ctx.subject),
 
     payment_status_update: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_status_update.includes(ctx.subject),
 
     payment_release: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_release.includes(ctx.subject),
 
     prompt_initiate: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_prompt_initiate.includes(ctx.subject),
 
     payment_link_create: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_link_create.includes(ctx.subject),
 
     reconcile: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_reconcile.includes(ctx.subject),
   }
 }
