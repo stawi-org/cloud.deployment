@@ -18,6 +18,7 @@ Do **not** point platform apps at `neon.account: identity`. Identity Neon
 | `platform-settings` | `…/service-profile-settings:v1.53.5` | `dark-base-48141714` | service-profile `apps/settings` |
 | `platform-geolocation` | `…/service-profile-geolocation:v1.53.5` | `wispy-mouse-24359648` | service-profile `apps/geolocation` |
 | `platform-files` | `…/service-files:v1.10.54` | `nameless-hat-40608441` | service-files |
+| `platform-chat-agent` | `…/service-profile-chatagent:v1.54.6+` | (tofu/Neon) | service-profile `apps/chatagent` |
 
 App names must match Neon `allowed_app_prefixes: [platform-]`.
 
@@ -35,6 +36,7 @@ Product APIs are **path-only** on the Cloudflare gateway (no `devices.stawi.org`
 | `api.stawi.org/settings` | `platform-settings` |
 | `api.stawi.org/geolocation` | `platform-geolocation` |
 | `api.stawi.org/files` | `platform-files` |
+| `api.stawi.org/chat-agent` | `platform-chat-agent` |
 
 Edge: **`edge/cloudflare-api-gateway`**. Host LB `edge-lb-platform` is retired
 (`hosts = {}`). See **[PUBLIC_EDGE_DNS.md](PUBLIC_EDGE_DNS.md)** and
@@ -97,7 +99,7 @@ workload_identity_provider: projects/305282281906/locations/global/workloadIdent
 
 | Repo | Ships |
 |------|--------|
-| service-profile | devices, settings, geolocation (+ identity-profile → stawi-identity) |
+| service-profile | devices, settings, geolocation, chatagent (+ identity-profile → stawi-identity) |
 | service-files | platform-files |
 
 ## Apply
@@ -117,6 +119,20 @@ Order: independent; identity stack must already serve Hydra/Keto.
 | files | `ENCRYPTION_PHRASE` (32 bytes, generated) |
 | devices | Cloudflare TURN (optional later) |
 | files storage | R2/S3 endpoint + keys (optional later) |
+| chat-agent | `platform-chat-agent-inference-api-keys` (required for LLM; comma-separated Google keys); optional `platform-chat-agent-inference-secondary-api-keys` (OpenAI) |
+
+### platform-chat-agent inference
+
+Sticky multi-key failover to Gemini (primary) and optional OpenAI (secondary).
+See `apps/platform-chat-agent/README.md`.
+
+```bash
+# Seed primary Google AI keys (required before revision can mount the secret)
+./scripts/seed-gcp-secrets.sh --project stawi-platform \
+  --set platform-chat-agent-inference-api-keys="AIza…primary,AIza…backup"
+
+gh workflow run app-apply.yml -f app=platform-chat-agent -f env=stawi-prod
+```
 
 ## Container images
 
@@ -126,6 +142,7 @@ Service images are **public** on GHCR. Cloud Run pulls them directly (no AR mirr
 ghcr.io/antinvestor/service-profile-devices:vX.Y.Z
 ghcr.io/antinvestor/service-profile-settings:vX.Y.Z
 ghcr.io/antinvestor/service-profile-geolocation:vX.Y.Z
+ghcr.io/antinvestor/service-profile-chatagent:vX.Y.Z
 ghcr.io/antinvestor/service-files:vX.Y.Z
 ```
 

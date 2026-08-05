@@ -62,6 +62,7 @@ workload_identity_provider:   projects/721554040672/locations/global/workloadIde
 | `antinvestor/service-profile` (devices package) | `ghcr.io/antinvestor/service-profile-devices` | `platform-devices` |
 | `antinvestor/service-profile` (settings) | `ghcr.io/antinvestor/service-profile-settings` | `platform-settings` |
 | `antinvestor/service-profile` (geolocation) | `ghcr.io/antinvestor/service-profile-geolocation` | `platform-geolocation` |
+| `antinvestor/service-profile` (chatagent) | `ghcr.io/antinvestor/service-profile-chatagent` | `platform-chat-agent` |
 | `antinvestor/service-files` | `ghcr.io/antinvestor/service-files` | `platform-files` |
 
 ```text
