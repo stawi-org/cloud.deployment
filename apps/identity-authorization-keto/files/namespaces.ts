@@ -274,6 +274,7 @@ class service_device implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_device_view: (profile_user | service_device)[]
     granted_device_manage: (profile_user | service_device)[]
@@ -289,6 +290,7 @@ class service_device implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_device_view.includes(ctx.subject),
 
@@ -296,18 +298,21 @@ class service_device implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_device_manage.includes(ctx.subject),
 
     device_key_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_device_key_view.includes(ctx.subject),
 
     device_key_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_device_key_manage.includes(ctx.subject),
 
     device_log_view: (ctx: Context): boolean =>
@@ -315,6 +320,7 @@ class service_device implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_device_log_view.includes(ctx.subject),
 
@@ -322,6 +328,7 @@ class service_device implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_device_log_manage.includes(ctx.subject),
   }
 }
@@ -501,6 +508,7 @@ class service_geolocation implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_location_ingest: (profile_user | service_geolocation)[]
     granted_area_view: (profile_user | service_geolocation)[]
@@ -516,6 +524,7 @@ class service_geolocation implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_location_ingest.includes(ctx.subject),
 
     area_view: (ctx: Context): boolean =>
@@ -523,12 +532,14 @@ class service_geolocation implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_area_view.includes(ctx.subject),
 
     area_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_area_manage.includes(ctx.subject),
 
     route_view: (ctx: Context): boolean =>
@@ -536,12 +547,14 @@ class service_geolocation implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_route_view.includes(ctx.subject),
 
     route_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_route_manage.includes(ctx.subject),
 
     track_view: (ctx: Context): boolean =>
@@ -549,6 +562,7 @@ class service_geolocation implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_track_view.includes(ctx.subject),
 
@@ -557,6 +571,7 @@ class service_geolocation implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_nearby_view.includes(ctx.subject),
   }
@@ -1355,6 +1370,7 @@ class service_profile implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_profile_view: (profile_user | service_profile)[]
     granted_profile_create: (profile_user | service_profile)[]
@@ -1374,29 +1390,34 @@ class service_profile implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_profile_view.includes(ctx.subject),
 
     profile_create: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_profile_create.includes(ctx.subject),
 
     profile_update: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_profile_update.includes(ctx.subject),
 
     profile_merge: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_profile_merge.includes(ctx.subject),
 
     contact_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_contact_manage.includes(ctx.subject),
 
     roster_view: (ctx: Context): boolean =>
@@ -1404,6 +1425,7 @@ class service_profile implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_roster_view.includes(ctx.subject),
 
@@ -1411,11 +1433,13 @@ class service_profile implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_roster_manage.includes(ctx.subject),
 
     address_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_address_manage.includes(ctx.subject),
 
     relationship_view: (ctx: Context): boolean =>
@@ -1423,12 +1447,14 @@ class service_profile implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_relationship_view.includes(ctx.subject),
 
     relationship_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_relationship_manage.includes(ctx.subject),
   }
 }
@@ -1533,6 +1559,7 @@ class service_setting implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_setting_view: (profile_user | service_setting)[]
     granted_setting_manage: (profile_user | service_setting)[]
@@ -1544,12 +1571,14 @@ class service_setting implements Namespace {
       this.related.member.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_setting_view.includes(ctx.subject),
 
     setting_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_setting_manage.includes(ctx.subject),
   }
 }
@@ -1861,5 +1890,37 @@ class file_upload implements Namespace {
 
     status: (ctx: Context): boolean =>
       this.related.granted_uploader.includes(ctx.subject),
+  }
+}
+
+class service_ocr implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_ocr_submit: (profile_user | service_ocr)[]
+    granted_ocr_status_view: (profile_user | service_ocr)[]
+  }
+
+  permits = {
+    ocr_submit: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ocr_submit.includes(ctx.subject),
+
+    ocr_status_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ocr_status_view.includes(ctx.subject),
   }
 }
