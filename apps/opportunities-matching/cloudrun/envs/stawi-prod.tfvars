@@ -1,5 +1,5 @@
 # GHCR packages are private; Cloud Run pulls from project AR mirror.
-image = "europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/opportunities-matching:v8.0.214"
+image = "europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/opportunities-matching:v8.0.215"
 container_port = 8080
 resource_path = "/matching"
 memory        = "1Gi"
