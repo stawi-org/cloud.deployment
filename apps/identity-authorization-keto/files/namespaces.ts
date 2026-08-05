@@ -1711,3 +1711,127 @@ class service_trustage implements Namespace {
       this.related.granted_signal_send.includes(ctx.subject),
   }
 }
+
+class file implements Namespace {
+  related: {
+    granted_owner: profile_user[]
+    granted_viewer: profile_user[]
+    granted_editor: profile_user[]
+    granted_uploader: profile_user[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject) ||
+      this.related.granted_viewer.includes(ctx.subject),
+
+    edit: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject) ||
+      this.related.granted_editor.includes(ctx.subject),
+
+    delete: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    upload: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject) ||
+      this.related.granted_uploader.includes(ctx.subject),
+
+    stats: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    share: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    retention_set: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    lock: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+  }
+}
+
+// file_version namespace represents historical versions of files.
+// Inherits permissions from the parent file.
+
+class file_version implements Namespace {
+  related: {
+    parent: file[]
+    creator: profile_user[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.parent.traverse((f) => f.permits.view(ctx)),
+
+    delete: (ctx: Context): boolean =>
+      this.related.parent.traverse((f) => f.permits.delete(ctx)),
+
+    restore: (ctx: Context): boolean =>
+      this.related.parent.traverse((f) => f.permits.edit(ctx)),
+  }
+}
+
+// file_retention_policy namespace represents retention policies
+// that can be applied to files.
+
+class file_retention_policy implements Namespace {
+  related: {
+    granted_owner: profile_user[]
+    files: file[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    update: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    delete: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+
+    apply: (ctx: Context): boolean =>
+      this.related.granted_owner.includes(ctx.subject),
+  }
+}
+
+// file_thumbnail namespace represents thumbnails generated from files.
+// Permissions inherit from the parent file.
+
+class file_thumbnail implements Namespace {
+  related: {
+    parent: file[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.parent.traverse((f) => f.permits.view(ctx)),
+
+    regenerate: (ctx: Context): boolean =>
+      this.related.parent.traverse((f) => f.permits.edit(ctx)),
+  }
+}
+
+// file_upload namespace represents multipart upload sessions.
+// Tracks in-progress uploads.
+
+class file_upload implements Namespace {
+  related: {
+    granted_uploader: profile_user[]
+    target_file: file[]
+  }
+
+  permits = {
+    write: (ctx: Context): boolean =>
+      this.related.granted_uploader.includes(ctx.subject),
+
+    complete: (ctx: Context): boolean =>
+      this.related.granted_uploader.includes(ctx.subject),
+
+    cancel: (ctx: Context): boolean =>
+      this.related.granted_uploader.includes(ctx.subject),
+
+    status: (ctx: Context): boolean =>
+      this.related.granted_uploader.includes(ctx.subject),
+  }
+}
