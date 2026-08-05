@@ -35,6 +35,7 @@ prod:
       /settings: { service: platform-settings, project: stawi-platform }
       /geolocation: { service: platform-geolocation, project: stawi-platform }
       /files: { service: platform-files, project: stawi-platform }
+      /chat-agent: { service: platform-chat-agent, project: stawi-platform }
       /audit: { service: operations-audit, project: stawi-operations }
       /formstore: { service: operations-formstore, project: stawi-operations }
       /queuestore: { service: operations-queuestore, project: stawi-operations }

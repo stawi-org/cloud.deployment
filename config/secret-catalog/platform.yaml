@@ -13,12 +13,37 @@ shared:
   - id: hydra-webhook-psk
     description: OAuth private_key_jwt signer PSK (same value as identity)
     required: true
-    used_by: [platform-devices, platform-settings, platform-geolocation, platform-files]
+    used_by: [platform-devices, platform-settings, platform-geolocation, platform-files, platform-chat-agent]
     source_hints:
       - "k8s: platform/hydra-webhook-psk psk (or identity/hydra-webhook-psk)"
       - "scripts/sync-cluster-secrets-to-gcp.sh"
 
 apps:
+  platform-chat-agent:
+    runtime_secrets:
+      - id: platform-chat-agent-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: platform-chat-agent-database-url-direct
+        managed_by_tofu: true
+        notes: "Neon direct (migrate/setup Job)"
+      - id: hydra-webhook-psk
+        shared: true
+      - id: platform-chat-agent-inference-api-keys
+        env: INFERENCE_API_KEYS
+        required: true
+        notes: "Comma-separated Google AI / Gemini keys (priority order; sticky failover)"
+        source_hints:
+          - "Google AI Studio API keys"
+          - "./scripts/seed-gcp-secrets.sh --project stawi-platform --set platform-chat-agent-inference-api-keys=..."
+      - id: platform-chat-agent-inference-secondary-api-keys
+        env: INFERENCE_SECONDARY_API_KEYS
+        required: false
+        notes: "Optional OpenAI key pool; map in secret_env_extra when seeded"
+        source_hints:
+          - "OpenAI API keys"
+          - "./scripts/seed-gcp-secrets.sh --project stawi-platform --set platform-chat-agent-inference-secondary-api-keys=..."
+
   platform-files:
     runtime_secrets:
       - id: platform-files-database-url
