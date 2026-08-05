@@ -33,6 +33,9 @@ on:
       CLOUDFLARE_API_TOKEN:
         required: false
         description: Zone DNS Edit on stawi.org — required for edge-lb-* apps
+      GHCR_TOKEN:
+        required: false
+        description: Optional PAT with read:packages — mirrors private GHCR images into project AR ghcr-mirror
 
 jobs:
   run:
@@ -112,6 +115,67 @@ jobs:
       - name: Set up gcloud CLI
         if: steps.auth.outcome == 'success'
         uses: google-github-actions/setup-gcloud@v2
+
+      # Cloud Run pulls from project AR ghcr-mirror (STANDARD repo). When the pin
+      # points at a missing tag, copy from GHCR so apply does not deploy a ghost image.
+      - name: Mirror GHCR image into AR ghcr-mirror if missing
+        if: inputs.mode == 'apply' && steps.auth.outcome == 'success' && startsWith(inputs.app, 'opportunities-')
+        env:
+          APP: ${{ inputs.app }}
+          ENV_NAME: ${{ inputs.env }}
+          PROJECT_ID: ${{ steps.creds.outputs.project_id }}
+          REGION: ${{ steps.creds.outputs.region }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          TFVARS="apps/${APP}/cloudrun/envs/${ENV_NAME}.tfvars"
+          if [[ ! -f "$TFVARS" ]]; then
+            echo "No ${TFVARS} — skip mirror"
+            exit 0
+          fi
+          IMAGE=$(grep -E '^\s*image\s*=' "$TFVARS" | head -1 | sed -E 's/.*=\s*"([^"]+)".*/\1/')
+          if [[ -z "$IMAGE" ]]; then
+            echo "No image= in tfvars — skip mirror"
+            exit 0
+          fi
+          # Only auto-mirror our opportunities AR pins:
+          # europe-west1-docker.pkg.dev/stawi-opportunities/ghcr-mirror/<name>:<tag>
+          if [[ "$IMAGE" != *"/ghcr-mirror/"* ]]; then
+            echo "Image is not ghcr-mirror (${IMAGE}) — skip mirror"
+            exit 0
+          fi
+          NAME_TAG="${IMAGE##*/ghcr-mirror/}"
+          NAME="${NAME_TAG%%:*}"
+          TAG="${NAME_TAG##*:}"
+          if [[ -z "$NAME" || -z "$TAG" || "$NAME" == "$TAG" ]]; then
+            echo "::warning::Could not parse name:tag from ${IMAGE}"
+            exit 0
+          fi
+          echo "Checking AR for ${IMAGE}"
+          if gcloud artifacts docker images describe "${IMAGE}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            echo "AR already has ${IMAGE}"
+            exit 0
+          fi
+          echo "::notice::AR missing ${IMAGE} — mirroring from GHCR"
+          if ! command -v crane >/dev/null; then
+            curl -sL "https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz" \
+              | sudo tar -xz -C /usr/local/bin crane
+          fi
+          SRC="ghcr.io/stawi-opportunities/${NAME}:${TAG}"
+          if [[ -n "${GHCR_TOKEN:-}" ]]; then
+            echo "${GHCR_TOKEN}" | crane auth login ghcr.io -u x-access-token --password-stdin
+          else
+            echo "::warning::GHCR_TOKEN not set — attempting anonymous pull (package must be public)"
+          fi
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          bash scripts/mirror-ghcr-to-ar.sh \
+            --project "${PROJECT_ID}" \
+            --location "${REGION}" \
+            --repo ghcr-mirror \
+            --src "${SRC}" \
+            --name "${NAME}" \
+            --tag "${TAG}"
 
       - name: Configure R2 credentials for backend
         env:

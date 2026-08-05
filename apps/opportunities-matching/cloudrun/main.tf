@@ -64,8 +64,10 @@ module "frame" {
   push_oidc_audience          = local.push_oidc_audience
   use_http2                   = true
   permissions_registration    = false
-  startup_probe_path          = "/healthz"
-  liveness_probe_path         = "/healthz"
+  # Frame serves /readyz (readiness) and /livez (liveness). /healthz returns
+  # Google Frontend HTML 404 on h2c Cloud Run for several Frame services.
+  startup_probe_path          = "/readyz"
+  liveness_probe_path         = "/livez"
 
   # Default {app}-events plus product fan-out / CV embed / worker-embed topics.
   create_default_events_topic = true

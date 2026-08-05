@@ -160,9 +160,9 @@
       "prefix": "/chat-agent",
       "service": "platform-chat-agent",
       "project": "stawi-platform",
-      "origin": "https://platform-chat-agent-PLACEHOLDER.run.app",
+      "origin": "https://platform-chat-agent-diujdvkz4a-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
@@ -170,7 +170,7 @@
         "description": "Context-driven conversational data collection (placement intake, opportunity side-chat).",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Disabled until platform-chat-agent Cloud Run ship sets real origin; re-enable via refresh-origins after ship."
+      "notes": "Live platform-chat-agent on stawi-platform; origins refreshed from Cloud Run."
     },
     {
       "id": "geolocation",
