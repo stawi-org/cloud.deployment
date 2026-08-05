@@ -299,11 +299,10 @@ jobs:
             fi
           }
 
-          # Frame stacks: skip Pub/Sub import (full apply owns messaging after state mv).
-          # Still import orphaned SM secret *shells* that exist in GCP but not in state
-          # (otherwise apply 409s on google_secret_manager_secret).
+          # Frame stacks: import orphaned SM secret *shells* and any messaging
+          # topics/subscriptions that exist in GCP but not in state (409 on create).
           if [[ "$USE_FRAME" == "true" ]]; then
-            echo "module.frame present — skip Pub/Sub import; import orphaned SM shells if any"
+            echo "module.frame present — import orphaned SM shells + messaging if any"
             # Import any SM secret whose id starts with the app name (covers
             # database-url, extra_secret_ids, OAuth shells, etc.). Prevents 409
             # when secrets exist in GCP but not in state after region moves.
@@ -330,6 +329,45 @@ jobs:
                     "projects/${PROJECT_ID}/secrets/${sid}"
                 fi
               done
+            fi
+
+            # Messaging keys used by Frame apps (name may differ from key).
+            # Import when the GCP resource exists so apply does not 409.
+            MSG_PREFIX='module.frame.module.messaging[0]'
+            # topic_key -> topic name candidates
+            import_topic_key() {
+              local key="$1"; shift
+              local name
+              for name in "$@"; do
+                if gcloud pubsub topics describe "$name" --project="$PROJECT_ID" >/dev/null 2>&1; then
+                  import_if_missing "${MSG_PREFIX}.google_pubsub_topic.this[\"${key}\"]" \
+                    "projects/${PROJECT_ID}/topics/${name}"
+                  return 0
+                fi
+              done
+            }
+            import_sub_key() {
+              local key="$1"; shift
+              local name
+              for name in "$@"; do
+                if gcloud pubsub subscriptions describe "$name" --project="$PROJECT_ID" >/dev/null 2>&1; then
+                  import_if_missing "${MSG_PREFIX}.google_pubsub_subscription.this[\"${key}\"]" \
+                    "projects/${PROJECT_ID}/subscriptions/${name}"
+                  return 0
+                fi
+              done
+            }
+            # opportunities-matching product messaging (+ generic events topic)
+            import_topic_key events "${APP}-events"
+            import_topic_key fanout "opportunities-fanout" "${APP}-fanout"
+            import_topic_key cv_embed "opportunities-cv-embed" "${APP}-cv-embed"
+            import_topic_key worker_embed "opportunities-worker-embed" "${APP}-worker-embed"
+            import_sub_key fanout "opportunities-fanout-push" "${APP}-fanout-push"
+            import_sub_key cv_embed "opportunities-cv-embed-push" "${APP}-cv-embed-push"
+            import_sub_key worker_embed "opportunities-worker-embed-pull" "${APP}-worker-embed-pull" "${APP}-worker-embed"
+            if gcloud pubsub topics describe "${APP}-events-dlq" --project="$PROJECT_ID" >/dev/null 2>&1; then
+              import_if_missing "${MSG_PREFIX}.google_pubsub_topic.dlq[0]" \
+                "projects/${PROJECT_ID}/topics/${APP}-events-dlq"
             fi
             exit 0
           fi
