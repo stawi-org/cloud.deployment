@@ -40,8 +40,11 @@ module "frame" {
 
   use_http2                = true
   permissions_registration = true
-  memory                   = "512Mi"
-  cpu                      = "1"
+  # Edge api.stawi.org/chat-agent proxies without a Google ID token; app-layer
+  # OAuth still protects RPC methods (unauthenticated → 401, not Cloud Run 403).
+  exposure = "public"
+  memory   = "512Mi"
+  cpu      = "1"
 
   app_env = {
     SECURELY_RUN_SERVICE = "true"
