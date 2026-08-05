@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-notification-integration-africastalking:v1.21.57"
+image                    = "ghcr.io/antinvestor/service-notification-integration-africastalking:v1.21.58"
 resource_path            = "/notification-africastalking"
 has_database             = false
 memory                   = "512Mi"

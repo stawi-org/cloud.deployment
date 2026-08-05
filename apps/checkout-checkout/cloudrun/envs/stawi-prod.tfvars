@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-payment-checkout:v0.5.104"
+image                    = "ghcr.io/antinvestor/service-payment-checkout:v0.5.105"
 resource_path            = "/checkout"
 has_database             = true
 memory                   = "512Mi"
