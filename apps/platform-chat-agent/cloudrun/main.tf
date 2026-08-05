@@ -43,6 +43,9 @@ module "frame" {
   # Edge api.stawi.org/chat-agent proxies without a Google ID token; app-layer
   # OAuth still protects RPC methods (unauthenticated → 401, not Cloud Run 403).
   exposure = "public"
+  # Frame probes (avoid broken /healthz on h2c Cloud Run)
+  startup_probe_path  = "/readyz"
+  liveness_probe_path = "/livez"
   memory   = "512Mi"
   cpu      = "1"
 
