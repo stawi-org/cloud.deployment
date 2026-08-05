@@ -86,8 +86,9 @@ module "frame" {
 
     # --- Sticky multi-key inference (service-profile apps/chatagent/llm) ---
     # Primary: Gemini OpenAI-compat (keys in INFERENCE_API_KEYS secret).
+    # gemini-2.0-flash is retired for new traffic; 3.6-flash verified via OpenAI-compat.
     INFERENCE_PROVIDER = "google"
-    INFERENCE_MODEL    = "gemini-2.0-flash"
+    INFERENCE_MODEL    = "gemini-3.6-flash"
     # Secondary: OpenAI after all Google keys are degraded (cooldown then prefer primary).
     # App ignores secondary until INFERENCE_SECONDARY_API_KEYS has real values.
     INFERENCE_SECONDARY_PROVIDER = "openai"

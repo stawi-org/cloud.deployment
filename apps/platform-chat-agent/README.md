@@ -34,7 +34,7 @@ Chat agent uses **sticky primary-with-failover** (not round-robin):
 | Env | Value |
 |-----|--------|
 | `INFERENCE_PROVIDER` | `google` |
-| `INFERENCE_MODEL` | `gemini-2.0-flash` |
+| `INFERENCE_MODEL` | `gemini-3.6-flash` |
 | `INFERENCE_API_KEYS` | Secret Manager → ordered Google AI keys |
 | `INFERENCE_SECONDARY_PROVIDER` | `openai` (active only when secondary keys are mapped) |
 | `INFERENCE_SECONDARY_MODEL` | `gpt-4o-mini` |
