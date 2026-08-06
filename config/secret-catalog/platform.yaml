@@ -38,10 +38,10 @@ apps:
           - "./scripts/seed-gcp-secrets.sh --project stawi-platform --set platform-chat-agent-inference-api-keys=..."
       - id: platform-chat-agent-inference-secondary-api-keys
         env: INFERENCE_SECONDARY_API_KEYS
-        required: false
-        notes: "Optional OpenAI key pool; map in secret_env_extra when seeded"
+        required: true
+        notes: "NVIDIA Build nvapi key(s) for OpenAI-compat secondary (integrate.api.nvidia.com)"
         source_hints:
-          - "OpenAI API keys"
+          - "NVIDIA Build / NGC API key (nvapi-…)"
           - "./scripts/seed-gcp-secrets.sh --project stawi-platform --set platform-chat-agent-inference-secondary-api-keys=..."
 
   platform-files:

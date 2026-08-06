@@ -36,8 +36,10 @@ Chat agent uses **sticky primary-with-failover** (not round-robin):
 | `INFERENCE_PROVIDER` | `google` |
 | `INFERENCE_MODEL` | `gemini-3.6-flash` |
 | `INFERENCE_API_KEYS` | Secret Manager → ordered Google AI keys |
-| `INFERENCE_SECONDARY_PROVIDER` | `openai` (active only when secondary keys are mapped) |
-| `INFERENCE_SECONDARY_MODEL` | `gpt-4o-mini` |
+| `INFERENCE_SECONDARY_PROVIDER` | `custom` (NVIDIA Build OpenAI-compat) |
+| `INFERENCE_SECONDARY_BASE_URL` | `https://integrate.api.nvidia.com` |
+| `INFERENCE_SECONDARY_MODEL` | `meta/llama-3.1-8b-instruct` |
+| `INFERENCE_SECONDARY_API_KEYS` | Secret Manager NVIDIA `nvapi-…` key(s) |
 | `INFERENCE_FAILOVER_COOLDOWN` | `2m` |
 | `NOTIFICATION_SERVICE_URI` | `https://api.stawi.org/notification` |
 
@@ -55,9 +57,9 @@ Provider defaults (in app code):
 ./scripts/seed-gcp-secrets.sh --project stawi-platform \
   --set platform-chat-agent-inference-api-keys="AIza…primary,AIza…backup"
 
-# Optional OpenAI pool (after enabling secret_env_extra map in main.tf)
+# Secondary: NVIDIA Build API key (OpenAI-compat at integrate.api.nvidia.com)
 ./scripts/seed-gcp-secrets.sh --project stawi-platform \
-  --set platform-chat-agent-inference-secondary-api-keys="sk-…primary,sk-…backup"
+  --set platform-chat-agent-inference-secondary-api-keys="nvapi-…"
 ```
 
 Or:
@@ -66,20 +68,20 @@ Or:
 printf '%s' 'AIza…primary,AIza…backup' | gcloud secrets versions add \
   platform-chat-agent-inference-api-keys \
   --project=stawi-platform --data-file=-
+
+printf '%s' 'nvapi-…' | gcloud secrets versions add \
+  platform-chat-agent-inference-secondary-api-keys \
+  --project=stawi-platform --data-file=-
 ```
 
 Tofu creates the secret **shells** (`extra_secret_ids`). A Cloud Run revision
-that mounts `INFERENCE_API_KEYS` will not start until the primary secret has
-at least one version.
+that mounts these secrets will not start until each mapped secret has at least
+one version.
 
-### Enable OpenAI secondary
+### Failover chain
 
-1. Seed `platform-chat-agent-inference-secondary-api-keys`.
-2. Uncomment `INFERENCE_SECONDARY_API_KEYS` in `cloudrun/main.tf` `secret_env_extra`.
-3. Re-apply: `gh workflow run app-apply.yml -f app=platform-chat-agent -f env=stawi-prod`
-
-Until secondary keys are mapped, the app runs **Google multi-key only**
-(secondary provider env is ignored when keys are absent).
+1. Google `gemini-3.6-flash` keys (`INFERENCE_API_KEYS`) — sticky primary  
+2. NVIDIA `meta/llama-3.1-8b-instruct` via `https://integrate.api.nvidia.com` — after primary degrades
 
 ## Omnichannel
 
