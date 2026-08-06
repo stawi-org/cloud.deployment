@@ -72,10 +72,9 @@ module "frame" {
     # Ordered primary keys: "key1,key2,key3" (sticky failover within Google).
     # REQUIRED: seed a version before Cloud Run can start this revision.
     INFERENCE_API_KEYS = { secret = local.inference_primary_secret }
-    # Secondary OpenAI pool: map when seeded (see README). Shell exists via
-    # extra_secret_ids so operators can add versions without a tofu change first.
-    # Uncomment after: gcloud secrets versions add platform-chat-agent-inference-secondary-api-keys ...
-    # INFERENCE_SECONDARY_API_KEYS = { secret = local.inference_secondary_secret }
+    # Secondary NVIDIA Build (OpenAI-compat) after primary keys degrade.
+    # Seed OOB: platform-chat-agent-inference-secondary-api-keys (nvapi-…)
+    INFERENCE_SECONDARY_API_KEYS = { secret = local.inference_secondary_secret }
   }
 
   app_env = {
@@ -89,10 +88,11 @@ module "frame" {
     # gemini-2.0-flash is retired for new traffic; 3.6-flash verified via OpenAI-compat.
     INFERENCE_PROVIDER = "google"
     INFERENCE_MODEL    = "gemini-3.6-flash"
-    # Secondary: OpenAI after all Google keys are degraded (cooldown then prefer primary).
-    # App ignores secondary until INFERENCE_SECONDARY_API_KEYS has real values.
-    INFERENCE_SECONDARY_PROVIDER = "openai"
-    INFERENCE_SECONDARY_MODEL    = "gpt-4o-mini"
+    # Secondary: NVIDIA Build OpenAI-compatible API (integrate.api.nvidia.com).
+    # Used only after Google keys are degraded; cooldown then prefer primary again.
+    INFERENCE_SECONDARY_PROVIDER = "custom"
+    INFERENCE_SECONDARY_BASE_URL = "https://integrate.api.nvidia.com"
+    INFERENCE_SECONDARY_MODEL    = "meta/llama-3.1-8b-instruct"
     INFERENCE_FAILOVER_COOLDOWN  = "2m"
   }
 }
