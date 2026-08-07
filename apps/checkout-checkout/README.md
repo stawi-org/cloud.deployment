@@ -4,7 +4,7 @@ Cloud Run app on **`stawi-payments`** (gcp.account: `payments`).
 
 | Field | Value |
 |-------|--------|
-| Image | `ghcr.io/antinvestor/service-payment-checkout:v0.5.108` |
+| Image | `ghcr.io/antinvestor/service-payment-checkout:v0.5.109` |
 | Path | `/checkout` |
 | Neon | `payments` |
 | Database | `True` |
