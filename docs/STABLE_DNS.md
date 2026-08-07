@@ -13,6 +13,7 @@ Apps and clients should only use **hostnames we control**. Backends
 | `oauth2-w.stawi.org` | Hydra **admin** (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
 | `authz.stawi.org` | Keto read gRPC (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
 | `authz-w.stawi.org` | Keto write gRPC (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
+| `pay.stawi.org` | Hosted checkout UI | CF grey CNAME → `ghs.googlehosted.com` | Cloud Run domain mapping (`checkout-checkout`) |
 
 **Do not put `*.run.app` in app env** except temporary break-glass. Runtime
 config uses the table above (`modules/frame-cloudrun-app`).

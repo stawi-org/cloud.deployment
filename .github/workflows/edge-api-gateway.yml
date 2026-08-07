@@ -99,11 +99,17 @@ jobs:
           set -euo pipefail
           sleep 12
           GATEWAY_BASE=https://api.stawi.org npm run smoke
-          echo "---- accounts / oauth2 ----"
+          echo "---- accounts / oauth2 / pay ----"
           for u in \
             https://accounts.stawi.org/readyz \
-            https://oauth2.stawi.org/health/ready; do
+            https://oauth2.stawi.org/health/ready \
+            https://pay.stawi.org/; do
             code=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 25 "$u" || echo ERR)
             echo "$code $u"
-            [[ "$code" == "200" ]] || { head -c 200 /tmp/body; echo; exit 1; }
+            # pay may return 404 on / when mapping is healthy; accept any non-5xx/ERR
+            if [[ "$u" == https://pay.stawi.org/* ]]; then
+              [[ "$code" =~ ^[1234][0-9][0-9]$ ]] || { head -c 200 /tmp/body; echo; exit 1; }
+            else
+              [[ "$code" == "200" ]] || { head -c 200 /tmp/body; echo; exit 1; }
+            fi
           done

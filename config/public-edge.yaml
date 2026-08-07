@@ -60,6 +60,9 @@ prod:
     - hostname: authz-w.stawi.org
       service: identity-authorization-keto-write
       project: stawi-identity
+    - hostname: pay.stawi.org
+      service: checkout-checkout
+      project: stawi-payments
 
   # Interim orange CNAME → Cloud Run (managed by edge/cloudflare-api-gateway ensure-cf-dns)
   cloudflare_direct_cnames:

@@ -94,7 +94,10 @@ cd edge/cloudflare-api-gateway && npm run refresh-origins
 gh workflow run edge-api-gateway.yml
 ```
 
-Hosted checkout UI: **`pay.stawi.org`** CF CNAME → `checkout-checkout` `*.run.app` (not the Worker path). Merchant API remains `api.stawi.org/checkout`.
+Hosted checkout UI: **`pay.stawi.org`** Cloud Run domain mapping → `checkout-checkout`
+(DNS: grey CNAME `pay` → `ghs.googlehosted.com`; managed by
+`edge/cloudflare-api-gateway/scripts/ensure-cf-domain-mapping-dns.mjs`). Merchant API
+remains `api.stawi.org/checkout`.
 
 ## Ship (images)
 

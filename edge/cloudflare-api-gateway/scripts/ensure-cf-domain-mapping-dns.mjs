@@ -8,7 +8,8 @@
 const ZONE = process.env.CLOUDFLARE_ZONE_ID || "706bf604a333d866bb38c03bf643e79a";
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const TARGET = "ghs.googlehosted.com";
-const HOSTS = (process.env.DOMAIN_MAP_HOSTS || "accounts,oauth2,oauth2-w,authz,authz-w")
+// Hosted checkout UI (pay) uses Cloud Run domain mapping on stawi-payments.
+const HOSTS = (process.env.DOMAIN_MAP_HOSTS || "accounts,oauth2,oauth2-w,authz,authz-w,pay")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
