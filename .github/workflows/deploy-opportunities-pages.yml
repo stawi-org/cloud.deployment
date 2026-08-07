@@ -1,0 +1,68 @@
+# One-shot / ops: build opportunities Hugo+Vite UI and deploy to Cloudflare Pages.
+# Uses CLOUDFLARE_API_TOKEN (same as edge-api-gateway).
+name: deploy-opportunities-pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: opportunities git ref (branch/tag/sha)
+        type: string
+        default: main
+      project_name:
+        description: Cloudflare Pages project name
+        type: string
+        default: opportunities
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout opportunities
+        uses: actions/checkout@v4
+        with:
+          repository: stawi-opportunities/opportunities
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.DEPLOY_REPO_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            ui/app/package-lock.json
+            ui/admin/package-lock.json
+
+      - name: Build UI (make ui-build)
+        run: make ui-build
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'c358ea38bde6fd03d13bf87068635230' }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN required"
+            exit 1
+          fi
+          # Resolve project if default name is wrong
+          if [[ "$PROJECT_NAME" == "opportunities" ]]; then
+            list=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects" || true)
+            echo "$list" | head -c 2000
+            for cand in opportunities opportunities-stawi-org stawi-opportunities jobs-stawi-org stawi-jobs; do
+              if echo "$list" | grep -q "\"name\":\"$cand\""; then
+                PROJECT_NAME=$cand
+                break
+              fi
+            done
+            echo "Using Pages project: $PROJECT_NAME"
+          fi
+          npx --yes wrangler@4 pages deploy ui/public \
+            --project-name="$PROJECT_NAME" \
+            --branch=main \
+            --commit-dirty=true
