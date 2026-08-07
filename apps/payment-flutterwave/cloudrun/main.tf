@@ -45,6 +45,11 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-payment-flutterwave"
+  # Multi-queue (prompts/payments/events): OIDC aud must be service root so every
+  # Pub/Sub push subscription shares one audience with FRAME_QUEUE_PUSH_OIDC_AUDIENCE.
+  # Path-specific event audiences cause "audience mismatch" and leave charges stuck
+  # on "Securing your payment…".
+  push_oidc_audience = local.push_oidc_audience
 
   extra_secret_ids  = toset([
     "flutterwave-client-id",

@@ -45,6 +45,8 @@ module "frame" {
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-payment-pawapay"
+  # Multi-queue rails: shared OIDC audience = service root (not events path).
+  push_oidc_audience = local.push_oidc_audience
 
   extra_secret_ids  = toset([
     "pawapay-api-token",
