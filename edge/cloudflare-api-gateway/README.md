@@ -8,9 +8,11 @@ https://api.stawi.org/            →  Scalar hub
 https://api.stawi.org/profile/…   →  path proxy → identity-profile
 ```
 
-`accounts` / `oauth2*` / `authz*` are **not** on this Worker and need **no Google LB**.
-Deploy ensures orange **CNAME → `*.run.app`** plus Origin Rule Host rewrite
-(`scripts/ensure-cf-dns.mjs`, `ensure-cf-origin-rules.mjs`). See [docs/STABLE_DNS.md](../../docs/STABLE_DNS.md).
+`pay` / `accounts` / `oauth2*` / `authz*` are **not** on this Worker and need **no Google LB**
+and **no Google managed domain cert**. Deploy ensures orange **CNAME → `*.run.app`**
+plus Origin Rule Host rewrite (`scripts/ensure-cf-dns.mjs`,
+`ensure-cf-origin-rules.mjs`). `pay.stawi.org` is CF direct only. See
+[docs/STABLE_DNS.md](../../docs/STABLE_DNS.md).
 
 ## Scalar hub
 

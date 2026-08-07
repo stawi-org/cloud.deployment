@@ -1,15 +1,17 @@
 # SSL and edge policy (canonical)
 
-**Goal:** best security + UX with low cost.  
-**Region:** production Cloud Run is **`europe-west1`** (domain mapping supported).  
-**Constraint (historical):** classic domain mapping was unavailable in `europe-west9` (501).
+**Goal:** best security + UX with low cost — **no wait on Google managed certs for
+browser checkout**.  
+**Region:** production Cloud Run defaults to **`europe-west1`**. CF direct mapping
+works in **any** region; domain mapping does not.
 
 ## Summary
 
 | Hostname / surface | Client TLS | Edge | Origin | Cloudflare proxy |
 |--------------------|------------|------|--------|------------------|
 | **`api.stawi.org`** (product APIs + Scalar) | Cloudflare Universal SSL | **Worker path proxy only** | Cloud Run `*.run.app` | **Orange** |
-| **`accounts.stawi.org`** (login UI) | CF Universal SSL **or** Google managed cert | Preferred: **Cloud Run domain mapping** + DNS records Google prints; interim: CF CNAME + Host rewrite | `identity-authentication` | Orange (CF path) or grey (native) |
+| **`pay.stawi.org`** (hosted checkout) | **CF Universal SSL** | **CF direct mapping** (orange CNAME + Origin Host rewrite) | `checkout-checkout` | **Orange** |
+| **`accounts.stawi.org`** (login UI) | CF Universal SSL **or** Google managed cert | CF direct default; optional domain-mapping DNS overlay | `identity-authentication` | Orange (CF) or grey (native) |
 | **`oauth2.stawi.org`** (OIDC public) | same | same | `identity-oauth2-hydra` | same |
 | **`oauth2-w.stawi.org`** (Hydra admin) | same | same + IAM | `identity-oauth2-hydra-admin` | same |
 | **`authz.stawi.org` / `authz-w`** (Keto) | same | same + IAM | keto read/write | same |
@@ -21,42 +23,59 @@ There are **no** product hosts (`profile.stawi.org`, `devices.*`, …) — only 
 ### Cloudflare Worker — **api.stawi.org only**
 
 - Path routing + Scalar multi-API hub  
-- Does **not** front `oauth2` / `accounts` / control-plane hosts long-term  
+- Does **not** front `pay` / `oauth2` / `accounts` long-term  
 
-### Control-plane + login hosts — prefer Cloud Run domain mapping
+### Browser + control-plane hosts — **CF direct mapping first**
 
-In **`europe-west1`**, map each FQDN with:
+```
+Client TLS: Cloudflare Universal SSL (immediate)
+DNS:        orange CNAME → <service>-….run.app
+Origin:     Origin Rule rewrites Host + origin host to that run.app name
+SSL mode:   Full (strict) — origin presents Google’s run.app cert
+```
+
+Implemented by:
+
+- `direct_cnames` in `edge/cloudflare-api-gateway/config/routes.prod.json`
+- `scripts/ensure-cf-dns.mjs`
+- `scripts/ensure-cf-origin-rules.mjs` (always on deploy)
+- Free fallback: `scripts/ensure-cf-worker-host-fallback.mjs` (skips domain-mapped hosts)
+
+**`pay.stawi.org` is CF direct only** (`edge: cf_direct`). Do not create a Cloud Run
+domain mapping for pay and do not add `pay` to `DOMAIN_MAP_HOSTS`.
+
+### Optional: Cloud Run domain mapping (IAM overlay)
+
+In regions that support it (e.g. **`europe-west1`**):
 
 ```bash
 gcloud beta run domain-mappings create \
   --service=SERVICE --domain=FQDN --region=europe-west1 --project=PROJECT
 ```
 
-Then install the **resourceRecords** Google returns (A/AAAA/CNAME) at Cloudflare.  
-Cloud Run accepts `Host: FQDN` natively — **no Worker Host rewrite, no Google LB**.
+Then grey CNAME → `ghs.googlehosted.com` via `ensure-cf-domain-mapping-dns.mjs`.
 
-Caveats (Google docs):
+Caveats:
 
-- Feature is **Preview**; Google still recommends Global HTTPS LB for some production cases  
-- Cert provisioning can take minutes–hours  
-- Verify `stawi.org` in Search Console first  
-- For IAM services, keep `custom_audiences = ["https://FQDN"]`
+- Feature is **Preview** and **region-gated** (historically 501 in `europe-west9`)
+- Cert provisioning can take **minutes–hours** and blocks HTTPS until Ready
+- Suitable as an optional IAM overlay — **not** for checkout UX
 
-### Interim (until domain mappings are ACTIVE)
-
-- Orange **CNAME** → `*.run.app` + Origin Rule Host rewrite  
-  (`ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`)  
-- Free fallback: Worker host proxy (`ensure-cf-worker-host-fallback.mjs`)  
-- Do **not** reintroduce Global LB unless domain mapping + CF both fail for gRPC
+Region migration context: [REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).  
+The region move unlocked domain mapping; **checkout must not depend on that feature**.
 
 ### Google Global HTTPS LB
 
 - Optional fallback only (`edge-lb-identity` with non-empty `hosts`)  
-- ~$18/mo; not required in `europe-west1` if domain mapping works  
+- ~$18/mo; not required when CF direct mapping works  
 
 ## Zone SSL
 
-Cloudflare zone mode: **Full (strict)** when origin presents a valid cert  
-(Google-managed domain-mapping cert, or run.app cert behind Host rewrite).
+Cloudflare zone mode: **Full (strict)**  
 
-See also: [docs/STABLE_DNS.md](./STABLE_DNS.md), [docs/REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).
+| Path | Origin cert |
+|------|-------------|
+| CF direct (Host rewrite to `*.run.app`) | Google-managed **run.app** cert |
+| Domain mapping (grey → ghs) | Google-managed **custom domain** cert |
+
+See also: [docs/STABLE_DNS.md](./STABLE_DNS.md).

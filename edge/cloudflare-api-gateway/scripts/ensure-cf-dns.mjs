@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Cloudflare DNS for the public edge (no Google LB for accounts/oauth2).
+ * Cloudflare DNS for the public edge (no Google LB; no Google managed certs).
  *
  * - api.stawi.org: proxied A → 192.0.2.1 (Worker terminates; dummy origin)
- * - direct_cnames (accounts, oauth2): proxied CNAME → Cloud Run *.run.app host
- *   (TLS at Cloudflare; origin is run.app — pair with ensure-cf-origin-rules.mjs
- *   so Host header is the run.app hostname Cloud Run expects)
+ * - direct_cnames (pay, accounts, oauth2*, authz*): proxied CNAME → Cloud Run
+ *   *.run.app host (TLS at Cloudflare Universal SSL; origin is run.app —
+ *   pair with ensure-cf-origin-rules.mjs so Host header is the run.app hostname
+ *   Cloud Run expects). This is CF direct mapping — works in any region.
  *
  * Env:
  *   CLOUDFLARE_API_TOKEN  (required)

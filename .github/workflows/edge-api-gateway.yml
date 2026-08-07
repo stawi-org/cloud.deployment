@@ -69,25 +69,29 @@ jobs:
             exit 1
           fi
           npx wrangler deploy
-          # Drop stale Worker routes for accounts/oauth2 (wrangler won't remove them)
+          # Drop stale Worker routes for direct_cnames (wrangler won't remove them)
           node scripts/ensure-cf-delete-worker-routes.mjs
-          # api → Worker A record (ensure-cf-dns); control-plane hosts use domain mapping.
+          # api → Worker dummy A; all direct_cnames → orange CNAME → *.run.app
+          # (CF Universal SSL; no Google managed cert). Includes pay.stawi.org.
           node scripts/ensure-cf-dns.mjs
-          # europe-west1 Cloud Run domain mappings (ghs.googlehosted.com, grey).
-          # Set USE_DOMAIN_MAPPING_DNS=false to fall back to orange CNAME + Host rewrite.
+          # Optional overlay: grey CNAME → ghs.googlehosted.com for IAM hosts only.
+          # Does NOT include pay — hosted checkout stays on CF direct mapping.
+          # Set USE_DOMAIN_MAPPING_DNS=false to leave every direct_cname on CF path.
           if [[ "${USE_DOMAIN_MAPPING_DNS:-true}" == "true" ]]; then
             node scripts/ensure-cf-domain-mapping-dns.mjs
-          else
-            set +e
-            node scripts/ensure-cf-origin-rules.mjs
-            OR_RC=$?
-            set -e
-            if [[ "$OR_RC" -eq 2 ]]; then
-              echo "::warning::Origin Host rules not applied. Enabling Worker host fallback."
-              node scripts/ensure-cf-worker-host-fallback.mjs
-            elif [[ "$OR_RC" -ne 0 ]]; then
-              exit "$OR_RC"
-            fi
+          fi
+          # Always apply Origin Host rewrite for CF-proxied direct_cnames (pay, and
+          # any host not greyed by domain-mapping DNS). Without this, Cloud Run
+          # sees Host: pay.stawi.org and returns Google 404 / CF 521.
+          set +e
+          node scripts/ensure-cf-origin-rules.mjs
+          OR_RC=$?
+          set -e
+          if [[ "$OR_RC" -eq 2 ]]; then
+            echo "::warning::Origin Host rules not applied. Enabling Worker host fallback for CF-direct hosts only."
+            node scripts/ensure-cf-worker-host-fallback.mjs
+          elif [[ "$OR_RC" -ne 0 ]]; then
+            exit "$OR_RC"
           fi
 
 
@@ -99,17 +103,19 @@ jobs:
           set -euo pipefail
           sleep 12
           GATEWAY_BASE=https://api.stawi.org npm run smoke
-          echo "---- accounts / oauth2 / pay ----"
+          echo "---- accounts / oauth2 / pay (CF direct or domain-map overlay) ----"
           for u in \
             https://accounts.stawi.org/readyz \
-            https://oauth2.stawi.org/health/ready \
-            https://pay.stawi.org/; do
+            https://oauth2.stawi.org/health/ready; do
             code=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 25 "$u" || echo ERR)
             echo "$code $u"
-            # pay may return 404 on / when mapping is healthy; accept any non-5xx/ERR
-            if [[ "$u" == https://pay.stawi.org/* ]]; then
-              [[ "$code" =~ ^[1234][0-9][0-9]$ ]] || { head -c 200 /tmp/body; echo; exit 1; }
-            else
-              [[ "$code" == "200" ]] || { head -c 200 /tmp/body; echo; exit 1; }
-            fi
+            [[ "$code" == "200" ]] || { head -c 200 /tmp/body; echo; exit 1; }
           done
+          # pay: CF direct path — any non-edge-failure proves Host rewrite works
+          pay_code=$(curl -sS -o /tmp/paybody -w "%{http_code}" --max-time 25 "https://pay.stawi.org/" || echo ERR)
+          echo "$pay_code https://pay.stawi.org/"
+          if [[ ! "$pay_code" =~ ^[1234][0-9][0-9]$ ]]; then
+            head -c 200 /tmp/paybody; echo
+            echo "::error::pay.stawi.org edge down (expected CF direct → checkout-checkout)"
+            exit 1
+          fi

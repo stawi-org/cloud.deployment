@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /**
- * Cloudflare Origin Rules: Host header = Cloud Run *.run.app for direct_cnames.
+ * Cloudflare Origin Rules: Host header + origin host = Cloud Run *.run.app
+ * for every direct_cnames entry (pay, accounts, oauth2*, authz*).
+ *
+ * This is what makes CF direct mapping work without Google domain mapping:
+ *   client → CF Universal SSL (Host: pay.stawi.org)
+ *         → Origin Rule rewrites Host/origin to checkout-checkout-….run.app
+ *         → Cloud Run serves the app (run.app cert; Full strict OK)
  *
  * Needs Zone permission for Rulesets (Zone.Zone Settings / Origin Rules edit).
  * Host-header override may also require a higher Cloudflare plan.
@@ -98,7 +104,7 @@ try {
       method: "POST",
       body: JSON.stringify({
         name: RULESET_NAME,
-        description: "Host header = Cloud Run *.run.app for accounts/oauth2 CNAMEs",
+        description: "Host header = Cloud Run *.run.app for direct_cnames (pay, accounts, oauth2, authz)",
         kind: "zone",
         phase: PHASE,
         rules,

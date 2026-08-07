@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
  * Free fallback when Origin Rule Host rewrite is unavailable:
- * attach Worker routes for direct_cnames hosts and ensure Worker DNS (proxied A).
+ * attach Worker routes for CF-direct hosts and ensure Worker DNS (proxied A).
  * The api gateway Worker already proxies host_routes when configured; this script
  * only creates zone Worker routes + dummy A records pointing traffic at the Worker.
  *
- * Preferred path remains: CNAME → run.app + Origin Rules (no Worker).
+ * Preferred path remains: orange CNAME → run.app + Origin Rules (no Worker).
+ *
+ * Skips short names in DOMAIN_MAP_HOSTS (default identity IAM hosts) so grey
+ * domain-mapping DNS is not clobbered when hybrid edge is enabled.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -17,6 +20,12 @@ const TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const WORKER = process.env.WORKER_NAME || "stawi-api-gateway";
 const DUMMY_A = "192.0.2.1";
 const ZONE_SUFFIX = ".stawi.org";
+const DOMAIN_MAPPED = new Set(
+  (process.env.DOMAIN_MAP_HOSTS || "accounts,oauth2,oauth2-w,authz,authz-w")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 if (!TOKEN) {
   console.error("CLOUDFLARE_API_TOKEN required");
@@ -26,10 +35,20 @@ if (!TOKEN) {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = join(root, "config/routes.prod.json");
 const config = JSON.parse(readFileSync(configPath, "utf8"));
-const directs = config.direct_cnames || [];
+const directs = (config.direct_cnames || []).filter((h) => {
+  const short = String(h.hostname || "")
+    .toLowerCase()
+    .replace(/\.$/, "")
+    .replace(/\.stawi\.org$/, "");
+  if (DOMAIN_MAPPED.has(short) || DOMAIN_MAPPED.has(h.id)) {
+    console.log(`skip domain-mapped host ${h.hostname} (Worker fallback would clobber grey DNS)`);
+    return false;
+  }
+  return true;
+});
 
 if (directs.length === 0) {
-  console.log("No direct_cnames — nothing to fall back");
+  console.log("No CF-direct hosts — nothing to fall back");
   process.exit(0);
 }
 

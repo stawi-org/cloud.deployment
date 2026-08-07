@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Worker: api.stawi.org only. All oauth2*/authz*/accounts: CF orange CNAME \u2192 Cloud Run (no Google LB). Stable DNS; switch backends by changing origin. See docs/STABLE_DNS.md.",
+  "description": "Worker: api.stawi.org only. Browser hosts (pay, accounts) and control-plane: CF orange CNAME \u2192 Cloud Run + Host rewrite (CF Universal SSL; no Google managed cert). Optional domain-mapping DNS overlay for IAM hosts only. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west1",
   "gateway": {
@@ -74,6 +74,16 @@
       "protocol": "grpc",
       "notes": "Keto write gRPC (IAM). Needs CF Host rewrite (Origin Rules); not Worker-fallbackable.",
       "service": "identity-authorization-keto-write"
+    },
+    {
+      "id": "pay",
+      "hostname": "pay.stawi.org",
+      "origin": "https://checkout-checkout-zbso62lzwq-ew.a.run.app",
+      "protocol": "http",
+      "notes": "Hosted checkout UI. CF direct mapping only (orange CNAME \u2192 run.app + Origin Host rewrite). CF Universal SSL \u2014 never Google domain-mapping certs.",
+      "service": "checkout-checkout",
+      "project": "stawi-payments",
+      "edge": "cf_direct"
     }
   ],
   "routes": [
@@ -496,7 +506,7 @@
         "title": "Checkout",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI remains pay.stawi.org (CF CNAME \u2192 Cloud Run)."
+      "notes": "Merchant RPCs on api.stawi.org/checkout. Hosted payer UI is pay.stawi.org via direct_cnames (CF SSL + Host rewrite to checkout-checkout)."
     },
     {
       "id": "ledger",

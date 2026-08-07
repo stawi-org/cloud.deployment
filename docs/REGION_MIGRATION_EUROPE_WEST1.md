@@ -1,8 +1,14 @@
 # Region migration: `europe-west9` → `europe-west1`
 
-**Why:** Cloud Run **domain mapping** works in `europe-west1` (Belgium), not in `europe-west9` (Paris, 501).  
+**Why (historical):** Cloud Run **domain mapping** works in `europe-west1` (Belgium), not in `europe-west9` (Paris, 501).  
 **Scope:** all prod accounts that were on west9 — **identity**, **platform**, **operations**, **api**.  
 **Neon:** stays `aws-eu-central-1` (Frankfurt) — still low latency to Belgium.
+
+**Update:** Hosted checkout (`pay.stawi.org`) and other browser hosts use **Cloudflare
+direct mapping** (orange CNAME → `*.run.app` + Origin Host rewrite + CF Universal SSL).
+That path does **not** need domain mapping or Google managed certs and works in any
+Cloud Run region. Domain mapping remains an **optional IAM overlay** only — do not
+block product UX on cert provisioning. See [STABLE_DNS.md](./STABLE_DNS.md).
 
 This is a **recreate** of regional resources. Cloud Run services are **not** movable in place.
 

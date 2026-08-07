@@ -1,13 +1,16 @@
 # Edge contract for Cloud Run — see docs/SSL_EDGE_POLICY.md
 #
-# Region: europe-west1 (Cloud Run domain mapping supported).
+# Region: europe-west1 (default). CF direct mapping works in any Cloud Run region;
+# Google domain mapping is optional and region-gated — do not rely on it for pay.
 #
 # SSL split:
 #   Cloudflare Universal SSL (orange) + Worker:
 #     api.stawi.org only (path APIs + Scalar)
-#   Preferred: Cloud Run domain mapping + DNS records Google prints:
-#     accounts, oauth2, oauth2-w, authz, authz-w
-#   Interim: CF orange CNAME → *.run.app + Origin Host rewrite / Worker fallback
+#   CF direct mapping (orange CNAME → *.run.app + Origin Host rewrite):
+#     pay.stawi.org (hosted checkout) — first-class; no Google managed cert
+#     accounts / oauth2* / authz* when not on domain-mapping DNS overlay
+#   Optional: Cloud Run domain mapping (grey CNAME → ghs.googlehosted.com):
+#     IAM hosts only if desired; cert provisioning minutes–hours
 #   Break-glass: Google Global LB (edge-lb-identity hosts non-empty)
 #
 # Product APIs: only api.stawi.org/<path>.
@@ -43,7 +46,8 @@ prod:
       /thesa: { service: operations-thesa, project: stawi-operations }
       /trustage: { service: operations-trustage, project: stawi-operations }
 
-  # Preferred long-term: Cloud Run domain mappings (see scripts/create-domain-mappings.sh)
+  # Optional overlay only (IAM). Never list pay here — checkout is CF direct only.
+  # See scripts/create-domain-mappings.sh and ensure-cf-domain-mapping-dns.mjs.
   domain_mappings:
     - hostname: accounts.stawi.org
       service: identity-authentication
@@ -60,12 +64,11 @@ prod:
     - hostname: authz-w.stawi.org
       service: identity-authorization-keto-write
       project: stawi-identity
-    - hostname: pay.stawi.org
-      service: checkout-checkout
-      project: stawi-payments
 
-  # Interim orange CNAME → Cloud Run (managed by edge/cloudflare-api-gateway ensure-cf-dns)
+  # First-class: orange CNAME → *.run.app + Origin Host rewrite (CF Universal SSL).
+  # Managed by edge/cloudflare-api-gateway ensure-cf-dns + ensure-cf-origin-rules.
   cloudflare_direct_cnames:
+    - pay.stawi.org       # checkout-checkout (stawi-payments) — CF direct only
     - accounts.stawi.org  # identity-authentication
     - oauth2.stawi.org    # identity-oauth2-hydra
     - oauth2-w.stawi.org

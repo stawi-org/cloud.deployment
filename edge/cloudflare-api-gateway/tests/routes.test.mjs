@@ -103,13 +103,13 @@ describe("routing semantics", () => {
 });
 
 describe("host_routes + direct_cnames", () => {
-  it("Worker is api-only; accounts/oauth2*/authz* are direct CNAMEs to run.app", () => {
+  it("Worker is api-only; accounts/oauth2*/authz*/pay are direct CNAMEs to run.app", () => {
     const hosts = config.host_routes || [];
     assert.equal(hosts.length, 0);
     assert.equal(config.hostname, "api.stawi.org");
     const directs = config.direct_cnames || [];
     const byId = Object.fromEntries(directs.map((h) => [h.id, h]));
-    for (const id of ["accounts", "oauth2", "oauth2-w", "authz", "authz-w"]) {
+    for (const id of ["accounts", "oauth2", "oauth2-w", "authz", "authz-w", "pay"]) {
       assert.ok(byId[id], `missing direct_cname ${id}`);
       assert.match(byId[id].origin, /\.run\.app$/);
     }
@@ -120,6 +120,10 @@ describe("host_routes + direct_cnames", () => {
     assert.equal(byId["authz-w"].hostname, "authz-w.stawi.org");
     assert.equal(byId.authz.protocol, "grpc");
     assert.equal(byId["authz-w"].protocol, "grpc");
+    assert.equal(byId.pay.hostname, "pay.stawi.org");
+    assert.equal(byId.pay.service, "checkout-checkout");
+    assert.equal(byId.pay.edge, "cf_direct");
+    assert.match(byId.pay.origin, /checkout-checkout.*\.run\.app$/);
   });
 });
 

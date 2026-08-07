@@ -8,54 +8,94 @@ Apps and clients should only use **hostnames we control**. Backends
 | Hostname | Purpose | Edge | Backend switch via |
 |----------|---------|------|--------------------|
 | `api.stawi.org` | Product APIs + Scalar | CF Worker (orange) | `routes.prod.json` path origins |
-| `accounts.stawi.org` | Login UI | CF orange CNAME → Cloud Run | `direct_cnames` origin |
-| `oauth2.stawi.org` | OIDC public | CF orange CNAME → Cloud Run | `direct_cnames` origin |
-| `oauth2-w.stawi.org` | Hydra **admin** (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
-| `authz.stawi.org` | Keto read gRPC (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
-| `authz-w.stawi.org` | Keto write gRPC (IAM) | CF orange CNAME → Cloud Run | `direct_cnames` origin |
-| `pay.stawi.org` | Hosted checkout UI | CF grey CNAME → `ghs.googlehosted.com` | Cloud Run domain mapping (`checkout-checkout`) |
+| **`pay.stawi.org`** | Hosted checkout UI | **CF direct mapping** (orange CNAME → `*.run.app` + Origin Host rewrite) | `direct_cnames` origin (`checkout-checkout`) |
+| `accounts.stawi.org` | Login UI | CF direct **or** optional domain-mapping overlay | `direct_cnames` / domain map |
+| `oauth2.stawi.org` | OIDC public | same | same |
+| `oauth2-w.stawi.org` | Hydra **admin** (IAM) | same | same |
+| `authz.stawi.org` | Keto read gRPC (IAM) | same | same |
+| `authz-w.stawi.org` | Keto write gRPC (IAM) | same | same |
 
 **Do not put `*.run.app` in app env** except temporary break-glass. Runtime
 config uses the table above (`modules/frame-cloudrun-app`).
 
-## Architecture (prefer domain mapping in `europe-west1`)
+## Architecture (CF direct mapping is first-class)
 
 ```
-Client / S2S
+Client
     │
-    ├─ https://api.stawi.org/<path>     → CF Worker → Cloud Run (path strip)
+    ├─ https://api.stawi.org/<path>
+    │     → CF Worker (Universal SSL) → Cloud Run *.run.app
     │
-    └─ https://oauth2*.stawi.org        → Cloud Run domain mapping (preferred)
-       https://authz*.stawi.org           DNS records from `gcloud beta run domain-mappings`
-       https://accounts.stawi.org
-                                      ── or interim CF CNAME + Host rewrite ──
+    ├─ https://pay.stawi.org/c/<session>
+    │     → CF orange CNAME → checkout-checkout *.run.app
+    │     → Origin Rule: Host = run.app hostname
+    │     → CF Universal SSL (no Google managed cert, no cert wait)
+    │
+    └─ https://accounts|oauth2*|authz*.stawi.org
+          → same CF direct path by default
+          ── optional grey CNAME → ghs.googlehosted.com (domain mapping) ──
 ```
 
-**Preferred:** map FQDNs with Cloud Run domain mapping (`scripts/create-domain-mappings.sh`).
-Cloud Run then accepts `Host: oauth2-w.stawi.org` natively — no Worker, no Google LB.
+### Why CF direct mapping (not Google domain-mapping certs) for pay
 
-**Interim** (before mappings ACTIVE): orange CNAME → `*.run.app` + Origin Host rewrite
-(`ensure-cf-dns.mjs` / `ensure-cf-origin-rules.mjs` / Worker host fallback).
+| Concern | Google domain mapping | CF direct (`direct_cnames`) |
+|---------|----------------------|----------------------------|
+| Client TLS | Google managed cert (minutes–hours; can stall) | **Cloudflare Universal SSL** (immediate) |
+| Region | Only regions that support domain mapping (e.g. `europe-west1`) | **Any** Cloud Run region (`*.run.app`) |
+| Host header | Native `Host: pay.stawi.org` | Origin Rule rewrites to `*.run.app` |
+| Failure mode | 521/SSL while cert pending | Needs Origin Rules (or free Worker host fallback) |
+| Checkout UX | Blocked during cert provisioning | Live as soon as DNS + rules apply |
 
-**Google Global HTTPS LB** is break-glass only (`edge-lb-identity` hosts non-empty).
+We previously moved production to **`europe-west1`** partly to unlock Cloud Run domain
+mapping. That feature remains **optional** for IAM hosts. **Hosted checkout must not
+depend on it** — `pay.stawi.org` is **`edge: cf_direct` only**.
 
-Region migration: [REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_WEST1.md).
+### Pipeline (edge-api-gateway deploy)
 
-### Caveats
+1. `ensure-cf-dns.mjs` — `api` Worker dummy A; **all** `direct_cnames` orange CNAME → `*.run.app`
+2. `ensure-cf-domain-mapping-dns.mjs` (optional) — greys **IAM** hosts only (`accounts`, `oauth2*`, `authz*`). **Never `pay`.**
+3. `ensure-cf-origin-rules.mjs` — **always** Host rewrite for CF-proxied directs  
+   (exit 2 → `ensure-cf-worker-host-fallback.mjs` for non–domain-mapped hosts only)
+
+```bash
+# Deploy CF edge
+gh workflow run edge-api-gateway.yml
+# or push under edge/cloudflare-api-gateway/**
+```
+
+Set `USE_DOMAIN_MAPPING_DNS=false` on the job to keep every direct host on pure CF path.
+
+### Origin Host rewrite (required for CF direct)
+
+Cloud Run only accepts `Host: <service>-….run.app` unless a domain mapping is
+ACTIVE. Orange CNAME alone is not enough:
+
+```
+Client Host: pay.stawi.org
+  → CF Origin Rule: host_header + origin host = checkout-checkout-….run.app
+  → Cloud Run serves checkout HTML
+```
+
+Without the rule: Google frontend 404, or Cloudflare 521 if origin is unreachable.
+
+## Caveats
 
 | Concern | Detail |
 |---------|--------|
 | gRPC (`authz*`) | Needs Origin Host rewrite (or CF gRPC proxy). Worker host-fallback is HTTP-oriented — prefer Origin Rules for Keto. |
-| IAM | Callers still mint **Google ID tokens** (`roles/run.invoker`); audiences = stable HTTPS hosts via Cloud Run `custom_audiences`. |
+| IAM | Callers mint **Google ID tokens** (`roles/run.invoker`); audiences = stable HTTPS hosts via Cloud Run `custom_audiences`. |
 | Switch backend | Change `origin` in `routes.prod.json` + re-run DNS/origin scripts (or re-deploy edge-api-gateway). App env stays on `*.stawi.org`. |
+| Domain mapping | Optional IAM overlay only. Do not add `pay` to `DOMAIN_MAP_HOSTS` or `create-domain-mappings.sh`. |
 
 ## Cost (minimal stable set)
 
 | Piece | Role | Approx. |
 |-------|------|---------|
 | CF Worker + Universal SSL | `api` path hub only | free / ~$5 |
-| CF orange CNAME + Origin Rules | `accounts`, `oauth2*`, `authz*` | free (plan permitting) |
+| CF orange CNAME + Origin Rules | `pay`, `accounts`, `oauth2*`, `authz*` | free (plan permitting) |
+| Worker host fallback | Free plan without Origin Host override | free |
 | Google Global HTTPS LB | **retired** for identity | $0 |
+| Google managed cert (domain mapping) | Optional IAM overlay | $0 + cert wait |
 
 ## App env (S2S)
 
@@ -65,15 +105,14 @@ Region migration: [REGION_MIGRATION_EUROPE_WEST1.md](./REGION_MIGRATION_EUROPE_W
 | `OAUTH2_SERVICE_ADMIN_URI` | `https://oauth2-w.stawi.org` |
 | `AUTHORIZATION_SERVICE_READ_URI` | `https://authz.stawi.org` |
 | `AUTHORIZATION_SERVICE_WRITE_URI` | `https://authz-w.stawi.org` |
+| `CHECKOUT_PUBLIC_BASE_URL` | `https://pay.stawi.org` |
 | Product `*_SERVICE_URI` | `https://api.stawi.org/<path>` |
 
 ## Ops
 
 ```bash
 # Deploy CF edge (Worker + DNS + Origin Rules for all direct_cnames)
-gh workflow run app-apply.yml -f app=edge-api-gateway -f env=stawi-prod
-# or from edge/cloudflare-api-gateway:
-#   npm run deploy:prod   # includes ensure-cf-dns / origin-rules / fallback
+gh workflow run edge-api-gateway.yml
 
 # Destroy idle identity LB (hosts={})
 gh workflow run app-apply.yml -f app=edge-lb-identity -f env=stawi-prod

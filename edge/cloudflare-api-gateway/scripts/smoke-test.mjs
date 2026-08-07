@@ -90,12 +90,14 @@ async function checkWithRetry(name, url, expectOk, attempts = 4) {
 }
 
 // Prefer health paths; IAM hosts (oauth2-w / authz*) may 403 without a Google ID token.
+// pay: hosted UI — root may 404; any non-edge-failure status proves CF direct path.
 const hostHealth = {
   accounts: "/readyz",
   oauth2: "/health/ready",
   "oauth2-w": "/health/ready",
   authz: "/",
   "authz-w": "/",
+  pay: "/",
 };
 // host_routes may be empty in git; direct_cnames are the stable public hosts.
 const smokeHosts = [

@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /**
- * Point stable hostnames at Cloud Run domain mappings (ghs.googlehosted.com).
- * DNS-only (grey) so Google can issue managed certs.
+ * Optional overlay: point IAM/control-plane hostnames at Cloud Run domain
+ * mappings (ghs.googlehosted.com), DNS-only (grey) for Google managed certs.
+ *
+ * Do NOT list browser hosts that use CF direct mapping (pay.stawi.org).
+ * Those stay orange CNAME → *.run.app + Origin Host rewrite (CF Universal SSL),
+ * which does not wait on Google certificate provisioning and works in any
+ * Cloud Run region (domain mapping is not required).
  *
  * Usage: CLOUDFLARE_API_TOKEN=… node scripts/ensure-cf-domain-mapping-dns.mjs
+ *        DOMAIN_MAP_HOSTS=accounts,oauth2,… (default: identity IAM hosts only)
  */
 const ZONE = process.env.CLOUDFLARE_ZONE_ID || "706bf604a333d866bb38c03bf643e79a";
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const TARGET = "ghs.googlehosted.com";
-// Hosted checkout UI (pay) uses Cloud Run domain mapping on stawi-payments.
-const HOSTS = (process.env.DOMAIN_MAP_HOSTS || "accounts,oauth2,oauth2-w,authz,authz-w,pay")
+// pay is intentionally excluded — checkout uses CF direct_cnames only.
+const HOSTS = (process.env.DOMAIN_MAP_HOSTS || "accounts,oauth2,oauth2-w,authz,authz-w")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);

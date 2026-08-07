@@ -94,10 +94,11 @@ cd edge/cloudflare-api-gateway && npm run refresh-origins
 gh workflow run edge-api-gateway.yml
 ```
 
-Hosted checkout UI: **`pay.stawi.org`** Cloud Run domain mapping → `checkout-checkout`
-(DNS: grey CNAME `pay` → `ghs.googlehosted.com`; managed by
-`edge/cloudflare-api-gateway/scripts/ensure-cf-domain-mapping-dns.mjs`). Merchant API
-remains `api.stawi.org/checkout`.
+Hosted checkout UI: **`pay.stawi.org`** via **CF direct mapping** (no Google managed
+cert): orange CNAME → `checkout-checkout` `*.run.app` + Origin Host rewrite
+(`direct_cnames` + `ensure-cf-dns.mjs` + `ensure-cf-origin-rules.mjs`). Client TLS is
+Cloudflare Universal SSL — deploy edge and checkout is live without cert wait.
+Do **not** domain-map `pay.stawi.org`. Merchant API remains `api.stawi.org/checkout`.
 
 ## Ship (images)
 
