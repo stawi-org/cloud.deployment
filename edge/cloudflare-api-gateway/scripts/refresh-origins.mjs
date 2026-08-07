@@ -157,5 +157,25 @@ for (const h of config.direct_cnames || []) {
   }
 }
 
+// host_routes (e.g. pay Worker host proxy) share the same service → origin map
+for (const h of config.host_routes || []) {
+  const svc = h.service || DIRECT_SERVICE[h.id];
+  if (!svc) {
+    console.log(`keep host_route ${h.id}: no service mapping`);
+    continue;
+  }
+  const live = urls.get(svc);
+  if (live && isRunApp(live) && live !== h.origin) {
+    console.log(`update host_route ${h.id}: ${h.origin || "(empty)"} → ${live}`);
+    h.origin = live;
+    if (!h.service) h.service = svc;
+    changed++;
+  } else if (live) {
+    console.log(`ok host_route ${h.id}: ${live}`);
+  } else {
+    console.log(`keep host_route ${h.id}: ${h.origin || "(no origin)"} (no live URL)`);
+  }
+}
+
 writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 console.log(`Wrote ${path} (${changed} changes)`);

@@ -103,10 +103,15 @@ describe("routing semantics", () => {
 });
 
 describe("host_routes + direct_cnames", () => {
-  it("Worker is api-only; accounts/oauth2*/authz*/pay are direct CNAMEs to run.app", () => {
-    const hosts = config.host_routes || [];
-    assert.equal(hosts.length, 0);
+  it("api path hub + pay host_route; accounts/oauth2*/authz* direct CNAMEs", () => {
     assert.equal(config.hostname, "api.stawi.org");
+    const hosts = config.host_routes || [];
+    const hostById = Object.fromEntries(hosts.map((h) => [h.id, h]));
+    assert.ok(hostById.pay, "pay must be a Worker host_route (CF direct, no Google cert)");
+    assert.equal(hostById.pay.hostname, "pay.stawi.org");
+    assert.equal(hostById.pay.strip_prefix, false);
+    assert.match(hostById.pay.origin, /checkout-checkout.*\.run\.app$/);
+
     const directs = config.direct_cnames || [];
     const byId = Object.fromEntries(directs.map((h) => [h.id, h]));
     for (const id of ["accounts", "oauth2", "oauth2-w", "authz", "authz-w", "pay"]) {
@@ -123,7 +128,6 @@ describe("host_routes + direct_cnames", () => {
     assert.equal(byId.pay.hostname, "pay.stawi.org");
     assert.equal(byId.pay.service, "checkout-checkout");
     assert.equal(byId.pay.edge, "cf_direct");
-    assert.match(byId.pay.origin, /checkout-checkout.*\.run\.app$/);
   });
 });
 

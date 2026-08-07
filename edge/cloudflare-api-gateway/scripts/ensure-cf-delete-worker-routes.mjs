@@ -21,8 +21,16 @@ if (!TOKEN) {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(readFileSync(join(root, "config/routes.prod.json"), "utf8"));
+// Keep Worker routes for host_routes (e.g. pay.stawi.org CF direct via Worker).
+const keepHosts = new Set(
+  (config.host_routes || [])
+    .filter((h) => h?.enabled !== false && h?.hostname)
+    .map((h) => String(h.hostname).toLowerCase().replace(/\.$/, "")),
+);
 const dropHosts = new Set(
-  (config.direct_cnames || []).map((h) => String(h.hostname).toLowerCase().replace(/\.$/, "")),
+  (config.direct_cnames || [])
+    .map((h) => String(h.hostname).toLowerCase().replace(/\.$/, ""))
+    .filter((host) => !keepHosts.has(host)),
 );
 
 async function cf(path, opts = {}) {

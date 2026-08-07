@@ -1,9 +1,10 @@
 /**
- * stawi-api-gateway — Cloudflare public edge for api.stawi.org only.
+ * stawi-api-gateway — Cloudflare public edge.
  * See docs/SSL_EDGE_POLICY.md.
  *
  *  - api.stawi.org → path proxy + Scalar hub (this Worker)
- *  - accounts / oauth2* / authz* → CF orange CNAME → Cloud Run (not this Worker)
+ *  - pay.stawi.org → host_routes proxy (CF direct; Host → checkout-checkout run.app)
+ *  - accounts / oauth2* / authz* → CF CNAME or domain mapping (not this Worker)
  *
  * Safety: origins only *.run.app; not an open proxy.
  * Extend: config/routes.prod.json → validate → deploy.
@@ -561,7 +562,7 @@ async function handle(request) {
     return corsPreflightResponse(request);
   }
 
-  // Optional host_routes (normally empty — only api.stawi.org is on this Worker).
+  // host_routes: pay.stawi.org (and any CF-direct browser host that needs Host rewrite).
   const hostRoute = HOST_ROUTES.get(host);
   if (hostRoute) {
     return proxyToOrigin(request, hostRoute, url, host, {

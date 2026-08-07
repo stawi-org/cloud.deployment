@@ -170,13 +170,25 @@ async function ensureDirectCname(hostname, origin) {
 // --- api Worker host ---
 await ensureWorkerA(shortName(config.hostname || "api.stawi.org"));
 
-// --- direct CNAME hosts (accounts, oauth2) ---
-for (const h of config.direct_cnames || []) {
-  if (!h?.hostname || !h?.origin) continue;
-  await ensureDirectCname(h.hostname, h.origin);
+// Hostnames served by this Worker (host_routes) need proxied dummy A, not CNAME.
+const workerHostnames = new Set(
+  (config.host_routes || [])
+    .filter((h) => h?.enabled !== false && h?.hostname)
+    .map((h) => String(h.hostname).toLowerCase().replace(/\.$/, "")),
+);
+for (const fqdn of workerHostnames) {
+  await ensureWorkerA(shortName(fqdn));
 }
 
-// Do not leave Worker dummy A for direct_cname hostnames if they still exist
-// under host_routes (legacy) — already handled by CNAME upsert.
+// --- direct CNAME hosts (accounts, oauth2, …) — skip Worker-hosted hosts ---
+for (const h of config.direct_cnames || []) {
+  if (!h?.hostname || !h?.origin) continue;
+  const fqdn = String(h.hostname).toLowerCase().replace(/\.$/, "");
+  if (workerHostnames.has(fqdn)) {
+    console.log(`skip direct CNAME ${fqdn} (Worker host_routes)`);
+    continue;
+  }
+  await ensureDirectCname(h.hostname, h.origin);
+}
 
 console.log("DNS ensure complete.");

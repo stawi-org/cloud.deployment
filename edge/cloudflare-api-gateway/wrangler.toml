@@ -10,7 +10,12 @@ compatibility_date = "2026-07-01"
 workers_dev = true
 account_id = "c358ea38bde6fd03d13bf87068635230"
 
-# Product path API + Scalar hub only (accounts / oauth2* / authz* = CF CNAME).
+# Product path API + Scalar hub (accounts / oauth2* / authz* = CF CNAME or domain map).
+# pay.stawi.org: Worker host proxy (CF direct; Host → run.app) — see host_routes.
 [[routes]]
 pattern = "api.stawi.org/*"
+zone_name = "stawi.org"
+
+[[routes]]
+pattern = "pay.stawi.org/*"
 zone_name = "stawi.org"

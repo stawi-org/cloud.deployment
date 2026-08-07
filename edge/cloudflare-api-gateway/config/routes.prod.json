@@ -33,7 +33,18 @@
     ],
     "extra_hosts": []
   },
-  "host_routes": [],
+  "host_routes": [
+    {
+      "id": "pay",
+      "hostname": "pay.stawi.org",
+      "service": "checkout-checkout",
+      "origin": "https://checkout-checkout-zbso62lzwq-ew.a.run.app",
+      "strip_prefix": false,
+      "enabled": true,
+      "public": true,
+      "notes": "Hosted checkout: CF Universal SSL via this Worker (Host rewrite to run.app). Preferable to Origin Rules when the API token lacks Rulesets edit. No Google managed cert."
+    }
+  ],
   "direct_cnames": [
     {
       "id": "accounts",

@@ -8,7 +8,7 @@ Apps and clients should only use **hostnames we control**. Backends
 | Hostname | Purpose | Edge | Backend switch via |
 |----------|---------|------|--------------------|
 | `api.stawi.org` | Product APIs + Scalar | CF Worker (orange) | `routes.prod.json` path origins |
-| **`pay.stawi.org`** | Hosted checkout UI | **CF direct mapping** (orange CNAME → `*.run.app` + Origin Host rewrite) | `direct_cnames` origin (`checkout-checkout`) |
+| **`pay.stawi.org`** | Hosted checkout UI | **CF direct mapping** (Worker host proxy or Origin Host rewrite → `*.run.app`) | `host_routes` + `direct_cnames` (`checkout-checkout`) |
 | `accounts.stawi.org` | Login UI | CF direct **or** optional domain-mapping overlay | `direct_cnames` / domain map |
 | `oauth2.stawi.org` | OIDC public | same | same |
 | `oauth2-w.stawi.org` | Hydra **admin** (IAM) | same | same |
@@ -27,9 +27,9 @@ Client
     │     → CF Worker (Universal SSL) → Cloud Run *.run.app
     │
     ├─ https://pay.stawi.org/c/<session>
-    │     → CF orange CNAME → checkout-checkout *.run.app
-    │     → Origin Rule: Host = run.app hostname
-    │     → CF Universal SSL (no Google managed cert, no cert wait)
+    │     → CF Universal SSL (orange)
+    │     → Worker host_route (or Origin Rule) rewrites Host → run.app
+    │     → checkout-checkout (no Google managed cert, no cert wait)
     │
     └─ https://accounts|oauth2*|authz*.stawi.org
           → same CF direct path by default
@@ -52,10 +52,14 @@ depend on it** — `pay.stawi.org` is **`edge: cf_direct` only**.
 
 ### Pipeline (edge-api-gateway deploy)
 
-1. `ensure-cf-dns.mjs` — `api` Worker dummy A; **all** `direct_cnames` orange CNAME → `*.run.app`
+1. `ensure-cf-dns.mjs` — `api` + `host_routes` (pay) Worker dummy A; other `direct_cnames` orange CNAME → `*.run.app`
 2. `ensure-cf-domain-mapping-dns.mjs` (optional) — greys **IAM** hosts only (`accounts`, `oauth2*`, `authz*`). **Never `pay`.**
-3. `ensure-cf-origin-rules.mjs` — **always** Host rewrite for CF-proxied directs  
-   (exit 2 → `ensure-cf-worker-host-fallback.mjs` for non–domain-mapped hosts only)
+3. `ensure-cf-origin-rules.mjs` — Host rewrite for pure CNAME directs when the token/plan allows  
+   (exit 2 → Worker host fallback; **pay** is already a permanent `host_routes` entry)
+
+**Production note:** Origin Rules API often returns 403 (token lacks Rulesets edit / plan).
+`pay` is therefore a permanent Worker `host_route` + `wrangler` route `pay.stawi.org/*`
+so Host rewrite never depends on Google certs or Origin Rules.
 
 ```bash
 # Deploy CF edge

@@ -10,7 +10,7 @@ works in **any** region; domain mapping does not.
 | Hostname / surface | Client TLS | Edge | Origin | Cloudflare proxy |
 |--------------------|------------|------|--------|------------------|
 | **`api.stawi.org`** (product APIs + Scalar) | Cloudflare Universal SSL | **Worker path proxy only** | Cloud Run `*.run.app` | **Orange** |
-| **`pay.stawi.org`** (hosted checkout) | **CF Universal SSL** | **CF direct mapping** (orange CNAME + Origin Host rewrite) | `checkout-checkout` | **Orange** |
+| **`pay.stawi.org`** (hosted checkout) | **CF Universal SSL** | **CF direct mapping** (Worker `host_routes` Host rewrite → run.app; Origin Rules optional) | `checkout-checkout` | **Orange** |
 | **`accounts.stawi.org`** (login UI) | CF Universal SSL **or** Google managed cert | CF direct default; optional domain-mapping DNS overlay | `identity-authentication` | Orange (CF) or grey (native) |
 | **`oauth2.stawi.org`** (OIDC public) | same | same | `identity-oauth2-hydra` | same |
 | **`oauth2-w.stawi.org`** (Hydra admin) | same | same + IAM | `identity-oauth2-hydra-admin` | same |
