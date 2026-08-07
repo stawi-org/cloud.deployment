@@ -83,6 +83,28 @@ one version.
 1. Google `gemini-3.6-flash` keys (`INFERENCE_API_KEYS`) — sticky primary  
 2. NVIDIA `meta/llama-3.1-8b-instruct` via `https://integrate.api.nvidia.com` — after primary degrades
 
+### Troubleshooting: both providers fail with auth errors
+
+If logs look like:
+
+```text
+primary [google] … status=400: Please pass a valid API key
+secondary [custom] … status=401: Authentication failed
+```
+
+but the same Secret Manager keys return **HTTP 200** when probed from a laptop
+against Gemini/NVIDIA, the keys are fine — the LLM HTTP client was almost
+certainly attaching the service’s **OAuth bearer** and overwriting
+`Authorization: Bearer <api-key>`.
+
+**Fix (service-profile chatagent):** build the inference client with
+`frameclient.WithHTTPNoAuth()` (same pattern as opportunities matching /
+crawler for external inference). Requires a chat-agent image that includes
+that change (post `v1.54.12`).
+
+Also confirm secrets are AI Studio `AIza…` / NVIDIA `nvapi-…` with no
+application (IP/HTTP-referrer) restrictions that block Cloud Run egress.
+
 ## Omnichannel
 
 ChatAgent is **channel-agnostic**: sessions may bind a Notification target
