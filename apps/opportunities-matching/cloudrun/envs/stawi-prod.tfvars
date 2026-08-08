@@ -1,5 +1,5 @@
 # Public GHCR — Cloud Run pulls ghcr.io directly (no AR mirror).
-image = "ghcr.io/stawi-opportunities/opportunities-matching:v8.0.230"
+image = "ghcr.io/stawi-opportunities/opportunities-matching:v8.0.231"
 container_port = 8080
 resource_path = "/matching"
 memory        = "1Gi"
