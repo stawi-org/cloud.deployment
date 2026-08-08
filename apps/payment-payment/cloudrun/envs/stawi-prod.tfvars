@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-payment:v0.5.105"
+image                    = "ghcr.io/antinvestor/service-payment:v0.5.111"
 resource_path            = "/payment"
 has_database             = true
 memory                   = "512Mi"

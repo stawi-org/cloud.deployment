@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-payment-integration-flutterwave:v0.5.105"
+image                    = "ghcr.io/antinvestor/service-payment-integration-flutterwave:v0.5.111"
 resource_path            = "/payment-flutterwave"
 has_database             = false
 memory                   = "512Mi"
