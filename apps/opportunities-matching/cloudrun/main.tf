@@ -115,9 +115,12 @@ module "frame" {
     OPPORTUNITY_FANOUT_QUEUE_URI  = "push://${local.fanout_topic}?protocol=gcppubsub"
     OPPORTUNITY_FANOUT_QUEUE_NAME = local.fanout_topic
     MATCHING_FANOUT_ENABLED       = "true"
-    # CV embed stage (self-push).
-    CV_EMBED_QUEUE_URL  = "push://${local.cv_embed_topic}?protocol=gcppubsub"
-    CV_EMBED_QUEUE_NAME = local.cv_embed_topic
+    # CV embed stage: push sub for delivery; gcppubsub publish (push:// is
+    # subscriber-only in Frame — registering it as publisher crashes startup
+    # once AI extraction enables the full CV pipeline).
+    CV_EMBED_QUEUE_URL   = "push://${local.cv_embed_topic}?protocol=gcppubsub"
+    CV_EMBED_QUEUE_NAME  = local.cv_embed_topic
+    CV_EMBED_PUBLISH_URL = "gcppubsub://${var.project_id}/${local.cv_embed_topic}"
     # Cluster worker URIs (document for product-opportunities Helm).
     MATCHING_FANOUT_PUBLISH_URL     = "gcppubsub://${var.project_id}/${local.fanout_topic}"
     WORKER_EMBED_PUBLISH_URL        = "gcppubsub://${var.project_id}/${local.worker_embed_topic}"
