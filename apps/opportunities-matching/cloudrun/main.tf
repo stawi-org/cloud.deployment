@@ -105,6 +105,9 @@ module "frame" {
   secret_env_extra = {
     BILLING_WEBHOOK_SECRET  = { secret = "billing-webhook-secret" }
     CHECKOUT_INTERNAL_TOKEN = { secret = "checkout-internal-token" }
+    # Shared with platform chat-agent (comma-separated keys; matching uses first).
+    # Required for sync AI CV sectioning on upload.
+    INFERENCE_API_KEY = { secret = "platform-chat-agent-inference-api-keys" }
   }
 
   service_env_extra = {
@@ -137,6 +140,9 @@ module "frame" {
     # Platform chat-agent: structured intake + opportunity side-chat.
     CHAT_AGENT_SERVICE_URI   = "https://api.stawi.org/chat-agent"
     CHAT_AGENT_ENABLED       = "true"
+    # Sync AI CV sectioning on upload (required before fully_processed).
+    INFERENCE_PROVIDER = "google"
+    INFERENCE_MODEL    = "gemini-3.6-flash"
   }
 }
 
@@ -145,6 +151,7 @@ resource "google_secret_manager_secret_iam_member" "preseeded" {
   for_each = toset([
     "billing-webhook-secret",
     "checkout-internal-token",
+    "platform-chat-agent-inference-api-keys",
   ])
   project   = var.project_id
   secret_id = each.value
