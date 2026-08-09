@@ -33,6 +33,14 @@ apps:
         required: true
         source_hints:
           - "must match checkout CHECKOUT_INTERNAL_TOKEN"
+      - id: opportunities-embedding-api-key
+        env: EMBEDDING_API_KEY
+        required: true
+        notes: "NVIDIA Build nvapi key for candidate persona embeddings (same model as cluster worker opportunity vectors)"
+        source_hints:
+          - "platform-chat-agent-inference-secondary-api-keys on stawi-platform (copy)"
+          - "vault: stawi/product-opportunities/common/inference-credentials nvidia_api_key"
+          - "k8s: product-opportunities/inference-credentials-opportunities EMBEDDING_API_KEY"
 
   opportunities-api:
     runtime_secrets:
