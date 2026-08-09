@@ -108,6 +108,11 @@ module "frame" {
     # Shared with platform chat-agent (comma-separated keys; matching uses first).
     # Required for sync AI CV sectioning on upload.
     INFERENCE_API_KEY = { secret = "platform-chat-agent-inference-api-keys" }
+    # NVIDIA Build key for candidate persona embeddings (same model/dim as
+    # cluster worker opportunity vectors — nv-embedqa-e5-v5 @ 1024).
+    # Without this, placement.Rebuild/Embed returns empty and match refresh
+    # fails with embedding_unavailable.
+    EMBEDDING_API_KEY = { secret = "opportunities-embedding-api-key" }
   }
 
   service_env_extra = {
@@ -146,6 +151,14 @@ module "frame" {
     # Sync AI CV sectioning on upload (required before fully_processed).
     INFERENCE_PROVIDER = "google"
     INFERENCE_MODEL    = "gemini-3.6-flash"
+    # Candidate vectors must match opportunity embeddings (cluster worker).
+    # Asymmetric E5: query side for candidates; worker uses passage for opps.
+    EMBEDDING_PROVIDER   = "nvidia"
+    EMBEDDING_BASE_URL   = "https://integrate.api.nvidia.com"
+    EMBEDDING_MODEL      = "nvidia/nv-embedqa-e5-v5"
+    EMBEDDING_INPUT_TYPE = "query"
+    # 0 = native 1024-d (matches opportunities.embedding vector(1024)).
+    EMBEDDING_DIMENSIONS = "0"
   }
 }
 
@@ -155,6 +168,7 @@ resource "google_secret_manager_secret_iam_member" "preseeded" {
     "billing-webhook-secret",
     "checkout-internal-token",
     "platform-chat-agent-inference-api-keys",
+    "opportunities-embedding-api-key",
   ])
   project   = var.project_id
   secret_id = each.value
