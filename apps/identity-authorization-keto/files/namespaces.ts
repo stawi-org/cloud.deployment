@@ -2253,3 +2253,213 @@ class service_chat_agent implements Namespace {
       this.related.granted_chat_agent_turn.includes(ctx.subject),
   }
 }
+
+class service_calendar implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_calendar_resource_view: (profile_user | service_calendar)[]
+    granted_calendar_resource_manage: (profile_user | service_calendar)[]
+    granted_calendar_availability_manage: (profile_user | service_calendar)[]
+    granted_calendar_slot_view: (profile_user | service_calendar)[]
+    granted_calendar_booking_view: (profile_user | service_calendar)[]
+    granted_calendar_booking_manage: (profile_user | service_calendar)[]
+    granted_calendar_sync_manage: (profile_user | service_calendar)[]
+  }
+
+  permits = {
+    calendar_resource_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_calendar_resource_view.includes(ctx.subject),
+
+    calendar_resource_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_calendar_resource_manage.includes(ctx.subject),
+
+    calendar_availability_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_calendar_availability_manage.includes(ctx.subject),
+
+    calendar_slot_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_calendar_slot_view.includes(ctx.subject),
+
+    calendar_booking_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_calendar_booking_view.includes(ctx.subject),
+
+    calendar_booking_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_calendar_booking_manage.includes(ctx.subject),
+
+    calendar_sync_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_calendar_sync_manage.includes(ctx.subject),
+  }
+}
+
+class service_ats implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_ats_dashboard_view: (profile_user | service_ats)[]
+    granted_ats_job_view: (profile_user | service_ats)[]
+    granted_ats_job_manage: (profile_user | service_ats)[]
+    granted_ats_application_view: (profile_user | service_ats)[]
+    granted_ats_application_manage: (profile_user | service_ats)[]
+    granted_ats_interview_view: (profile_user | service_ats)[]
+    granted_ats_interview_manage: (profile_user | service_ats)[]
+    granted_ats_talent_view: (profile_user | service_ats)[]
+    granted_ats_talent_manage: (profile_user | service_ats)[]
+    granted_ats_availability_manage: (profile_user | service_ats)[]
+    granted_ats_ai_use: (profile_user | service_ats)[]
+    granted_ats_hire: (profile_user | service_ats)[]
+    granted_ats_publish: (profile_user | service_ats)[]
+  }
+
+  permits = {
+    ats_dashboard_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ats_dashboard_view.includes(ctx.subject),
+
+    ats_job_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ats_job_view.includes(ctx.subject),
+
+    ats_job_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_job_manage.includes(ctx.subject),
+
+    ats_application_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ats_application_view.includes(ctx.subject),
+
+    ats_application_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_application_manage.includes(ctx.subject),
+
+    ats_interview_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ats_interview_view.includes(ctx.subject),
+
+    ats_interview_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_interview_manage.includes(ctx.subject),
+
+    ats_talent_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ats_talent_view.includes(ctx.subject),
+
+    ats_talent_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_talent_manage.includes(ctx.subject),
+
+    ats_availability_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_availability_manage.includes(ctx.subject),
+
+    ats_ai_use: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_ai_use.includes(ctx.subject),
+
+    ats_hire: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_hire.includes(ctx.subject),
+
+    ats_publish: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_ats_publish.includes(ctx.subject),
+  }
+}
