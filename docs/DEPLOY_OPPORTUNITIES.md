@@ -27,6 +27,7 @@ Shared surfaces only: worker dual-DB catalog write + Pub/Sub fan-out.
 | `opportunities-matching` | Candidates, matches, CV/chat, billing; **owns product Neon** | product | `/matching` | `ghcr.io/stawi-opportunities/opportunities-matching:v8.0.215` |
 | `opportunities-api` | Public search + detail; attaches **product** Neon | product (shared) | **`/opportunities`** | `ghcr.io/stawi-opportunities/opportunities-api:v8.0.242` |
 | `opportunities-crawler` | **Owns crawl Neon** + migrate Job; service min=0 | crawl | none (private) | `ghcr.io/stawi-opportunities/opportunities-crawler:v8.0.211` |
+| `opportunities-ats` | Employer ATS (`service_ats`); scheduling via **platform-calendar** | ATS (own) | **`/ats`** | `ghcr.io/stawi-opportunities/opportunities-ats:v8.1.0` |
 
 Images are **public GHCR** (`ghcr.io/stawi-opportunities/...`). Do not pin Artifact Registry `ghcr-mirror` paths.
 

@@ -42,6 +42,20 @@ apps:
           - "vault: stawi/product-opportunities/common/inference-credentials nvidia_api_key"
           - "k8s: product-opportunities/inference-credentials-opportunities EMBEDDING_API_KEY"
 
+  opportunities-ats:
+    runtime_secrets:
+      - id: opportunities-ats-database-url
+        managed_by_tofu: true
+        notes: "ATS Neon (pooled)"
+      - id: opportunities-ats-database-url-direct
+        managed_by_tofu: true
+        notes: "ATS Neon (direct; migrate)"
+      - id: opportunities-matching-database-url
+        shared: true
+        notes: "optional talent shortlist"
+      - id: hydra-webhook-psk
+        shared: true
+
   opportunities-api:
     runtime_secrets:
       - id: opportunities-matching-database-url

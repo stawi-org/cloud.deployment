@@ -1,0 +1,12 @@
+name: opportunities-ats
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: opportunities
+neon:
+  account: opportunities
+runtime: cloudrun
+domain: opportunities
+version: 1
