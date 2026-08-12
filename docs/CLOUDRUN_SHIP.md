@@ -64,6 +64,7 @@ workload_identity_provider:   projects/721554040672/locations/global/workloadIde
 | `antinvestor/service-profile` (geolocation) | `ghcr.io/antinvestor/service-profile-geolocation` | `platform-geolocation` |
 | `antinvestor/service-profile` (chatagent) | `ghcr.io/antinvestor/service-profile-chatagent` | `platform-chat-agent` |
 | `antinvestor/service-files` | `ghcr.io/antinvestor/service-files` | `platform-files` |
+| `stawi-opportunities/opportunities` (`apps/calendar`) | `ghcr.io/stawi-opportunities/opportunities-calendar` | `platform-calendar` |
 
 ```text
 project_id:                   stawi-platform
