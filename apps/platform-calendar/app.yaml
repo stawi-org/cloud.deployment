@@ -1,0 +1,12 @@
+name: platform-calendar
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: platform
+neon:
+  account: platform
+runtime: cloudrun
+domain: platform
+version: 1

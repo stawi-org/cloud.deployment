@@ -13,7 +13,7 @@ shared:
   - id: hydra-webhook-psk
     description: OAuth private_key_jwt signer PSK (same value as identity)
     required: true
-    used_by: [platform-devices, platform-settings, platform-geolocation, platform-files, platform-chat-agent]
+    used_by: [platform-devices, platform-settings, platform-geolocation, platform-files, platform-chat-agent, platform-calendar]
     source_hints:
       - "k8s: platform/hydra-webhook-psk psk (or identity/hydra-webhook-psk)"
       - "scripts/sync-cluster-secrets-to-gcp.sh"
@@ -43,6 +43,17 @@ apps:
         source_hints:
           - "NVIDIA Build / NGC API key (nvapi-…)"
           - "./scripts/seed-gcp-secrets.sh --project stawi-platform --set platform-chat-agent-inference-secondary-api-keys=..."
+
+  platform-calendar:
+    runtime_secrets:
+      - id: platform-calendar-database-url
+        managed_by_tofu: true
+        env: DATABASE_URL
+      - id: platform-calendar-database-url-direct
+        managed_by_tofu: true
+        notes: "Neon direct (migrate/setup Job)"
+      - id: hydra-webhook-psk
+        shared: true
 
   platform-files:
     runtime_secrets:
