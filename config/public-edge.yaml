@@ -40,6 +40,7 @@ prod:
       /files: { service: platform-files, project: stawi-platform }
       /chat-agent: { service: platform-chat-agent, project: stawi-platform }
       /calendar: { service: platform-calendar, project: stawi-platform }
+      /ats: { service: opportunities-ats, project: stawi-opportunities }
       /audit: { service: operations-audit, project: stawi-operations }
       /formstore: { service: operations-formstore, project: stawi-operations }
       /queuestore: { service: operations-queuestore, project: stawi-operations }

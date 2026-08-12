@@ -20,4 +20,6 @@ additional_invoker_members = [
   "serviceAccount:platform-files@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-geolocation@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-settings@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:platform-calendar@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:opportunities-ats@stawi-opportunities.iam.gserviceaccount.com",
 ]

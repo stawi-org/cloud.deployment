@@ -603,6 +603,23 @@
       "notes": "Enable after Cloud Run apply. Reuses profile/files/redirect/notification/payment/checkout."
     },
     {
+      "id": "ats",
+      "prefix": "/ats",
+      "service": "opportunities-ats",
+      "project": "stawi-opportunities",
+      "origin": "https://opportunities-ats-f6yrcb5eta-ew.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "ATS",
+        "description": "Employer ATS (jobs, pipeline, interviews). Scheduling via platform-calendar.",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Own Neon on opportunities. Calendar is platform-calendar at /calendar."
+    },
+    {
       "id": "loans",
       "prefix": "/loans",
       "service": "finance-loans",
