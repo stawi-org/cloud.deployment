@@ -38,4 +38,6 @@ additional_invoker_members = [
   # ledger (stawi-ledger) — ledger + billing
   "serviceAccount:ledger-ledger@stawi-ledger.iam.gserviceaccount.com",
   "serviceAccount:ledger-billing@stawi-ledger.iam.gserviceaccount.com",
+  # imports (stawi-importation-sales) — Stawi Imports admin ReBAC
+  "serviceAccount:imports@stawi-importation-sales.iam.gserviceaccount.com",
 ]
