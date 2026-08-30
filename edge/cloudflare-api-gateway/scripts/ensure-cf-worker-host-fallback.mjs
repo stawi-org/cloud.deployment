@@ -52,8 +52,11 @@ if (directs.length === 0) {
   process.exit(0);
 }
 
-// 1) Inject host_routes from direct_cnames so Worker can proxy
-config.host_routes = directs.map((h) => ({
+// 1) Inject host_routes from direct_cnames so Worker can proxy.
+// MERGE with declared host_routes (e.g. api.stawi.trade, a Worker custom
+// domain on another zone) instead of replacing — replacing silently dropped
+// declared hosts from the deployed bundle.
+const fallbackRoutes = directs.map((h) => ({
   id: h.id,
   hostname: h.hostname,
   service: h.id,
@@ -63,6 +66,13 @@ config.host_routes = directs.map((h) => ({
   public: true,
   notes: "Free fallback Host proxy (Origin Rules unavailable)",
 }));
+const fallbackHosts = new Set(fallbackRoutes.map((r) => String(r.hostname).toLowerCase()));
+config.host_routes = [
+  ...(config.host_routes || []).filter(
+    (r) => r?.hostname && !fallbackHosts.has(String(r.hostname).toLowerCase()),
+  ),
+  ...fallbackRoutes,
+];
 writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 console.log("Wrote host_routes fallback into routes.prod.json (deploy-time only on runner)");
 
