@@ -19,3 +19,9 @@ zone_name = "stawi.org"
 [[routes]]
 pattern = "pay.stawi.org/*"
 zone_name = "stawi.org"
+
+# Stawi Imports API on the stawi.trade zone — Worker custom domain (DNS + cert
+# auto-provisioned). Proxied to the imports Cloud Run via host_routes.
+[[routes]]
+pattern = "api.stawi.trade"
+custom_domain = true

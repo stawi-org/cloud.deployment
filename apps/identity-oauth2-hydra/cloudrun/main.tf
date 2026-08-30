@@ -103,6 +103,8 @@ locals {
     "https://accounts.stawi.dev",
     "https://stawi.trade",
     "https://www.stawi.trade",
+    "https://stawi.loan",
+    "https://www.stawi.loan",
     "https://api.stawi.org",
     "https://api.stawi.dev",
     "http://localhost:5173",

@@ -43,6 +43,16 @@
       "enabled": true,
       "public": true,
       "notes": "Hosted checkout: CF Universal SSL via this Worker (Host rewrite to run.app). Preferable to Origin Rules when the API token lacks Rulesets edit. No Google managed cert."
+    },
+    {
+      "id": "imports-api",
+      "hostname": "api.stawi.trade",
+      "service": "imports",
+      "origin": "https://imports-75p7mkagza-ew.a.run.app",
+      "strip_prefix": false,
+      "enabled": true,
+      "public": true,
+      "notes": "Stawi Imports API on its own zone (stawi.trade). Worker custom domain (wrangler.toml); Host rewrite to run.app like pay."
     }
   ],
   "direct_cnames": [
