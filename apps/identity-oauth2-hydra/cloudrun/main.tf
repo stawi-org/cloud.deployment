@@ -101,6 +101,8 @@ locals {
     "https://thesa-dev.stawi.org",
     "https://accounts.stawi.org",
     "https://accounts.stawi.dev",
+    "https://stawi.trade",
+    "https://www.stawi.trade",
     "https://api.stawi.org",
     "https://api.stawi.dev",
     "http://localhost:5173",
