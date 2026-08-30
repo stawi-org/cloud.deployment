@@ -703,7 +703,7 @@
       "id": "imports",
       "prefix": "/imports",
       "service": "imports",
-      "project": "stawi-labs-dev",
+      "project": "stawi-importation-sales",
       "origin": "https://REPLACE-AFTER-FIRST-DEPLOY-ew.a.run.app",
       "strip_prefix": true,
       "enabled": false,
@@ -713,7 +713,7 @@
         "title": "Imports",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Stawi Imports Connect-RPC API (stawilabs/stawi.imports). Set origin to the Cloud Run URL from the imports app's tofu output, then enabled=true. Frontend is a CF Worker custom-domain on imports.stawi.org (not listed here)."
+      "notes": "Stawi Imports Connect-RPC API (stawiimports/stawi.imports). Set origin to the Cloud Run URL from the imports app's tofu output, then enabled=true. Frontend is a CF Worker custom-domain on imports.stawi.org (not listed here)."
     }
   ]
 }

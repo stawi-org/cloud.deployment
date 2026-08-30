@@ -1,5 +1,5 @@
 image                    = "ghcr.io/stawilabs/stawi.imports-api:v0.1.0"
-platform                 = "stawi-dev"
+platform                 = "stawi-prod"
 resource_path            = "/imports"
 has_database             = true
 memory                   = "512Mi"
