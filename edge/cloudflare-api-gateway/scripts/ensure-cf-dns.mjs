@@ -177,6 +177,13 @@ const workerHostnames = new Set(
     .map((h) => String(h.hostname).toLowerCase().replace(/\.$/, "")),
 );
 for (const fqdn of workerHostnames) {
+  // Hostnames on other zones (e.g. api.stawi.trade) are Worker custom domains:
+  // wrangler provisions their DNS + certs in their own zone. Managing them here
+  // would create bogus <host>.stawi.org records in the stawi.org zone.
+  if (fqdn !== "stawi.org" && !fqdn.endsWith(ZONE_SUFFIX)) {
+    console.log(`skip ${fqdn} (outside ${ZONE_SUFFIX.slice(1)} zone — Worker custom domain)`);
+    continue;
+  }
   await ensureWorkerA(shortName(fqdn));
 }
 
@@ -184,6 +191,10 @@ for (const fqdn of workerHostnames) {
 for (const h of config.direct_cnames || []) {
   if (!h?.hostname || !h?.origin) continue;
   const fqdn = String(h.hostname).toLowerCase().replace(/\.$/, "");
+  if (fqdn !== "stawi.org" && !fqdn.endsWith(ZONE_SUFFIX)) {
+    console.log(`skip direct CNAME ${fqdn} (outside ${ZONE_SUFFIX.slice(1)} zone)`);
+    continue;
+  }
   if (workerHostnames.has(fqdn)) {
     console.log(`skip direct CNAME ${fqdn} (Worker host_routes)`);
     continue;
