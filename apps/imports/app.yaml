@@ -1,0 +1,12 @@
+name: imports
+owners:
+  - platform
+envs:
+  - stawi-dev # labs account is dev-only; move to a funded prod account before launch
+gcp:
+  account: labs
+neon:
+  account: labs
+runtime: cloudrun
+domain: labs
+version: 1

@@ -15,6 +15,7 @@ locals {
     "https://opportunities.stawi.dev",
     "https://accounts.stawi.org",
     "https://accounts.stawi.dev",
+    "https://imports.stawi.org",
     "http://localhost:5173",
     "http://localhost:3000",
   ]
