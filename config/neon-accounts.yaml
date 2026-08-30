@@ -118,3 +118,16 @@ accounts:
     sensitivity: medium
     sops_auth_path: credentials/neon/finance/auth.yaml
     neon_org_hint: Stawi Finance
+  imports:
+    description: Neon organization for imports domain (auto-registered by bootstrap-neon-account.sh)
+    owners:
+      - platform
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - imports-
+    sensitivity: medium
+    sops_auth_path: credentials/neon/imports/auth.yaml
+    neon_org_hint: Importation Sales
+    neon_org_id: org-noisy-sun-95614589
