@@ -36,8 +36,8 @@ module "frame" {
   migrate_args             = var.migrate_args
 
   app_env = {
-    IMPORTS_PUBLIC_BASE_URL = "https://imports.stawi.org"
-    FRONTEND_ORIGIN         = "https://imports.stawi.org"
+    IMPORTS_PUBLIC_BASE_URL = "https://stawi.trade"
+    FRONTEND_ORIGIN         = "https://stawi.trade"
     PROFILE_SERVICE_URI     = "https://api.stawi.org/profile"
   }
 }
