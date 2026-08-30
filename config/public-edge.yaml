@@ -47,6 +47,9 @@ prod:
       /redirect: { service: operations-redirect, project: stawi-operations }
       /thesa: { service: operations-thesa, project: stawi-operations }
       /trustage: { service: operations-trustage, project: stawi-operations }
+      # Pending first deploy — route disabled in routes.prod.json until the
+      # Cloud Run origin exists. Frontend: CF Worker custom domain imports.stawi.org.
+      /imports: { service: imports, project: stawi-importation-sales }
 
   # Optional overlay only (IAM). Never list pay here — checkout is CF direct only.
   # See scripts/create-domain-mappings.sh and ensure-cf-domain-mapping-dns.mjs.

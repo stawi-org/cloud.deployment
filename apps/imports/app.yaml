@@ -1,0 +1,12 @@
+name: imports
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: imports
+neon:
+  account: imports
+runtime: cloudrun
+domain: imports
+version: 1
