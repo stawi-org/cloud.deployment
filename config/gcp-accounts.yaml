@@ -229,3 +229,19 @@ accounts:
           managed-by: cloud-deployment
           domain: finance
           environment: prod
+  imports:
+    description: GCP account imports (auto-registered by bootstrap-gcp-account.sh)
+    owners:
+      - platform
+    sensitivity: medium
+    envs:
+      stawi-prod:
+        project_id: stawi-importation-sales
+        region: europe-west1
+        workload_identity_provider: projects/838731814902/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-importation-sales.iam.gserviceaccount.com
+        sops_auth_path: credentials/gcp/imports/stawi-prod/auth.yaml
+        labels:
+          managed-by: cloud-deployment
+          domain: imports
+          environment: prod
