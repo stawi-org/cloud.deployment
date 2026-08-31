@@ -11,6 +11,23 @@ provider "google" {
   region  = var.region
 }
 
+# Shared secret for trustage -> imports sweep callbacks (X-Lifecycle-Token).
+# Rendered into the trustage workflow definitions by the setup job and
+# checked by POST /internal/lifecycle/sweep/{expire|sla|reminders}.
+resource "random_password" "lifecycle_callback_token" {
+  length  = 48
+  special = false
+}
+
+locals {
+  # Trustage (cron sweeps) + the callback base the sweeps post back to.
+  # Needed by BOTH the runtime service and the setup job (workflow sync).
+  lifecycle_env = {
+    TRUSTAGE_URL          = "https://api.stawi.org/trustage"
+    API_INTERNAL_BASE_URL = "https://api.stawi.trade"
+  }
+}
+
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
 
@@ -35,9 +52,21 @@ module "frame" {
   memory                   = var.memory
   migrate_args             = var.migrate_args
 
-  app_env = {
+  extra_secret_ids  = toset(["${var.app_name}-lifecycle-callback-token"])
+  extra_version_ids = toset(["${var.app_name}-lifecycle-callback-token"])
+  extra_secret_values = {
+    "${var.app_name}-lifecycle-callback-token" = random_password.lifecycle_callback_token.result
+  }
+  # secret_env_extra is merged into the migrate/setup job too (see module).
+  secret_env_extra = {
+    LIFECYCLE_CALLBACK_TOKEN = { secret = "${var.app_name}-lifecycle-callback-token" }
+  }
+
+  app_env = merge(local.lifecycle_env, {
     IMPORTS_PUBLIC_BASE_URL = "https://stawi.trade"
     FRONTEND_ORIGIN         = "https://stawi.trade"
     PROFILE_SERVICE_URI     = "https://api.stawi.org/profile"
-  }
+    REQUEST_DECISION_EXPIRY = "336h"
+  })
+  migrate_env = local.lifecycle_env
 }
