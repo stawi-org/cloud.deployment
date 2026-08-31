@@ -59,7 +59,7 @@ GOOGLE_CLOUD_PROJECT      → stawi-opportunities
 | candidates, matches, applications | url_frontier, job_ingest_queue |
 | billing entitlement cache | crawl_jobs, job_ingest_events |
 
-Search on **product** Neon uses **`lakebase_text`**. Crawl Neon uses Timescale for audit/queues only.
+Search on **product** Neon uses **`lakebase_text`**. Crawl Neon holds plain append-only audit/queue tables.
 
 ## Apply order
 
@@ -130,7 +130,7 @@ kubectl -n product-opportunities create secret generic product-neon-credentials-
 neon_extensions = [
   "uuid-ossp", "pg_stat_statements", "pg_trgm",
   "btree_gin", "btree_gist", "vector",
-  "lakebase_text", "timescaledb",
+  "lakebase_text",
 ]
 ```
 
@@ -139,7 +139,7 @@ neon_extensions = [
 ```hcl
 neon_extensions = [
   "uuid-ossp", "pg_stat_statements", "pg_trgm",
-  "btree_gin", "btree_gist", "timescaledb", "vector",
+  "btree_gin", "btree_gist", "vector",
 ]
 ```
 

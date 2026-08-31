@@ -37,7 +37,7 @@ resource "neon_database" "app" {
 # ---------------------------------------------------------------------------
 # PostgreSQL extensions (CREATE EXTENSION IF NOT EXISTS)
 #
-# Neon supports many extensions (timescaledb Apache-2, postgis, uuid-ossp, …).
+# Neon supports many extensions (postgis, uuid-ossp, vector, …).
 # pg_search is deprecated on Neon for new projects (as of 2026-03) — avoid.
 # Prefer lakebase_text for BM25 (requires Lakebase Search enabled on the project).
 #

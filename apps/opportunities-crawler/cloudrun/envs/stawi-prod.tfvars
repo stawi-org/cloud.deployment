@@ -4,7 +4,7 @@ container_port = 8080
 resource_path  = ""
 memory         = "512Mi"
 has_database   = true
-# Crawl DB: queues, frontier, sources, Timescale audit — not product catalog.
+# Crawl DB: queues, frontier, sources, append-only audit — not product catalog.
 # No lakebase_text (product search stays on matching Neon).
 neon_extensions = [
   "uuid-ossp",
@@ -12,7 +12,6 @@ neon_extensions = [
   "pg_trgm",
   "btree_gin",
   "btree_gist",
-  "timescaledb",
   "vector",
 ]
 requested_audience_paths = []

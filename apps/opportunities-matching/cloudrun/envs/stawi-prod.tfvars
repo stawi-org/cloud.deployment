@@ -16,7 +16,6 @@ neon_extensions = [
   "btree_gin",
   "btree_gist",
   "vector",
-  "timescaledb",
   "lakebase_text",
 ]
 requested_audience_paths = [
