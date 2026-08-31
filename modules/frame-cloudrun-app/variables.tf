@@ -354,3 +354,24 @@ variable "keep_warm_scheduler_region" {
   type    = string
   default = "europe-west1"
 }
+
+# ---------------------------------------------------------------------------
+# Database cutover overrides (Supabase migration)
+# ---------------------------------------------------------------------------
+# When non-null, these replace the Neon module outputs in the two live DB
+# secrets (<app>-database-url / <app>-database-url-direct). The app root
+# supplies URIs from modules/supabase-database; the Neon project still
+# exists, so rollback = set back to null. Both must be set together.
+variable "database_url_override" {
+  type        = string
+  default     = null
+  sensitive   = true
+  description = "Override for the pooled runtime DATABASE_URL secret value"
+}
+
+variable "database_url_direct_override" {
+  type        = string
+  default     = null
+  sensitive   = true
+  description = "Override for the direct/migrate DATABASE_URL secret value"
+}

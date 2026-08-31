@@ -5,6 +5,10 @@ provider "neon" {
   api_key = var.neon_api_key
 }
 
+provider "supabase" {
+  access_token = var.supabase_access_token
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -24,6 +28,37 @@ locals {
   push_oidc_audience   = local.service_run_url
 }
 
+# Supabase project (phase 1 of the migration). Base five extensions match the
+# Neon defaults now that timescaledb is gone.
+module "supabase_db" {
+  count  = var.supabase_enabled ? 1 : 0
+  source = "../../../modules/supabase-database"
+
+  app_name = var.app_name
+  org_id   = var.supabase_org_id
+  region   = var.supabase_region
+  extensions = [
+    "uuid-ossp",
+    "pg_stat_statements",
+    "pg_trgm",
+    "btree_gin",
+    "btree_gist",
+  ]
+}
+
+locals {
+  # Phase-1 staging secrets: expose the Supabase URIs for the data copy
+  # before cutover. Removed once the migration completes.
+  supabase_secret_ids = var.supabase_enabled ? [
+    "${var.app_name}-supabase-database-url",
+    "${var.app_name}-supabase-database-url-direct",
+  ] : []
+  supabase_secret_values = var.supabase_enabled ? {
+    "${var.app_name}-supabase-database-url"        = module.supabase_db[0].pooled_connection_uri
+    "${var.app_name}-supabase-database-url-direct" = module.supabase_db[0].connection_uri
+  } : {}
+}
+
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
 
@@ -41,6 +76,22 @@ module "frame" {
   neon_region_id           = var.neon_region_id
   neon_extensions          = var.neon_extensions
   has_database             = var.has_database
+
+  # Supabase migration: staging secrets in phase 1; live-secret override in
+  # phase 2 (after the data copy). Neon stays provisioned for rollback.
+  extra_secret_ids    = toset(concat(tolist(var.extra_secret_ids), local.supabase_secret_ids))
+  extra_version_ids   = toset(concat(tolist(var.extra_version_ids), local.supabase_secret_ids))
+  extra_secret_values = merge(var.extra_secret_values, local.supabase_secret_values)
+  database_url_override = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].pooled_connection_uri
+    : null
+  )
+  database_url_direct_override = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].connection_uri
+    : null
+  )
   container_port           = var.container_port
   memory                   = var.memory
   migrate_args             = var.migrate_args

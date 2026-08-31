@@ -117,3 +117,42 @@ variable "migrate_args" {
   type    = list(string)
   default = ["setup"]
 }
+
+# ---------------------------------------------------------------------------
+# Supabase migration (docs/superpowers/specs/2026-08-31-supabase-migration-design.md)
+# ---------------------------------------------------------------------------
+variable "supabase_access_token" {
+  type        = string
+  sensitive   = true
+  default     = "unused"
+  description = "Supabase org access token (from SOPS credentials via CI — never commit)"
+}
+
+variable "supabase_org_id" {
+  type        = string
+  default     = ""
+  description = "Supabase organization slug (from supabase-accounts registry / SOPS)"
+}
+
+variable "supabase_region" {
+  type    = string
+  default = "eu-central-1"
+}
+
+variable "supabase_enabled" {
+  type        = bool
+  default     = false
+  description = "Phase 1: create the Supabase project + staging secrets (no service impact)"
+}
+
+variable "database_cutover" {
+  type        = bool
+  default     = false
+  description = "Phase 2: point the live DB secrets at Supabase (requires supabase_enabled and completed data copy)"
+}
+
+variable "extra_version_ids" {
+  type        = set(string)
+  default     = []
+  description = "Subset of extra_secret_ids whose versions tofu manages"
+}

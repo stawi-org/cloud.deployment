@@ -17,6 +17,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_YAML="$ROOT/apps/${APP}/app.yaml"
 GCP_REG="$ROOT/config/gcp-accounts.yaml"
 NEON_REG="$ROOT/config/neon-accounts.yaml"
+SUPABASE_REG="$ROOT/config/supabase-accounts.yaml"
 
 [[ -f "$APP_YAML" ]] || { echo "ERROR: missing $APP_YAML" >&2; exit 1; }
 command -v yq >/dev/null 2>&1 || { echo "ERROR: yq required" >&2; exit 1; }
@@ -24,6 +25,8 @@ command -v yq >/dev/null 2>&1 || { echo "ERROR: yq required" >&2; exit 1; }
 GCP_ACCOUNT=$(yq -r '.gcp.account // ""' "$APP_YAML")
 NEON_ACCOUNT=$(yq -r '.neon.account // ""' "$APP_YAML")
 [[ "$NEON_ACCOUNT" == "null" ]] && NEON_ACCOUNT=""
+SUPABASE_ACCOUNT=$(yq -r '.supabase.account // ""' "$APP_YAML")
+[[ "$SUPABASE_ACCOUNT" == "null" ]] && SUPABASE_ACCOUNT=""
 
 [[ -n "$GCP_ACCOUNT" && "$GCP_ACCOUNT" != "null" ]] || {
   echo "ERROR: apps/${APP}/app.yaml missing gcp.account" >&2
@@ -63,6 +66,24 @@ if [[ -n "$NEON_ACCOUNT" ]]; then
   [[ "$NEON_ORG_ID" == "null" ]] && NEON_ORG_ID=""
 fi
 
+USES_SUPABASE="false"
+SUPABASE_SOPS=""
+SUPABASE_ORG_ID=""
+if [[ -n "$SUPABASE_ACCOUNT" ]]; then
+  USES_SUPABASE="true"
+  if ! yq -e ".accounts[\"${SUPABASE_ACCOUNT}\"]" "$SUPABASE_REG" >/dev/null 2>&1; then
+    echo "ERROR: unknown supabase.account=${SUPABASE_ACCOUNT}" >&2
+    exit 1
+  fi
+  if ! yq -e ".accounts[\"${SUPABASE_ACCOUNT}\"].allowed_deploy_envs[] | select(. == \"${ENV}\")" "$SUPABASE_REG" >/dev/null 2>&1; then
+    echo "ERROR: supabase.account=${SUPABASE_ACCOUNT} disallows env ${ENV}" >&2
+    exit 1
+  fi
+  SUPABASE_SOPS="credentials/supabase/${SUPABASE_ACCOUNT}/auth.yaml"
+  SUPABASE_ORG_ID=$(yq -r ".accounts[\"${SUPABASE_ACCOUNT}\"].supabase_org_id // \"\"" "$SUPABASE_REG")
+  [[ "$SUPABASE_ORG_ID" == "null" ]] && SUPABASE_ORG_ID=""
+fi
+
 LABELS_JSON=$(yq -o=json -I=0 ".accounts[\"${GCP_ACCOUNT}\"].envs[\"${ENV}\"].labels // {}" "$GCP_REG")
 
 CTX=$(jq -nc \
@@ -78,6 +99,10 @@ CTX=$(jq -nc \
   --arg gcp_sops_path "$GCP_SOPS" \
   --arg neon_sops_path "$NEON_SOPS" \
   --arg neon_org_id "$NEON_ORG_ID" \
+  --arg supabase_account "$SUPABASE_ACCOUNT" \
+  --arg uses_supabase "$USES_SUPABASE" \
+  --arg supabase_sops_path "$SUPABASE_SOPS" \
+  --arg supabase_org_id "$SUPABASE_ORG_ID" \
   --argjson labels "$LABELS_JSON" \
   '{
     app: $app,
@@ -92,6 +117,10 @@ CTX=$(jq -nc \
     gcp_sops_path: $gcp_sops_path,
     neon_sops_path: $neon_sops_path,
     neon_org_id: $neon_org_id,
+    supabase_account: $supabase_account,
+    uses_supabase: ($uses_supabase == "true"),
+    supabase_sops_path: $supabase_sops_path,
+    supabase_org_id: $supabase_org_id,
     labels: $labels
   }')
 
@@ -108,8 +137,9 @@ case "$FORMAT" in
     [[ -n "${GITHUB_OUTPUT:-}" ]] || { echo "ERROR: GITHUB_OUTPUT not set" >&2; exit 1; }
     while IFS= read -r line; do
       echo "$line" >> "${GITHUB_OUTPUT}"
-    done < <(echo "$CTX" | jq -r 'to_entries[] | select(.key != "labels" and .key != "uses_neon") | "\(.key)=\(.value)"')
+    done < <(echo "$CTX" | jq -r 'to_entries[] | select(.key != "labels" and .key != "uses_neon" and .key != "uses_supabase") | "\(.key)=\(.value)"')
     echo "uses_neon=$(jq -r '.uses_neon' <<<"$CTX")" >> "${GITHUB_OUTPUT}"
+    echo "uses_supabase=$(jq -r '.uses_supabase' <<<"$CTX")" >> "${GITHUB_OUTPUT}"
     echo "labels_json=$(echo "$CTX" | jq -c '.labels')" >> "${GITHUB_OUTPUT}"
     ;;
   *) echo "ERROR: unknown format $FORMAT" >&2; exit 1 ;;

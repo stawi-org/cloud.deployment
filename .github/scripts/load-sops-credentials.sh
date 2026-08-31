@@ -26,6 +26,8 @@ CTX=$("$ROOT/.github/scripts/resolve-app-context.sh" "$APP" "$ENV" --format=json
 GCP_ACCOUNT=$(jq -r '.gcp_account' <<<"$CTX")
 NEON_ACCOUNT=$(jq -r '.neon_account // empty' <<<"$CTX")
 USES_NEON=$(jq -r '.uses_neon' <<<"$CTX")
+SUPABASE_ACCOUNT=$(jq -r '.supabase_account // empty' <<<"$CTX")
+USES_SUPABASE=$(jq -r '.uses_supabase // false' <<<"$CTX")
 # Prefer registry non-secret region if SOPS omits it
 REG_REGION=$(jq -r '.region // empty' <<<"$CTX")
 REG_PROJECT=$(jq -r '.project_id // empty' <<<"$CTX")
@@ -128,6 +130,32 @@ if [[ "$USES_NEON" == "true" ]]; then
   echo "Resolved neon.account=${NEON_ACCOUNT} org_id=${NEON_ORG_ID}" >&2
 fi
 
+SUPABASE_ACCESS_TOKEN=""
+SUPABASE_ORG_ID=$(jq -r '.supabase_org_id // empty' <<<"$CTX")
+if [[ "$USES_SUPABASE" == "true" ]]; then
+  SUPABASE_SOPS="$ROOT/credentials/supabase/${SUPABASE_ACCOUNT}/auth.yaml"
+  if [[ ! -f "$SUPABASE_SOPS" ]]; then
+    echo "ERROR: missing $SUPABASE_SOPS — encrypt the org access token first (see config/supabase-accounts.yaml)" >&2
+    exit 1
+  fi
+  SUPABASE_JSON=$(sops -d "$SUPABASE_SOPS" | yq -o=json '.')
+  SUPABASE_ACCESS_TOKEN=$(jq -r '.auth.access_token // .access_token // empty' <<<"$SUPABASE_JSON")
+  # Prefer SOPS supabase_org_id when present; else registry
+  SOPS_SB_ORG=$(jq -r '.auth.supabase_org_id // .supabase_org_id // empty' <<<"$SUPABASE_JSON")
+  if [[ -n "$SOPS_SB_ORG" && "$SOPS_SB_ORG" != "null" ]]; then
+    SUPABASE_ORG_ID="$SOPS_SB_ORG"
+  fi
+  [[ -n "$SUPABASE_ACCESS_TOKEN" && "$SUPABASE_ACCESS_TOKEN" != "null" ]] || {
+    echo "ERROR: decrypted Supabase auth missing access_token" >&2
+    exit 1
+  }
+  [[ -n "$SUPABASE_ORG_ID" && "$SUPABASE_ORG_ID" != "null" ]] || {
+    echo "ERROR: supabase.account=${SUPABASE_ACCOUNT} missing supabase_org_id in registry/SOPS" >&2
+    exit 1
+  }
+  echo "Resolved supabase.account=${SUPABASE_ACCOUNT} org_id=${SUPABASE_ORG_ID}" >&2
+fi
+
 emit_gha() {
   [[ -n "${GITHUB_OUTPUT:-}" ]] || { echo "ERROR: GITHUB_OUTPUT not set" >&2; exit 1; }
   [[ -n "${GITHUB_ENV:-}" ]] || { echo "ERROR: GITHUB_ENV not set" >&2; exit 1; }
@@ -141,6 +169,9 @@ emit_gha() {
     echo "neon_account=${NEON_ACCOUNT}"
     echo "uses_neon=${USES_NEON}"
     echo "neon_org_id=${NEON_ORG_ID}"
+    echo "supabase_account=${SUPABASE_ACCOUNT}"
+    echo "uses_supabase=${USES_SUPABASE}"
+    echo "supabase_org_id=${SUPABASE_ORG_ID}"
   } >> "${GITHUB_OUTPUT}"
 
   # Workflow commands (add-mask) must go to stdout — never to GITHUB_ENV.
@@ -158,6 +189,18 @@ emit_gha() {
     echo "TF_VAR_neon_api_key=unused" >> "${GITHUB_ENV}"
     echo "TF_VAR_neon_org_id=" >> "${GITHUB_ENV}"
   fi
+  if [[ -n "$SUPABASE_ACCESS_TOKEN" ]]; then
+    echo "::add-mask::${SUPABASE_ACCESS_TOKEN}"
+    {
+      echo "TF_VAR_supabase_access_token<<SOPS_SUPABASE_EOF"
+      echo "${SUPABASE_ACCESS_TOKEN}"
+      echo "SOPS_SUPABASE_EOF"
+    } >> "${GITHUB_ENV}"
+    echo "TF_VAR_supabase_org_id=${SUPABASE_ORG_ID}" >> "${GITHUB_ENV}"
+  else
+    echo "TF_VAR_supabase_access_token=unused" >> "${GITHUB_ENV}"
+    echo "TF_VAR_supabase_org_id=" >> "${GITHUB_ENV}"
+  fi
 }
 
 emit_exports() {
@@ -170,6 +213,12 @@ emit_exports() {
     echo "export TF_VAR_neon_org_id=$(printf %q "$NEON_ORG_ID")"
   else
     echo "export TF_VAR_neon_api_key=unused"
+  fi
+  if [[ -n "$SUPABASE_ACCESS_TOKEN" ]]; then
+    echo "export TF_VAR_supabase_access_token=$(printf %q "$SUPABASE_ACCESS_TOKEN")"
+    echo "export TF_VAR_supabase_org_id=$(printf %q "$SUPABASE_ORG_ID")"
+  else
+    echo "export TF_VAR_supabase_access_token=unused"
   fi
 }
 

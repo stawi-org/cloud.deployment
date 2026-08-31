@@ -4,6 +4,10 @@ provider "neon" {
   api_key = var.neon_api_key
 }
 
+provider "supabase" {
+  access_token = var.supabase_access_token
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -14,6 +18,18 @@ module "db" {
   app_name  = var.app_name
   org_id    = var.neon_org_id
   region_id = var.neon_region_id
+}
+
+# Supabase project (phase 1 of the migration). Hydra uses no extensions.
+# NOTE: hydra's JWKs are AEAD-encrypted under SECRETS_SYSTEM — the data copy
+# must move rows verbatim and never rotate that secret.
+module "supabase_db" {
+  count  = var.supabase_enabled ? 1 : 0
+  source = "../../../modules/supabase-database"
+
+  app_name = var.app_name
+  org_id   = var.supabase_org_id
+  region   = var.supabase_region
 }
 
 resource "google_service_account" "runtime" {
@@ -38,6 +54,26 @@ locals {
   issuer        = local.is_prod ? "https://stawi.org" : "https://stawi.dev"
   cookie_domain = local.is_prod ? "stawi.org" : "stawi.dev"
 
+  # Supabase migration: staging ids in phase 1, live-value override in phase 2.
+  supabase_secret_ids = var.supabase_enabled ? [
+    "${var.app_name}-supabase-database-url",
+    "${var.app_name}-supabase-database-url-direct",
+  ] : []
+  supabase_secret_values = var.supabase_enabled ? {
+    "${var.app_name}-supabase-database-url"        = module.supabase_db[0].pooled_connection_uri
+    "${var.app_name}-supabase-database-url-direct" = module.supabase_db[0].connection_uri
+  } : {}
+  db_pooled_uri = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].pooled_connection_uri
+    : module.db.pooled_connection_uri
+  )
+  db_direct_uri = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].connection_uri
+    : module.db.connection_uri
+  )
+
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
   token_hook_secret_id      = "${var.app_name}-token-hook-auth"
@@ -47,11 +83,11 @@ locals {
     "hydra-webhook-psk",
     local.token_hook_secret_id,
   ])
-  secret_ids  = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), local.app_secret_ids, var.extra_secret_ids)
-  version_ids = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), local.app_secret_ids)
+  secret_ids  = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), local.app_secret_ids, var.extra_secret_ids, toset(local.supabase_secret_ids))
+  version_ids = setunion(toset([local.database_secret_id, local.database_direct_secret_id]), local.app_secret_ids, toset(local.supabase_secret_ids))
   secret_values = merge(
-    { (local.database_secret_id) = module.db.pooled_connection_uri },
-    { (local.database_direct_secret_id) = module.db.connection_uri },
+    { (local.database_secret_id) = local.db_pooled_uri },
+    { (local.database_direct_secret_id) = local.db_direct_uri },
     local.generated_secret_values,
     # Only the auth.config object — type is OAUTH2_TOKEN_HOOK_AUTH_TYPE env (see hydra_env).
     # See ory/hydra#3959: consolidated CONFIG_VALUE style is ignored; AUTH_CONFIG is config only.
@@ -63,6 +99,7 @@ locals {
       })
     },
     var.extra_secret_values,
+    local.supabase_secret_values,
   )
 
   # Deterministic admin Cloud Run URL (K8s: hydra-admin ClusterIP only).

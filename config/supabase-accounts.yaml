@@ -1,0 +1,30 @@
+version: 1
+# Supabase organizations per domain (mirrors config/neon-accounts.yaml).
+# org_id is the organization SLUG (Dashboard > Organization Settings >
+# Organization slug). Access tokens live SOPS-encrypted in
+# credentials/supabase/<account>/auth.yaml (never commit plaintext).
+accounts:
+  operations:
+    description: Supabase organization for operations domain (trustage, audit)
+    owners:
+      - platform
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - operations-
+    sensitivity: medium
+    sops_auth_path: credentials/supabase/operations/auth.yaml
+    supabase_org_id: tdvjflugowojsgznvyzs
+  identity:
+    description: Supabase organization for identity domain (keto, hydra)
+    owners:
+      - identity-team
+    allowed_deploy_envs:
+      - stawi-dev
+      - stawi-prod
+    allowed_app_prefixes:
+      - identity-
+    sensitivity: critical
+    sops_auth_path: credentials/supabase/identity/auth.yaml
+    supabase_org_id: qvkjysxvrobgopcvvost
