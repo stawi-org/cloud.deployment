@@ -11,11 +11,11 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 
 | App directory | K8s name | Image (GHCR) | DB | Extensions |
 |---------------|----------|--------------|----|------------|
-| `operations-audit` | service-audit | `service-authentication-audit` | yes | base + **timescaledb** |
+| `operations-audit` | service-audit | `service-authentication-audit` | yes | base |
 | `operations-formstore` | operations-formstore | `service-trustage-formstore` | yes | base |
 | `operations-queuestore` | operations-queuestore | `service-trustage-queue` | yes | base |
 | `operations-redirect` | service-redirect | `service-files-redirect` | yes | base |
-| `operations-trustage` | trustage | `service-trustage` | yes | base + **timescaledb** |
+| `operations-trustage` | trustage | `service-trustage` | yes | base |
 | `operations-thesa` | service-thesa | `service-thesa` | **no** | — |
 
 **Base extensions:** `uuid-ossp`, `pg_stat_statements`, `pg_trgm`, `btree_gin`, `btree_gist`  
@@ -76,7 +76,7 @@ Operations services from `deployment.manifests/namespaces/operations`, deployed 
 Override per app in `apps/<app>/cloudrun/envs/stawi-prod.tfvars`:
 
 ```hcl
-neon_extensions = ["uuid-ossp", "pg_trgm", "timescaledb"]
+neon_extensions = ["uuid-ossp", "pg_trgm", "postgis"]
 ```
 
 ## Apply (CI)
@@ -104,12 +104,12 @@ All six Cloud Run services on **stawi-operations** report **Ready** and **`/read
 
 | Service | Ready | `/readyz` | Neon / secrets |
 |---------|-------|-----------|----------------|
-| operations-audit | yes | 200 | base + timescaledb; `AUDIT_SIGNING_KEY`, `DATABASE_URL` |
+| operations-audit | yes | 200 | base; `AUDIT_SIGNING_KEY`, `DATABASE_URL` |
 | operations-formstore | yes | 200 | base; `DATABASE_URL` |
 | operations-queuestore | yes | 200 | base; `DATABASE_URL` |
 | operations-redirect | yes | 200 | base; `ENCRYPTION_PHRASE`, analytics username/password |
 | operations-thesa | yes | 200 | no DB; analytics backend URL/token |
-| operations-trustage | yes | 200 | base + timescaledb; multi-topic Pub/Sub |
+| operations-trustage | yes | 200 | base; multi-topic Pub/Sub |
 
 Trustage multi-topic env (applied): `QUEUE_EXEC_*` → `operations-trustage-exec`,
 `QUEUE_EVENT_*` → `operations-trustage-wf-events`, Frame events dual-URL + OIDC push,
