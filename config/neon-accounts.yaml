@@ -126,6 +126,8 @@ accounts:
       - stawi-dev
       - stawi-prod
     allowed_app_prefixes:
+      - imports-
+    allowed_app_names:
       - imports
     sensitivity: medium
     sops_auth_path: credentials/neon/imports/auth.yaml
