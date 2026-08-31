@@ -39,3 +39,6 @@ additional_invoker_members = [
   "serviceAccount:ledger-ledger@stawi-ledger.iam.gserviceaccount.com",
   "serviceAccount:ledger-billing@stawi-ledger.iam.gserviceaccount.com",
 ]
+
+# Supabase migration phase 1: provision project + staging secrets (cutover separate)
+supabase_enabled = true

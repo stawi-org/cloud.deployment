@@ -92,10 +92,22 @@ locals {
   # Never default version_ids to all secret_ids — missing secret_values[id] fails plan.
   extra_version_ids = var.extra_version_ids
 
+  # Cutover overrides (Supabase migration): when set, the live DB secrets
+  # carry the override URIs; the Neon project keeps existing either way so
+  # rollback is just unsetting the overrides. See
+  # docs/superpowers/specs/2026-08-31-supabase-migration-design.md.
   secret_values = merge(
     var.has_database ? {
-      (local.database_secret_id)        = module.db[0].pooled_connection_uri
-      (local.database_direct_secret_id) = module.db[0].connection_uri
+      (local.database_secret_id) = (
+        var.database_url_override != null
+        ? var.database_url_override
+        : module.db[0].pooled_connection_uri
+      )
+      (local.database_direct_secret_id) = (
+        var.database_url_direct_override != null
+        ? var.database_url_direct_override
+        : module.db[0].connection_uri
+      )
     } : {},
     var.extra_secret_values,
   )

@@ -7,3 +7,6 @@ creation_rules:
   - path_regex: credentials/neon/.*/auth\.yaml$
     encrypted_regex: "^(.*)$"
     age: age1a2a4pnyq7yhp8qntzrx3htpvp6vf7syxcuwu4qlqz3kheq4jl5vslrtrsn
+  - path_regex: credentials/supabase/.*/auth\.yaml$
+    encrypted_regex: "^(.*)$"
+    age: age1a2a4pnyq7yhp8qntzrx3htpvp6vf7syxcuwu4qlqz3kheq4jl5vslrtrsn

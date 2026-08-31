@@ -8,6 +8,10 @@ provider "neon" {
   api_key = var.neon_api_key
 }
 
+provider "supabase" {
+  access_token = var.supabase_access_token
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -18,6 +22,17 @@ module "db" {
   app_name  = var.app_name
   org_id    = var.neon_org_id
   region_id = var.neon_region_id
+}
+
+# Supabase project (phase 1 of the migration). Keto uses no extensions.
+# Cutover keeps DSN/DATABASE_URL on SESSION mode (prepared statements).
+module "supabase_db" {
+  count  = var.supabase_enabled ? 1 : 0
+  source = "../../../modules/supabase-database"
+
+  app_name = var.app_name
+  org_id   = var.supabase_org_id
+  region   = var.supabase_region
 }
 
 resource "google_service_account" "runtime" {
@@ -56,6 +71,26 @@ resource "google_storage_bucket_iam_member" "runtime_object_viewer" {
 }
 
 locals {
+  # Supabase migration: staging ids in phase 1, live-value override in phase 2.
+  supabase_secret_ids = var.supabase_enabled ? [
+    "${var.app_name}-supabase-database-url",
+    "${var.app_name}-supabase-database-url-direct",
+  ] : []
+  supabase_secret_values = var.supabase_enabled ? {
+    "${var.app_name}-supabase-database-url"        = module.supabase_db[0].pooled_connection_uri
+    "${var.app_name}-supabase-database-url-direct" = module.supabase_db[0].connection_uri
+  } : {}
+  db_pooled_uri = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].pooled_connection_uri
+    : module.db.pooled_connection_uri
+  )
+  db_direct_uri = (
+    var.database_cutover && var.supabase_enabled
+    ? module.supabase_db[0].connection_uri
+    : module.db.connection_uri
+  )
+
   database_secret_id         = "${var.app_name}-database-url"
   database_direct_secret_id  = "${var.app_name}-database-url-direct"
   keto_yml_secret_id         = "${var.app_name}-keto-yml"
@@ -68,19 +103,21 @@ locals {
       local.keto_migrate_yml_secret_id,
     ]),
     var.extra_secret_ids,
+    toset(local.supabase_secret_ids),
   )
-  version_ids = toset([
+  version_ids = setunion(toset([
     local.database_secret_id,
     local.database_direct_secret_id,
     local.keto_yml_secret_id,
     local.keto_migrate_yml_secret_id,
-  ])
+  ]), toset(local.supabase_secret_ids))
   secret_values = merge(
-    { (local.database_secret_id) = module.db.pooled_connection_uri },
-    { (local.database_direct_secret_id) = module.db.connection_uri },
+    { (local.database_secret_id) = local.db_pooled_uri },
+    { (local.database_direct_secret_id) = local.db_direct_uri },
     { (local.keto_yml_secret_id) = file("${path.module}/../files/keto.yml") },
     { (local.keto_migrate_yml_secret_id) = file("${path.module}/../files/keto-migrate.yml") },
     var.extra_secret_values,
+    local.supabase_secret_values,
   )
 
   keto_common_env = merge(module.messaging.service_env, {

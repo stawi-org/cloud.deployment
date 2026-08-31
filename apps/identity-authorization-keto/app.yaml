@@ -8,5 +8,7 @@ gcp:
   account: identity
 neon:
   account: identity
+supabase:
+  account: identity
 runtime: cloudrun
 domain: identity
