@@ -58,9 +58,11 @@ while IFS= read -r -d '' app_yaml; do
     fi
   done
 
-  # allowed_app_prefixes: if non-empty, app name must start with one
+  # allowed_app_prefixes / allowed_app_names: if either is non-empty, the app
+  # name must start with an allowed prefix or equal an allowed name exactly.
   prefixes="$(yq -r ".accounts[\"${acc}\"].allowed_app_prefixes // [] | .[]" "$REG" | paste -sd'|' - || true)"
-  if [[ -n "$prefixes" ]]; then
+  names="$(yq -r ".accounts[\"${acc}\"].allowed_app_names // [] | .[]" "$REG" | paste -sd'|' - || true)"
+  if [[ -n "$prefixes" || -n "$names" ]]; then
     ok=0
     while IFS= read -r p; do
       [[ -z "$p" ]] && continue
@@ -68,9 +70,18 @@ while IFS= read -r -d '' app_yaml; do
         ok=1
         break
       fi
-    done < <(yq -r ".accounts[\"${acc}\"].allowed_app_prefixes[]" "$REG")
+    done < <(yq -r ".accounts[\"${acc}\"].allowed_app_prefixes // [] | .[]" "$REG")
     if [[ "$ok" -ne 1 ]]; then
-      echo "ERROR: apps/${app} name does not match allowed_app_prefixes for neon.account='${acc}': $(yq -r ".accounts[\"${acc}\"].allowed_app_prefixes | join(\", \")" "$REG")" >&2
+      while IFS= read -r n; do
+        [[ -z "$n" ]] && continue
+        if [[ "$app" == "$n" ]]; then
+          ok=1
+          break
+        fi
+      done < <(yq -r ".accounts[\"${acc}\"].allowed_app_names // [] | .[]" "$REG")
+    fi
+    if [[ "$ok" -ne 1 ]]; then
+      echo "ERROR: apps/${app} name does not match allowed_app_prefixes/allowed_app_names for neon.account='${acc}': $(yq -r "(.accounts[\"${acc}\"].allowed_app_prefixes // []) + (.accounts[\"${acc}\"].allowed_app_names // []) | join(\", \")" "$REG")" >&2
       fail=1
     fi
   fi

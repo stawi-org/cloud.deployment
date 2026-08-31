@@ -64,7 +64,6 @@ variable "extensions" {
 
     Common Neon-supported extensions:
       - uuid-ossp, pgcrypto, pg_trgm, btree_gin, btree_gist, pg_stat_statements
-      - timescaledb (Apache-2 features only; no compression)
       - postgis (and postgis_topology when needed)
       - vector (pgvector)
       - lakebase_text (BM25 via lakebase_bm25; requires Lakebase Search enabled on the project)

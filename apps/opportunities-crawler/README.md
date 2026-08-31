@@ -3,7 +3,7 @@
 Owns the **crawl Neon** project (separate from product/matching Neon).  
 Long-running crawl pods still run on the Kubernetes `product-opportunities` namespace; this Cloud Run app exists primarily for:
 
-1. Neon project + extensions (Timescale for crawl hypertables)
+1. Neon project + extensions
 2. Secret Manager URLs (`opportunities-crawler-database-url`)
 3. One-shot migrate Job (`DO_DATABASE_MIGRATE`)
 
