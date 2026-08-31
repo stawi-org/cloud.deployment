@@ -2463,3 +2463,147 @@ class service_ats implements Namespace {
       this.related.granted_ats_publish.includes(ctx.subject),
   }
 }
+
+class service_imports implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_vehicles_view: (profile_user | service_imports)[]
+    granted_vehicles_create: (profile_user | service_imports)[]
+    granted_vehicles_update: (profile_user | service_imports)[]
+    granted_vehicles_delete: (profile_user | service_imports)[]
+    granted_requests_view: (profile_user | service_imports)[]
+    granted_requests_update: (profile_user | service_imports)[]
+    granted_quotes_view: (profile_user | service_imports)[]
+    granted_quotes_create: (profile_user | service_imports)[]
+    granted_quotes_update: (profile_user | service_imports)[]
+    granted_orders_view: (profile_user | service_imports)[]
+    granted_orders_update: (profile_user | service_imports)[]
+    granted_payments_view: (profile_user | service_imports)[]
+    granted_payments_create: (profile_user | service_imports)[]
+    granted_payments_update: (profile_user | service_imports)[]
+    granted_analytics_view: (profile_user | service_imports)[]
+    granted_transactions_view: (profile_user | service_imports)[]
+    granted_transactions_update: (profile_user | service_imports)[]
+    granted_acquisition_authorize: (profile_user | service_imports)[]
+  }
+
+  permits = {
+    vehicles_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_vehicles_view.includes(ctx.subject),
+
+    vehicles_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_vehicles_create.includes(ctx.subject),
+
+    vehicles_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_vehicles_update.includes(ctx.subject),
+
+    vehicles_delete: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_vehicles_delete.includes(ctx.subject),
+
+    requests_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_requests_view.includes(ctx.subject),
+
+    requests_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_requests_update.includes(ctx.subject),
+
+    quotes_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_quotes_view.includes(ctx.subject),
+
+    quotes_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_quotes_create.includes(ctx.subject),
+
+    quotes_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_quotes_update.includes(ctx.subject),
+
+    orders_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_orders_view.includes(ctx.subject),
+
+    orders_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_orders_update.includes(ctx.subject),
+
+    payments_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_payments_view.includes(ctx.subject),
+
+    payments_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payments_create.includes(ctx.subject),
+
+    payments_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payments_update.includes(ctx.subject),
+
+    analytics_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_analytics_view.includes(ctx.subject),
+
+    transactions_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_transactions_view.includes(ctx.subject),
+
+    transactions_update: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_transactions_update.includes(ctx.subject),
+
+    acquisition_authorize: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_acquisition_authorize.includes(ctx.subject),
+  }
+}
