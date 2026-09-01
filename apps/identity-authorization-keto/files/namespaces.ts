@@ -2491,6 +2491,8 @@ class service_imports implements Namespace {
     granted_transactions_view: (profile_user | service_imports)[]
     granted_transactions_update: (profile_user | service_imports)[]
     granted_acquisition_authorize: (profile_user | service_imports)[]
+    granted_team_manage: (profile_user | service_imports)[]
+    granted_assign: (profile_user | service_imports)[]
   }
 
   permits = {
@@ -2605,6 +2607,17 @@ class service_imports implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_acquisition_authorize.includes(ctx.subject),
+
+    team_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_team_manage.includes(ctx.subject),
+
+    assign: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_assign.includes(ctx.subject),
   }
 }
 
