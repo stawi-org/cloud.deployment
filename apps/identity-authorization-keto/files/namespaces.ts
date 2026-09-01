@@ -2607,3 +2607,624 @@ class service_imports implements Namespace {
       this.related.granted_acquisition_authorize.includes(ctx.subject),
   }
 }
+
+class manufacturing_property implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: profile_user[]
+
+    granted_recipe_view: profile_user[]
+    granted_recipe_manage: profile_user[]
+    granted_plan_view: profile_user[]
+    granted_plan_manage: profile_user[]
+    granted_plan_validate: profile_user[]
+    granted_batch_view: profile_user[]
+    granted_batch_operate: profile_user[]
+    granted_batch_complete: profile_user[]
+    granted_batch_override: profile_user[]
+    granted_inventory_view: profile_user[]
+    granted_inventory_manage: profile_user[]
+    granted_inventory_adjust: profile_user[]
+    granted_equipment_view: profile_user[]
+    granted_equipment_manage: profile_user[]
+    granted_cold_chain_view: profile_user[]
+    granted_cold_chain_manage: profile_user[]
+    granted_shelf_life_view: profile_user[]
+    granted_shelf_life_manage: profile_user[]
+    granted_inspection_view: profile_user[]
+    granted_inspection_perform: profile_user[]
+    granted_inspection_override: profile_user[]
+    granted_inspection_template_manage: profile_user[]
+    granted_waste_view: profile_user[]
+    granted_waste_record: profile_user[]
+    granted_waste_dispose: profile_user[]
+    granted_costing_view: profile_user[]
+    granted_costing_manage: profile_user[]
+    granted_trace_view: profile_user[]
+    granted_recall_initiate: profile_user[]
+    granted_recall_manage: profile_user[]
+    granted_recall_resolve: profile_user[]
+    granted_demand_view: profile_user[]
+    granted_demand_manage: profile_user[]
+  }
+
+  permits = {
+    // --- View permits: any role on the property ---
+    recipe_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recipe_view.includes(ctx.subject),
+
+    plan_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_view.includes(ctx.subject),
+
+    batch_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_view.includes(ctx.subject),
+
+    inventory_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inventory_view.includes(ctx.subject),
+
+    equipment_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_equipment_view.includes(ctx.subject),
+
+    cold_chain_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_cold_chain_view.includes(ctx.subject),
+
+    shelf_life_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shelf_life_view.includes(ctx.subject),
+
+    inspection_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_view.includes(ctx.subject),
+
+    waste_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_waste_view.includes(ctx.subject),
+
+    costing_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_costing_view.includes(ctx.subject),
+
+    trace_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_trace_view.includes(ctx.subject),
+
+    demand_view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_demand_view.includes(ctx.subject),
+
+    // --- Operate / manage permits: owner/admin/operator ---
+    recipe_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recipe_manage.includes(ctx.subject),
+
+    plan_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_manage.includes(ctx.subject),
+
+    plan_validate: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_validate.includes(ctx.subject),
+
+    batch_operate: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_operate.includes(ctx.subject),
+
+    batch_complete: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_complete.includes(ctx.subject),
+
+    inventory_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inventory_manage.includes(ctx.subject),
+
+    inventory_adjust: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inventory_adjust.includes(ctx.subject),
+
+    equipment_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_equipment_manage.includes(ctx.subject),
+
+    cold_chain_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_cold_chain_manage.includes(ctx.subject),
+
+    shelf_life_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shelf_life_manage.includes(ctx.subject),
+
+    inspection_perform: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_perform.includes(ctx.subject),
+
+    inspection_template_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_template_manage.includes(ctx.subject),
+
+    waste_record: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_waste_record.includes(ctx.subject),
+
+    waste_dispose: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_waste_dispose.includes(ctx.subject),
+
+    costing_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_costing_manage.includes(ctx.subject),
+
+    recall_initiate: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_initiate.includes(ctx.subject),
+
+    recall_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_manage.includes(ctx.subject),
+
+    demand_manage: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_demand_manage.includes(ctx.subject),
+
+    // --- Override / resolve permits: owner/admin only ---
+    batch_override: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_override.includes(ctx.subject),
+
+    inspection_override: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_override.includes(ctx.subject),
+
+    recall_resolve: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.admin.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_resolve.includes(ctx.subject),
+  }
+}
+
+class service_manufacturing implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_recipe_view: (profile_user | service_manufacturing)[]
+    granted_recipe_manage: (profile_user | service_manufacturing)[]
+    granted_plan_view: (profile_user | service_manufacturing)[]
+    granted_plan_manage: (profile_user | service_manufacturing)[]
+    granted_plan_validate: (profile_user | service_manufacturing)[]
+    granted_batch_view: (profile_user | service_manufacturing)[]
+    granted_batch_operate: (profile_user | service_manufacturing)[]
+    granted_batch_complete: (profile_user | service_manufacturing)[]
+    granted_batch_override: (profile_user | service_manufacturing)[]
+    granted_inventory_view: (profile_user | service_manufacturing)[]
+    granted_inventory_manage: (profile_user | service_manufacturing)[]
+    granted_inventory_adjust: (profile_user | service_manufacturing)[]
+    granted_equipment_view: (profile_user | service_manufacturing)[]
+    granted_equipment_manage: (profile_user | service_manufacturing)[]
+    granted_cleaning_perform: (profile_user | service_manufacturing)[]
+    granted_cleaning_verify: (profile_user | service_manufacturing)[]
+    granted_maintenance_manage: (profile_user | service_manufacturing)[]
+    granted_environment_view: (profile_user | service_manufacturing)[]
+    granted_environment_record: (profile_user | service_manufacturing)[]
+    granted_environment_alarm_acknowledge: (profile_user | service_manufacturing)[]
+    granted_environment_manage: (profile_user | service_manufacturing)[]
+    granted_shelf_life_view: (profile_user | service_manufacturing)[]
+    granted_shelf_life_manage: (profile_user | service_manufacturing)[]
+    granted_label_view: (profile_user | service_manufacturing)[]
+    granted_inspection_view: (profile_user | service_manufacturing)[]
+    granted_inspection_perform: (profile_user | service_manufacturing)[]
+    granted_inspection_override: (profile_user | service_manufacturing)[]
+    granted_inspection_template_manage: (profile_user | service_manufacturing)[]
+    granted_waste_view: (profile_user | service_manufacturing)[]
+    granted_waste_record: (profile_user | service_manufacturing)[]
+    granted_waste_dispose: (profile_user | service_manufacturing)[]
+    granted_costing_view: (profile_user | service_manufacturing)[]
+    granted_costing_manage: (profile_user | service_manufacturing)[]
+    granted_trace_view: (profile_user | service_manufacturing)[]
+    granted_recall_initiate: (profile_user | service_manufacturing)[]
+    granted_recall_manage: (profile_user | service_manufacturing)[]
+    granted_recall_resolve: (profile_user | service_manufacturing)[]
+    granted_demand_view: (profile_user | service_manufacturing)[]
+    granted_demand_manage: (profile_user | service_manufacturing)[]
+  }
+
+  permits = {
+    recipe_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_recipe_view.includes(ctx.subject),
+
+    recipe_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recipe_manage.includes(ctx.subject),
+
+    plan_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_plan_view.includes(ctx.subject),
+
+    plan_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_manage.includes(ctx.subject),
+
+    plan_validate: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_validate.includes(ctx.subject),
+
+    batch_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_batch_view.includes(ctx.subject),
+
+    batch_operate: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_operate.includes(ctx.subject),
+
+    batch_complete: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_complete.includes(ctx.subject),
+
+    batch_override: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_batch_override.includes(ctx.subject),
+
+    inventory_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_inventory_view.includes(ctx.subject),
+
+    inventory_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inventory_manage.includes(ctx.subject),
+
+    inventory_adjust: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inventory_adjust.includes(ctx.subject),
+
+    equipment_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_equipment_view.includes(ctx.subject),
+
+    equipment_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_equipment_manage.includes(ctx.subject),
+
+    cleaning_perform: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_cleaning_perform.includes(ctx.subject),
+
+    cleaning_verify: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_cleaning_verify.includes(ctx.subject),
+
+    maintenance_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_maintenance_manage.includes(ctx.subject),
+
+    environment_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_environment_view.includes(ctx.subject),
+
+    environment_record: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_environment_record.includes(ctx.subject),
+
+    environment_alarm_acknowledge: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_environment_alarm_acknowledge.includes(ctx.subject),
+
+    environment_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_environment_manage.includes(ctx.subject),
+
+    shelf_life_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_shelf_life_view.includes(ctx.subject),
+
+    shelf_life_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_shelf_life_manage.includes(ctx.subject),
+
+    label_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_label_view.includes(ctx.subject),
+
+    inspection_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_inspection_view.includes(ctx.subject),
+
+    inspection_perform: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_perform.includes(ctx.subject),
+
+    inspection_override: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_override.includes(ctx.subject),
+
+    inspection_template_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_inspection_template_manage.includes(ctx.subject),
+
+    waste_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_waste_view.includes(ctx.subject),
+
+    waste_record: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_waste_record.includes(ctx.subject),
+
+    waste_dispose: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_waste_dispose.includes(ctx.subject),
+
+    costing_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_costing_view.includes(ctx.subject),
+
+    costing_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_costing_manage.includes(ctx.subject),
+
+    trace_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_trace_view.includes(ctx.subject),
+
+    recall_initiate: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_initiate.includes(ctx.subject),
+
+    recall_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_manage.includes(ctx.subject),
+
+    recall_resolve: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_recall_resolve.includes(ctx.subject),
+
+    demand_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_demand_view.includes(ctx.subject),
+
+    demand_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_demand_manage.includes(ctx.subject),
+  }
+}
