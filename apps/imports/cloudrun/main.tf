@@ -24,6 +24,8 @@ locals {
   # Needed by BOTH the runtime service and the setup job (workflow sync).
   lifecycle_env = {
     TRUSTAGE_URL          = "https://api.stawi.org/trustage"
+    IDENTITY_URL          = "https://api.stawi.org/identity"
+    PROFILE_URL           = "https://api.stawi.org/profile"
     API_INTERNAL_BASE_URL = "https://api.stawi.trade"
   }
 }
