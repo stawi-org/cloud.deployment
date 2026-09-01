@@ -42,3 +42,4 @@ additional_invoker_members = [
 
 # Supabase migration phase 1: provision project + staging secrets (cutover separate)
 supabase_enabled = true
+database_cutover = true
