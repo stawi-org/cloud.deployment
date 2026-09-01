@@ -247,7 +247,7 @@ resource "google_service_account" "runtime" {
 }
 
 module "db" {
-  count     = var.has_database ? 1 : 0
+  count     = var.has_database && var.neon_enabled ? 1 : 0
   source    = "../neon-database"
   app_name  = var.app_name
   org_id    = var.neon_org_id

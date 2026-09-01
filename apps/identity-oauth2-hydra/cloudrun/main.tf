@@ -14,6 +14,7 @@ provider "google" {
 }
 
 module "db" {
+  count     = var.neon_enabled ? 1 : 0
   source    = "../../../modules/neon-database"
   app_name  = var.app_name
   org_id    = var.neon_org_id
@@ -66,12 +67,12 @@ locals {
   db_pooled_uri = (
     var.database_cutover && var.supabase_enabled
     ? module.supabase_db[0].pooled_connection_uri
-    : module.db.pooled_connection_uri
+    : module.db[0].pooled_connection_uri
   )
   db_direct_uri = (
     var.database_cutover && var.supabase_enabled
     ? module.supabase_db[0].connection_uri
-    : module.db.connection_uri
+    : module.db[0].connection_uri
   )
 
   database_secret_id        = "${var.app_name}-database-url"

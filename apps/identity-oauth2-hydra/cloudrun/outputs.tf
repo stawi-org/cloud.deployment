@@ -22,7 +22,7 @@ output "project_id" {
 }
 
 output "neon_project_id" {
-  value = module.db.project_id
+  value = var.neon_enabled ? module.db[0].project_id : null
 }
 
 output "database_secret_id" {

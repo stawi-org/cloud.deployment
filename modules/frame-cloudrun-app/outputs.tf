@@ -68,7 +68,7 @@ output "frame_subscribe_url" {
 }
 
 output "neon_project_id" {
-  value = var.has_database ? module.db[0].project_id : null
+  value = var.has_database && var.neon_enabled ? module.db[0].project_id : null
 }
 
 output "migrate_job_name" {
