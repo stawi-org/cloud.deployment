@@ -64,9 +64,13 @@ locals {
     "${var.app_name}-supabase-database-url"        = module.supabase_db[0].pooled_connection_uri
     "${var.app_name}-supabase-database-url-direct" = module.supabase_db[0].connection_uri
   } : {}
+  # Hydra's pgx stack uses prepared statements, which collide on Supavisor
+  # TRANSACTION pooling (SQLSTATE 42P05 "prepared statement already exists"
+  # broke startup on 2026-09-01). Like keto, hydra runs entirely on SESSION
+  # mode; the "pooled" secret carries the session URI on Supabase.
   db_pooled_uri = (
     var.database_cutover && var.supabase_enabled
-    ? module.supabase_db[0].pooled_connection_uri
+    ? module.supabase_db[0].connection_uri
     : module.db[0].pooled_connection_uri
   )
   db_direct_uri = (
