@@ -76,6 +76,7 @@ module "frame" {
   neon_region_id           = var.neon_region_id
   neon_extensions          = var.neon_extensions
   has_database             = var.has_database
+  neon_enabled             = var.neon_enabled
 
   # Supabase migration: staging secrets in phase 1; live-secret override in
   # phase 2 (after the data copy). Neon stays provisioned for rollback.

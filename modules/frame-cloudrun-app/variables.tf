@@ -375,3 +375,13 @@ variable "database_url_direct_override" {
   sensitive   = true
   description = "Override for the direct/migrate DATABASE_URL secret value"
 }
+
+variable "neon_enabled" {
+  type        = bool
+  default     = true
+  description = <<-EOT
+    Create the Neon project for this app. Set false only after the app has
+    fully cut over to Supabase (database_url_override set) — the next apply
+    then DESTROYS the Neon project and its data.
+  EOT
+}

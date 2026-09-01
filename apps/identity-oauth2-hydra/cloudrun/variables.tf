@@ -132,3 +132,9 @@ variable "database_cutover" {
   default     = false
   description = "Phase 2: point the live DB secrets at Supabase (requires supabase_enabled and completed data copy)"
 }
+
+variable "neon_enabled" {
+  type        = bool
+  default     = true
+  description = "Create the Neon project. False only after Supabase cutover — next apply destroys the Neon project and data."
+}

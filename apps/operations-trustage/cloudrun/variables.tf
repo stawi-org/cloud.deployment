@@ -156,3 +156,9 @@ variable "extra_version_ids" {
   default     = []
   description = "Subset of extra_secret_ids whose versions tofu manages"
 }
+
+variable "neon_enabled" {
+  type        = bool
+  default     = true
+  description = "Create the Neon project. False only after Supabase cutover — next apply destroys the Neon project and data."
+}

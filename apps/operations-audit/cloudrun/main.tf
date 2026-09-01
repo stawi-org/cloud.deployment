@@ -64,6 +64,7 @@ module "frame" {
   neon_region_id           = var.neon_region_id
   neon_extensions          = var.neon_extensions
   has_database             = var.has_database
+  neon_enabled             = var.neon_enabled
   container_port           = var.container_port
   memory                   = var.memory
   migrate_args             = var.migrate_args
