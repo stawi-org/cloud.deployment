@@ -501,7 +501,12 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}, ctx = {
     init.body = request.body;
   }
   if (cacheable) {
-    init.cf = { cacheEverything: true, cacheTtl: route.cachePolicy.ttlSeconds };
+    // Only successes earn the long TTL: a 404 during upload propagation or a
+    // 5xx must never be pinned at the edge for the configured lifetime.
+    init.cf = {
+      cacheEverything: true,
+      cacheTtlByStatus: { "200-299": route.cachePolicy.ttlSeconds, "404": 30, "500-599": 0 },
+    };
   }
 
   let upstream;

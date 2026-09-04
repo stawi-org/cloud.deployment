@@ -8,7 +8,7 @@
  * Config shape:
  *   "cache": {
  *     "paths": ["/v1/public/media/"],   // origin-relative prefixes (after strip_prefix)
- *     "ttl_seconds": 31536000,           // Cloudflare cacheTtl for the origin fetch
+ *     "ttl_seconds": 31536000,           // edge TTL for 2xx origin responses (404 → 30s, 5xx uncached)
  *     "methods": ["GET", "HEAD"]         // optional, default GET+HEAD
  *   }
  */

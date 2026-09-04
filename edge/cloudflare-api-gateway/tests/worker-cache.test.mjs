@@ -85,7 +85,10 @@ describe("edge cache: files public media", () => {
       calls[0].url,
       "https://platform-files-diujdvkz4a-ew.a.run.app/v1/public/media/stawi.org/m1",
     );
-    assert.deepEqual(calls[0].init.cf, { cacheEverything: true, cacheTtl: 31536000 });
+    assert.deepEqual(calls[0].init.cf, {
+      cacheEverything: true,
+      cacheTtlByStatus: { "200-299": 31536000, "404": 30, "500-599": 0 },
+    });
     assert.ok(cache.store.has(MEDIA), "stored under the public URL");
 
     const c2 = ctx();
