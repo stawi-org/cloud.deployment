@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { validateCachePolicy } from "../src/edge-cache.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(readFileSync(join(root, "config/routes.prod.json"), "utf8"));
@@ -72,6 +73,7 @@ for (const r of config.host_routes || []) {
   if (r.strip_prefix === true) {
     warnings.push(`host_route ${r.id}: strip_prefix true is unusual for host proxies`);
   }
+  errors.push(...validateCachePolicy(r));
 }
 
 for (const r of config.routes || []) {
@@ -106,6 +108,11 @@ for (const r of config.routes || []) {
   }
   if (!r.service || !r.project) {
     warnings.push(`${r.id}: missing service/project metadata`);
+  }
+
+  errors.push(...validateCachePolicy(r));
+  if (r.cache && r.public === false) {
+    warnings.push(`${r.id}: cache block on a non-public route (only anonymous requests are cached)`);
   }
 
   if (r.docs) {
