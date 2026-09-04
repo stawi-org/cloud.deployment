@@ -27,6 +27,9 @@ locals {
     IDENTITY_URL          = "https://api.stawi.org/identity"
     PROFILE_URL           = "https://api.stawi.org/profile"
     API_INTERNAL_BASE_URL = "https://api.stawi.trade"
+    # Customer/staff notifications: templates are registered by the setup job
+    # (client/templates.Sync) and messages are sent at runtime.
+    NOTIFICATION_URL = "https://api.stawi.org/notification"
   }
 }
 
