@@ -66,6 +66,13 @@ module "frame" {
     GCS_PUBLIC_BUCKET    = var.gcs_public_bucket
     LOCAL_PRIVATE_BUCKET = var.local_private_bucket
     LOCAL_PUBLIC_BUCKET  = var.local_public_bucket
+    # Pre-generated variants served from the anonymous public media route
+    # (service-files >= v1.10.60). Sizes match the catalogue consumers:
+    # thumb 96, card 480x360, hero 1200, og 1200x630 (stawi.imports
+    # internal/media.Variants). Dynamic generation stays off so the request
+    # path never resizes.
+    THUMBNAIL_SIZES    = "32x32:crop,96x96:crop,480x360:scale,640x480:scale,1200x1200:scale,1200x630:crop"
+    DYNAMIC_THUMBNAILS = "false"
   }
 }
 

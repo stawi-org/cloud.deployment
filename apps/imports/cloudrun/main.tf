@@ -27,6 +27,13 @@ locals {
     IDENTITY_URL          = "https://api.stawi.org/identity"
     PROFILE_URL           = "https://api.stawi.org/profile"
     API_INTERNAL_BASE_URL = "https://api.stawi.trade"
+    # Customer/staff notifications: templates are registered by the setup job
+    # (client/templates.Sync) and messages are sent at runtime.
+    NOTIFICATION_URL = "https://api.stawi.org/notification"
+    # Product images: stored in service-files (PUBLIC visibility) by the API
+    # and served to browsers from the anonymous public media route via the
+    # edge cache, never proxied through this service.
+    FILES_SERVICE_URI = "https://api.stawi.org/files"
   }
 }
 

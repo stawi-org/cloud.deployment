@@ -1,7 +1,7 @@
-image                    = "ghcr.io/stawilabs/stawi.imports-api:v0.6.0"
+image                    = "ghcr.io/stawilabs/stawi.imports-api:v0.7.0"
 platform                 = "stawi-prod"
 resource_path            = "/imports"
 has_database             = true
 memory                   = "512Mi"
-requested_audience_paths = ["/profile", "/tenancy", "/trustage", "/identity"]
+requested_audience_paths = ["/profile", "/tenancy", "/trustage", "/identity", "/notification", "/files"]
 neon_extensions          = ["uuid-ossp", "pg_stat_statements", "pg_trgm"]
