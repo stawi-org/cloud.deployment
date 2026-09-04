@@ -92,6 +92,47 @@ curl -sS https://api.stawi.org/payment/openapi.yaml | head
 | `strip_prefix: true` (default) | Service keeps handlers at `/` (Connect: `/profile.v1…`) |
 | `docs.openapi_path` on the service root | After strip, gateway fetches that path from Cloud Run |
 
+## Edge cache (`routes[].cache`)
+
+Optional per-route block that caches **anonymous** responses at the Cloudflare edge via the
+Workers Cache API (`caches.default`). Built for immutable public media, e.g. the files
+service's `GET /v1/public/media/{serverName}/{mediaId}[/thumbnail?width=&height=]`, reached
+through the gateway as `https://api.stawi.org/files/v1/public/media/...`.
+
+```json
+"cache": {
+  "paths": ["/v1/public/media/"],
+  "ttl_seconds": 31536000,
+  "methods": ["GET", "HEAD"]
+}
+```
+
+| Field | Purpose |
+|-------|---------|
+| `cache.paths` | Required. Origin-relative path prefixes (matched **after** `strip_prefix`). Must start with `/`; bare `/` is rejected. |
+| `cache.ttl_seconds` | Required. Integer 1..31536000; passed to the origin fetch as `cf.cacheTtl` (with `cacheEverything`). |
+| `cache.methods` | Optional, default `["GET","HEAD"]`. Only GET/HEAD are allowed. |
+
+Runtime behaviour (see `src/edge-cache.js`):
+
+- A request is **eligible** when the method matches, the origin path is under a `cache.paths`
+  prefix, and it carries **no `Authorization` header**. Ineligible requests on a route with a
+  cache block are proxied as usual with `X-Gateway-Cache: BYPASS`.
+- Cache key = the full public URL (query included — thumbnail `width`/`height` matter). HEAD
+  shares the GET entry.
+- Hit → cached response with `X-Gateway-Cache: HIT` (Cloudflare answers `If-None-Match` →
+  304 and `Range` → 206 from the stored 200 itself).
+- Miss → origin fetch with `cf: { cacheEverything, cacheTtl }`, response returned with
+  `X-Gateway-Cache: MISS`; stored via `ctx.waitUntil(cache.put(...))` **only** when it is a
+  full `200` to a GET, `Cache-Control` contains `public` (and not `private`/`no-store`/
+  `no-cache`), and there is no `Set-Cookie` or `Vary: *`. `206` partials, `304`, and any
+  non-2xx are passed through uncached. `ETag`/`If-None-Match` are forwarded untouched.
+- Immutable objects are cached for the origin's `max-age`; there is no purge hook, so only
+  put content-addressed / immutable paths under `cache.paths`.
+
+`npm run validate` rejects malformed blocks and warns when a cache block sits on a
+`public: false` route.
+
 ## Safety
 
 - **Not an open proxy** — origins are config-only; re-checked at runtime.

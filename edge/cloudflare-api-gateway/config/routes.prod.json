@@ -244,6 +244,11 @@
       "strip_prefix": true,
       "enabled": true,
       "public": true,
+      "cache": {
+        "paths": ["/v1/public/media/"],
+        "ttl_seconds": 31536000,
+        "methods": ["GET", "HEAD"]
+      },
       "docs": {
         "enabled": true,
         "title": "Files",

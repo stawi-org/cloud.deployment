@@ -10,8 +10,15 @@
  * Extend: config/routes.prod.json → validate → deploy.
  */
 
-import routesConfig from "../config/routes.prod.json";
+import routesConfig from "../config/routes.prod.json" with { type: "json" };
 import { isOpenAPIPath, rewriteOpenAPIServers } from "./openapi-rewrite.js";
+import {
+  CACHE_HEADER,
+  cacheEligible,
+  cacheKey,
+  compileCachePolicy,
+  responseStorable,
+} from "./edge-cache.js";
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -41,6 +48,7 @@ function buildRouteTable(config) {
     .map((r) => ({
       ...r,
       prefix: normalizePrefix(r.prefix),
+      cachePolicy: compileCachePolicy(r),
     }))
     .filter((r) => r.prefix && r.origin);
 
@@ -54,7 +62,7 @@ const HOST_ROUTES = (() => {
   const m = new Map();
   for (const r of routesConfig.host_routes || []) {
     if (r.enabled === false || !r.hostname || !r.origin) continue;
-    m.set(String(r.hostname).toLowerCase(), r);
+    m.set(String(r.hostname).toLowerCase(), { ...r, cachePolicy: compileCachePolicy(r) });
   }
   return m;
 })();
@@ -438,8 +446,9 @@ function wantsHtml(request) {
  * @param {URL} url
  * @param {string} publicHost  hostname clients used (for X-Forwarded-Host)
  * @param {{ rewriteOpenAPI?: boolean, openapiServerUrl?: string }} [opts]
+ * @param {{ waitUntil?: (p: Promise<unknown>) => void }} [ctx]
  */
-async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
+async function proxyToOrigin(request, route, url, publicHost, opts = {}, ctx = {}) {
   if (!originAllowed(route.origin, routesConfig)) {
     return jsonResponse(
       {
@@ -472,6 +481,15 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
     return jsonResponse({ error: "origin_escape_blocked" }, 500);
   }
 
+  // Edge cache (routes[].cache): anonymous GET/HEAD under configured origin
+  // paths. Keyed by the full public URL; see src/edge-cache.js.
+  const cacheable = cacheEligible(route.cachePolicy, request, stripped);
+  const cache = cacheable ? openEdgeCache() : null;
+  if (cache) {
+    const hit = await cache.match(cacheKey(request));
+    if (hit) return cachedHitResponse(hit, request, route);
+  }
+
   const headers = copyRequestHeaders(request, originBase.host, publicHost);
   /** @type {RequestInit} */
   const init = {
@@ -481,6 +499,9 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
+  }
+  if (cacheable) {
+    init.cf = { cacheEverything: true, cacheTtl: route.cachePolicy.ttlSeconds };
   }
 
   let upstream;
@@ -536,17 +557,51 @@ async function proxyToOrigin(request, route, url, publicHost, opts = {}) {
     });
   }
 
-  return new Response(upstream.body, {
+  if (route.cachePolicy && !cacheable) {
+    respHeaders.set(CACHE_HEADER, "BYPASS");
+  } else if (cacheable) {
+    respHeaders.set(CACHE_HEADER, "MISS");
+  }
+
+  const out = new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: respHeaders,
+  });
+
+  if (cache && responseStorable(request, out)) {
+    const store = cache.put(new Request(request.url), out.clone());
+    if (typeof ctx.waitUntil === "function") ctx.waitUntil(store);
+    else await store.catch(() => {});
+  }
+  return out;
+}
+
+/** caches.default is only present on the Workers runtime. */
+function openEdgeCache() {
+  const c = globalThis.caches;
+  return c && c.default ? c.default : null;
+}
+
+/** @param {Response} hit @param {Request} request */
+function cachedHitResponse(hit, request, route) {
+  const headers = new Headers(hit.headers);
+  headers.set("x-stawi-gateway", "cloudflare-api-gateway");
+  headers.set("x-stawi-route", route.id);
+  headers.set(CACHE_HEADER, "HIT");
+  const body = request.method === "HEAD" || hit.status === 304 ? null : hit.body;
+  return new Response(body, {
+    status: hit.status,
+    statusText: hit.statusText,
+    headers,
   });
 }
 
 /**
  * @param {Request} request
+ * @param {{ waitUntil?: (p: Promise<unknown>) => void }} ctx
  */
-async function handle(request) {
+async function handle(request, ctx) {
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
   const allowedHost =
@@ -565,9 +620,14 @@ async function handle(request) {
   // host_routes: pay.stawi.org (and any CF-direct browser host that needs Host rewrite).
   const hostRoute = HOST_ROUTES.get(host);
   if (hostRoute) {
-    return proxyToOrigin(request, hostRoute, url, host, {
-      rewriteOpenAPI: false,
-    });
+    return proxyToOrigin(
+      request,
+      hostRoute,
+      url,
+      host,
+      { rewriteOpenAPI: false },
+      ctx,
+    );
   }
 
   // Path gateway + Scalar hub (api.stawi.org only in prod).
@@ -601,15 +661,22 @@ async function handle(request) {
     );
   }
 
-  return proxyToOrigin(request, route, url, HOSTNAME, {
-    rewriteOpenAPI: true,
-    openapiServerUrl: `https://${HOSTNAME}${route.prefix}`,
-  });
+  return proxyToOrigin(
+    request,
+    route,
+    url,
+    HOSTNAME,
+    {
+      rewriteOpenAPI: true,
+      openapiServerUrl: `https://${HOSTNAME}${route.prefix}`,
+    },
+    ctx,
+  );
 }
 
 export default {
-  async fetch(request) {
-    const res = await handle(request);
+  async fetch(request, _env, ctx) {
+    const res = await handle(request, ctx || {});
     return withCors(request, res);
   },
 };
