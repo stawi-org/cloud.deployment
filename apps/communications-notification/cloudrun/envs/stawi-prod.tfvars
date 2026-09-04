@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-notification:v1.21.58"
+image                    = "ghcr.io/antinvestor/service-notification:v1.21.61"
 resource_path            = "/notification"
 has_database             = true
 memory                   = "512Mi"
