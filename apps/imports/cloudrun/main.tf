@@ -64,11 +64,19 @@ module "frame" {
     LIFECYCLE_CALLBACK_TOKEN = { secret = "${var.app_name}-lifecycle-callback-token" }
   }
 
+  # Structured logs so Cloud Logging parses severity (alerts key on it).
+  # /readyz pings the database (imports v0.6.0+); one warm instance keeps the
+  # stawi.trade SSR path off the ~2.7s cold start.
+  min_instance_count  = 1
+  startup_probe_path  = "/readyz"
+  liveness_probe_path = "/livez"
+
   app_env = merge(local.lifecycle_env, {
     IMPORTS_PUBLIC_BASE_URL = "https://stawi.trade"
     FRONTEND_ORIGIN         = "https://stawi.trade"
     PROFILE_SERVICE_URI     = "https://api.stawi.org/profile"
     REQUEST_DECISION_EXPIRY = "336h"
+    LOG_FORMAT              = "json"
   })
-  migrate_env = local.lifecycle_env
+  migrate_env = merge(local.lifecycle_env, { LOG_FORMAT = "json" })
 }
