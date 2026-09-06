@@ -125,6 +125,12 @@ locals {
     GCP_PROJECT = var.project_id
     APP_NAME    = var.app_name
     LOG_LEVEL   = "info"
+    # Keto reads namespaces.ts once at start-up from the GCS FUSE mount.
+    # Uploading a new object does not restart it, so every OPL merge
+    # (opl-push from the service repos) silently left the old namespaces
+    # serving. Carrying the file hash in the template forces a new revision
+    # of keto-read and keto-write whenever the OPL changes.
+    NAMESPACES_TS_MD5 = filemd5("${path.module}/../files/namespaces.ts")
   })
   # Keto (and its gRPC/pgx stack) uses prepared statements. Neon *pooler*
   # (transaction mode) drops them → SQLSTATE 26000 "prepared statement pgx_N
