@@ -245,9 +245,14 @@
       "enabled": true,
       "public": true,
       "cache": {
-        "paths": ["/v1/public/media/"],
+        "paths": [
+          "/v1/public/media/"
+        ],
         "ttl_seconds": 31536000,
-        "methods": ["GET", "HEAD"]
+        "methods": [
+          "GET",
+          "HEAD"
+        ]
       },
       "docs": {
         "enabled": true,
@@ -729,6 +734,38 @@
         "openapi_path": "/openapi.yaml"
       },
       "notes": "Stawi Imports Connect-RPC API (stawilabs/stawi.imports). Frontend is a CF Worker custom-domain on imports.stawi.org (not listed here)."
+    },
+    {
+      "id": "commerce",
+      "prefix": "/commerce",
+      "service": "platform-commerce",
+      "project": "stawi-platform",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Commerce",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Multi-shop commerce (antinvestor/service-commerce). Origin filled by refresh-origins after first apply on stawi-platform."
+    },
+    {
+      "id": "procurement",
+      "prefix": "/procurement",
+      "service": "platform-procurement",
+      "project": "stawi-platform",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Procurement",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Suppliers, purchase orders, goods receipts (antinvestor/service-commerce). Origin filled by refresh-origins after first apply on stawi-platform."
     }
   ]
 }
