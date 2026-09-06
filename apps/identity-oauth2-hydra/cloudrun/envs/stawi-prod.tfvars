@@ -19,6 +19,8 @@ additional_admin_invoker_members = [
   "serviceAccount:platform-files@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-geolocation@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-settings@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:platform-commerce@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:platform-procurement@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:communications-notification@stawi-communications.iam.gserviceaccount.com",
   "serviceAccount:communications-at@stawi-communications.iam.gserviceaccount.com",
   "serviceAccount:communications-smtp@stawi-communications.iam.gserviceaccount.com",
