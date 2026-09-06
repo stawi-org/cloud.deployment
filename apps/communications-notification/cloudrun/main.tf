@@ -30,10 +30,10 @@ module "frame" {
   container_port  = var.container_port
   memory          = var.memory
   migrate_args    = var.migrate_args
-  # Run the setup job on apply so the permission manifest registers with
-  # tenancy (it had never run: migrate_execute defaults to false and this
-  # app has no ship workflow executing the job).
-  migrate_execute          = true
+  # The setup job (migrate + permission manifest registration) is executed by
+  # ops / the ship workflow, not on every apply. Flip to true for a one-off
+  # re-registration, then revert.
+  migrate_execute          = false
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   oauth2_service_client_id = "service-notification"
