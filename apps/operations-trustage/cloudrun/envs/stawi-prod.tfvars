@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-trustage:v0.4.8"
+image                    = "ghcr.io/antinvestor/service-trustage:v0.4.9"
 container_port           = 8080
 resource_path            = "/trustage"
 memory                   = "768Mi"
