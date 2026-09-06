@@ -11,6 +11,18 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  # Peers reached over the path gateway; shared by the service and its setup job.
+  peer_env = {
+    CHECKOUT_SERVICE_URI     = "https://api.stawi.org/checkout"
+    LEDGER_SERVICE_URI       = "https://api.stawi.org/ledger"
+    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
+    COMMERCE_SERVICE_URI     = "https://api.stawi.org/commerce"
+    WORKFLOWS_PATH           = "/workflows"
+  }
+}
+
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
 
@@ -39,18 +51,17 @@ module "frame" {
   # (tenancy migration 20260906_01_service_commerce.sql).
   oauth2_service_client_id = "service-commerce"
 
-  app_env = {
-    CHECKOUT_SERVICE_URI     = "https://api.stawi.org/checkout"
-    LEDGER_SERVICE_URI       = "https://api.stawi.org/ledger"
-    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
-    TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
-    COMMERCE_SERVICE_URI     = "https://api.stawi.org/commerce"
-    CHECKOUT_RETURN_URL      = var.checkout_return_url
-    ORDER_PAYMENT_WINDOW     = "45m"
-    LEDGER_TIMEZONE          = "Africa/Nairobi"
-    LEDGER_BOOK_TYPE         = "merchant"
-    WORKFLOWS_PATH           = "/workflows"
-    SECURELY_RUN_SERVICE     = "true"
-    PROFILER_ENABLE          = "false"
-  }
+  # The setup job registers notification templates and trustage workflows,
+  # so it needs the same peer URIs as the runtime (migrate_env is the only
+  # env the module forwards to the job).
+  migrate_env = local.peer_env
+
+  app_env = merge(local.peer_env, {
+    CHECKOUT_RETURN_URL  = var.checkout_return_url
+    ORDER_PAYMENT_WINDOW = "45m"
+    LEDGER_TIMEZONE      = "Africa/Nairobi"
+    LEDGER_BOOK_TYPE     = "merchant"
+    SECURELY_RUN_SERVICE = "true"
+    PROFILER_ENABLE      = "false"
+  })
 }
