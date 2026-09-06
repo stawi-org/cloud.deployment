@@ -72,11 +72,11 @@ module "frame" {
   identity_project_id = var.identity_project_id
   identity_region     = var.identity_region
 
-  neon_org_id              = var.neon_org_id
-  neon_region_id           = var.neon_region_id
-  neon_extensions          = var.neon_extensions
-  has_database             = var.has_database
-  neon_enabled             = var.neon_enabled
+  neon_org_id     = var.neon_org_id
+  neon_region_id  = var.neon_region_id
+  neon_extensions = var.neon_extensions
+  has_database    = var.has_database
+  neon_enabled    = var.neon_enabled
 
   # Supabase migration: staging secrets in phase 1; live-secret override in
   # phase 2 (after the data copy). Neon stays provisioned for rollback.
@@ -93,9 +93,13 @@ module "frame" {
     ? module.supabase_db[0].connection_uri
     : null
   )
-  container_port           = var.container_port
-  memory                   = var.memory
-  migrate_args             = var.migrate_args
+  container_port = var.container_port
+  memory         = var.memory
+  migrate_args   = var.migrate_args
+  # Run the setup job on apply so the permission manifest registers with
+  # tenancy (it had never run: migrate_execute defaults to false and this
+  # app has no ship workflow executing the job).
+  migrate_execute          = true
   resource_path            = var.resource_path
   requested_audience_paths = var.requested_audience_paths
   # Greenfield Hydra client id is "trustage" (not service-trustage).
