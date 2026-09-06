@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-commerce:v0.4.2"
+image                    = "ghcr.io/antinvestor/service-commerce:v0.4.3"
 resource_path            = "/commerce"
 has_database             = true
 memory                   = "512Mi"
