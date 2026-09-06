@@ -106,6 +106,9 @@ module "frame" {
   oauth2_service_client_id = "trustage"
 
   min_instance_count = 1
+  # The cron/multi-sweep schedulers are in-process tickers: with CPU throttled
+  # between requests (Cloud Run default) they starve and schedules never fire.
+  cpu_idle           = false
   push_oidc_audience = local.push_oidc_audience
 
   create_default_events_topic = false

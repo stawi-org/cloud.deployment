@@ -70,8 +70,8 @@ variable "enable_keto_admin" {
 }
 
 variable "oauth_signer_secret" {
-  type        = string
-  default     = "hydra-webhook-psk"
+  type    = string
+  default = "hydra-webhook-psk"
   # Historical secret id: same value protects authentication's remote JWT
   # signer webhook (OAUTH2_SIGNER_API_KEY). Product apps do NOT call Hydra
   # admin/webhooks — they call accounts…/webhook/sign/private-key-jwt so
@@ -210,6 +210,12 @@ variable "min_instance_count" {
   description = "Use 1 only for in-process schedulers (e.g. trustage mem:// wakes)"
 }
 
+variable "cpu_idle" {
+  type        = bool
+  default     = true
+  description = "true = CPU only during requests (default). false = CPU always allocated; required with min_instance_count >= 1 for in-process schedulers (cron/sweep loops) that must run between requests."
+}
+
 variable "max_instance_count" {
   type    = number
   default = 5
@@ -266,7 +272,7 @@ variable "migrate_execute" {
 }
 
 variable "migrate_args" {
-  type        = list(string)
+  type = list(string)
   # Frame setup plan: argv "setup" with no task list runs every registered step
   # (migrate, bootstrap, permissions, verify, …) in registration order.
   default     = ["setup"]
