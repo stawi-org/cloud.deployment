@@ -151,9 +151,9 @@ locals {
       OAUTH2_TOKEN_ENDPOINT_AUTH_METHOD = "private_key_jwt"
       OAUTH2_JWT_VERIFY_ISSUER          = local.issuer
       # Colony Hydra SA clients are service-* (not Cloud Run app names).
-      OAUTH2_SERVICE_CLIENT_ID          = local.oauth2_service_client_id
-      OAUTH2_RESOURCE_AUDIENCE          = "${local.api_base}${local.resource_path}"
-      OAUTH2_REQUESTED_AUDIENCES        = join(",", [for p in local.audience_paths : "${local.api_base}${p}"])
+      OAUTH2_SERVICE_CLIENT_ID   = local.oauth2_service_client_id
+      OAUTH2_RESOURCE_AUDIENCE   = "${local.api_base}${local.resource_path}"
+      OAUTH2_REQUESTED_AUDIENCES = join(",", [for p in local.audience_paths : "${local.api_base}${p}"])
       OAUTH2_PRIVATE_JWT_KEY = jsonencode({
         source     = "url"
         signer_url = "${local.accounts_origin}/webhook/sign/private-key-jwt"
@@ -195,7 +195,7 @@ locals {
   migrate_env_default = merge(
     local.frame_oauth_env,
     {
-      LOG_LEVEL             = "INFO"
+      LOG_LEVEL = "INFO"
       # Setup Job: full registered plan (migrate/bootstrap/permissions/…).
       DO_SETUP              = "true"
       EVENTS_QUEUE_URL      = "mem://frame.events.migrate"
@@ -365,6 +365,7 @@ module "service" {
   cpu                   = var.cpu
   min_instance_count    = var.min_instance_count
   max_instance_count    = var.max_instance_count
+  cpu_idle              = var.cpu_idle
   exposure              = var.exposure
   public_invoker        = var.public_invoker
   invoker_members       = var.invoker_members
