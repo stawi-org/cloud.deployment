@@ -18,6 +18,8 @@ additional_invoker_members = [
   "serviceAccount:platform-geolocation@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-settings@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-chat-agent@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:platform-commerce@stawi-platform.iam.gserviceaccount.com",
+  "serviceAccount:platform-procurement@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:platform-calendar@stawi-platform.iam.gserviceaccount.com",
   "serviceAccount:opportunities-ats@stawi-opportunities.iam.gserviceaccount.com",
   # communications (stawi-communications)
