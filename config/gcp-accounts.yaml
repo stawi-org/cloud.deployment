@@ -236,10 +236,10 @@ accounts:
     sensitivity: medium
     envs:
       stawi-prod:
-        project_id: stawi-importation-sales
+        project_id: stawi-trade
         region: europe-west1
-        workload_identity_provider: projects/838731814902/locations/global/workloadIdentityPools/github/providers/github-actions
-        deploy_service_account: tofu-deploy@stawi-importation-sales.iam.gserviceaccount.com
+        workload_identity_provider: projects/425585130700/locations/global/workloadIdentityPools/github/providers/github-actions
+        deploy_service_account: tofu-deploy@stawi-trade.iam.gserviceaccount.com
         sops_auth_path: credentials/gcp/imports/stawi-prod/auth.yaml
         labels:
           managed-by: cloud-deployment
