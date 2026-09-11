@@ -80,6 +80,12 @@ module "frame" {
 
   app_env = merge(local.lifecycle_env, {
     IMPORTS_PUBLIC_BASE_URL = "https://stawi.trade"
+    # The API reads PUBLIC_BASE_URL (IMPORTS_PUBLIC_BASE_URL is honoured from
+    # v0.11.0); both are set so share/notification links are right on any
+    # release. DEFAULT_INITIAL_PERCENT is pinned because v0.6.0–v0.10.0 default
+    # it to 300, which rejects every STAGED payment choice.
+    PUBLIC_BASE_URL         = "https://stawi.trade"
+    DEFAULT_INITIAL_PERCENT = "60"
     FRONTEND_ORIGIN         = "https://stawi.trade"
     PROFILE_SERVICE_URI     = "https://api.stawi.org/profile"
     REQUEST_DECISION_EXPIRY = "336h"
