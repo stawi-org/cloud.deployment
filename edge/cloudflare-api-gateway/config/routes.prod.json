@@ -773,32 +773,32 @@
       "prefix": "/stawi",
       "service": "finance-stawi",
       "project": "stawi-finance",
-      "origin": "",
+      "origin": "https://finance-stawi-ovah2rdbaa-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Stawi",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Fintech stawi group-lending product on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+      "notes": "Fintech stawi group-lending product on stawi-finance."
     },
     {
       "id": "seed",
       "prefix": "/seed",
       "service": "finance-seed",
       "project": "stawi-finance",
-      "origin": "",
+      "origin": "https://finance-seed-ovah2rdbaa-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Seed",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Fintech seed direct lending on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+      "notes": "Fintech seed direct lending on stawi-finance."
     },
     {
       "id": "manufacturing",
