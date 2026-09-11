@@ -4,9 +4,9 @@ owners:
 envs:
   - stawi-prod
 gcp:
-  account: imports
+  account: trade
 neon:
-  account: imports
+  account: trade
 runtime: cloudrun
-domain: imports
+domain: trade
 version: 1
