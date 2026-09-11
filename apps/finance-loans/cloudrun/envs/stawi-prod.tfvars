@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-fintech-loans:v1.96.22"
+image                    = "ghcr.io/antinvestor/service-fintech-loans:v1.96.27"
 resource_path            = "/loans"
 has_database             = true
 memory                   = "512Mi"

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Worker: api.stawi.org only. Browser hosts (pay, accounts) and control-plane: CF orange CNAME → Cloud Run + Host rewrite (CF Universal SSL; no Google managed cert). Optional domain-mapping DNS overlay for IAM hosts only. See docs/STABLE_DNS.md.",
+  "description": "Worker: api.stawi.org only. Browser hosts (pay, accounts) and control-plane: CF orange CNAME \u2192 Cloud Run + Host rewrite (CF Universal SSL; no Google managed cert). Optional domain-mapping DNS overlay for IAM hosts only. See docs/STABLE_DNS.md.",
   "hostname": "api.stawi.org",
   "region": "europe-west1",
   "gateway": {
@@ -62,7 +62,7 @@
       "hostname": "accounts.stawi.org",
       "origin": "https://identity-authentication-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Login UI. CF CNAME → Cloud Run.",
+      "notes": "Login UI. CF CNAME \u2192 Cloud Run.",
       "service": "identity-authentication"
     },
     {
@@ -70,7 +70,7 @@
       "hostname": "oauth2.stawi.org",
       "origin": "https://identity-oauth2-hydra-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "OIDC public. CF CNAME → Cloud Run.",
+      "notes": "OIDC public. CF CNAME \u2192 Cloud Run.",
       "service": "identity-oauth2-hydra"
     },
     {
@@ -78,7 +78,7 @@
       "hostname": "oauth2-w.stawi.org",
       "origin": "https://identity-oauth2-hydra-admin-akpnezytka-ew.a.run.app",
       "protocol": "http",
-      "notes": "Hydra admin (IAM). CF CNAME → Cloud Run; callers send Google ID token.",
+      "notes": "Hydra admin (IAM). CF CNAME \u2192 Cloud Run; callers send Google ID token.",
       "service": "identity-oauth2-hydra-admin"
     },
     {
@@ -102,7 +102,7 @@
       "hostname": "pay.stawi.org",
       "origin": "https://checkout-checkout-zbso62lzwq-ew.a.run.app",
       "protocol": "http",
-      "notes": "Hosted checkout UI. CF direct mapping only (orange CNAME → run.app + Origin Host rewrite). CF Universal SSL — never Google domain-mapping certs.",
+      "notes": "Hosted checkout UI. CF direct mapping only (orange CNAME \u2192 run.app + Origin Host rewrite). CF Universal SSL \u2014 never Google domain-mapping certs.",
       "service": "checkout-checkout",
       "project": "stawi-payments",
       "edge": "cf_direct"
@@ -767,6 +767,54 @@
         "openapi_path": "/openapi.yaml"
       },
       "notes": "Suppliers, purchase orders, goods receipts (antinvestor/service-commerce). Origin filled by refresh-origins after first apply on stawi-platform."
+    },
+    {
+      "id": "stawi",
+      "prefix": "/stawi",
+      "service": "finance-stawi",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Stawi",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech stawi group-lending product on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+    },
+    {
+      "id": "seed",
+      "prefix": "/seed",
+      "service": "finance-seed",
+      "project": "stawi-finance",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Seed",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Fintech seed direct lending on stawi-finance. Enable after Cloud Run apply + refresh-origins."
+    },
+    {
+      "id": "manufacturing",
+      "prefix": "/manufacturing",
+      "service": "manufacturing",
+      "project": "stawi-manufacturing",
+      "origin": "",
+      "strip_prefix": true,
+      "enabled": false,
+      "public": true,
+      "docs": {
+        "enabled": true,
+        "title": "Manufacturing",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "Manufacturing service (antinvestor/service-manufacturing) on stawi-manufacturing. Enable after bootstrap + apply + refresh-origins."
     }
   ]
 }
