@@ -229,8 +229,8 @@ accounts:
           managed-by: cloud-deployment
           domain: finance
           environment: prod
-  imports:
-    description: GCP account imports (auto-registered by bootstrap-gcp-account.sh)
+  trade:
+    description: GCP account trade (stawi.trade imports API; key renamed from imports on 2026-09-11)
     owners:
       - platform
     sensitivity: medium
@@ -240,8 +240,8 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/425585130700/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-trade.iam.gserviceaccount.com
-        sops_auth_path: credentials/gcp/imports/stawi-prod/auth.yaml
+        sops_auth_path: credentials/gcp/trade/stawi-prod/auth.yaml
         labels:
           managed-by: cloud-deployment
-          domain: imports
+          domain: trade
           environment: prod
