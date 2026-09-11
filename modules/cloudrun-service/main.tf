@@ -57,13 +57,15 @@ resource "google_cloud_run_v2_service" "this" {
   deletion_protection = var.deletion_protection
 
   # client/client_version are mutated by gcloud/API clients.
-  # Image is managed by OpenTofu from tfvars (bootstrap + explicit bumps).
-  # Decentralized ship can still gcloud-update the image; re-apply will
-  # converge to the tfvars tag unless ship also bumps envs/*.tfvars.
+  # The image is owned by the decentralized release ship (docs/CLOUDRUN_SHIP.md):
+  # tfvars only seeds it on first create. Ignoring it here matches the migrate
+  # job and stops app-apply from rolling a service back to a stale pin (this
+  # happened to imports on 2026-09-06: v0.10.0 → v0.7.0).
   lifecycle {
     ignore_changes = [
       client,
       client_version,
+      template[0].containers[0].image,
     ]
   }
 
