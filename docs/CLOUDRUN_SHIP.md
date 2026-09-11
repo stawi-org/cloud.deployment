@@ -133,4 +133,8 @@ Or re-ship a previous semver tag via the service repo workflow.
 - First-time service create
 - Neon / IAM / WIF bootstrap
 
-Image-only releases never need a monorepo pin PR.
+Image-only releases never need a monorepo pin PR: both the service and the
+migrate job ignore image drift, so `envs/*.tfvars` `image` only matters when a
+service is first created (or recreated). Bump it occasionally so a rebuilt
+service starts on a current tag, but a stale pin can no longer roll production
+back.
