@@ -58,5 +58,7 @@ module "frame" {
     SEED_CURRENCY_CODE   = "KES"
     LOG_FORMAT           = "json"
   })
-  migrate_env = merge(local.peer_env, { LOG_FORMAT = "json" })
+  # v1.96.27 binaries still use the legacy DO_MIGRATION gate for the setup
+  # path (ShouldRunSetup lands in the next release); keep both until then.
+  migrate_env = merge(local.peer_env, { LOG_FORMAT = "json", DO_MIGRATION = "true" })
 }
