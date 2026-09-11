@@ -1,4 +1,4 @@
-image                    = "ghcr.io/stawilabs/stawi.imports-api:v0.7.0"
+image                    = "ghcr.io/stawilabs/stawi.trade-api:v0.10.0"
 platform                 = "stawi-prod"
 resource_path            = "/imports"
 has_database             = true
