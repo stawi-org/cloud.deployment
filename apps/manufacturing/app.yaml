@@ -1,0 +1,12 @@
+name: manufacturing
+owners:
+  - platform
+envs:
+  - stawi-prod
+gcp:
+  account: manufacturing
+neon:
+  account: manufacturing
+runtime: cloudrun
+domain: manufacturing
+version: 1
