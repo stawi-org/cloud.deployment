@@ -142,6 +142,8 @@ accounts:
       - stawi-prod
     allowed_app_prefixes:
       - manufacturing-
+    allowed_app_names:
+      - manufacturing
     sensitivity: medium
     sops_auth_path: credentials/neon/manufacturing/auth.yaml
     neon_org_hint: Stawi Manufacturing

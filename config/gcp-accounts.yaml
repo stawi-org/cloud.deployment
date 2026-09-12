@@ -258,6 +258,8 @@ accounts:
         region: europe-west1
         workload_identity_provider: projects/386465898850/locations/global/workloadIdentityPools/github/providers/github-actions
         deploy_service_account: tofu-deploy@stawi-manufacturing.iam.gserviceaccount.com
+        ship_workload_identity_provider: projects/386465898850/locations/global/workloadIdentityPools/github/providers/github-ship
+        ship_service_account: cloudrun-ship@stawi-manufacturing.iam.gserviceaccount.com
         sops_auth_path: credentials/gcp/manufacturing/stawi-prod/auth.yaml
         labels:
           managed-by: cloud-deployment
