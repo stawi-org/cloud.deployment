@@ -805,16 +805,16 @@
       "prefix": "/manufacturing",
       "service": "manufacturing",
       "project": "stawi-manufacturing",
-      "origin": "",
+      "origin": "https://manufacturing-ztyxrikobq-ew.a.run.app",
       "strip_prefix": true,
-      "enabled": false,
+      "enabled": true,
       "public": true,
       "docs": {
         "enabled": true,
         "title": "Manufacturing",
         "openapi_path": "/openapi.yaml"
       },
-      "notes": "Manufacturing service (antinvestor/service-manufacturing) on stawi-manufacturing. Enable after bootstrap + apply + refresh-origins."
+      "notes": "Manufacturing service (antinvestor/service-manufacturing) on stawi-manufacturing."
     }
   ]
 }
