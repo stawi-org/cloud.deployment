@@ -100,5 +100,5 @@ variable "migrate_args" {
 variable "checkout_return_url" {
   type        = string
   default     = ""
-  description = "Default page buyers return to after hosted checkout; {order_id} is substituted"
+  description = "Storefront page buyers are forwarded to after commerce verifies their payment; {order_id} is substituted. Empty shows commerce's own status page."
 }
