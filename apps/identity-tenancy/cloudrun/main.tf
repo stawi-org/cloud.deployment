@@ -17,14 +17,14 @@ provider "google" {
 }
 
 locals {
-  is_prod = var.platform == "stawi-prod"
+  is_prod  = var.platform == "stawi-prod"
   api_base = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
   # Canonical public surface is the path gateway (override via public_hostname only if needed).
   tenancy_public_url = (
     trimspace(var.public_hostname) != ""
     ? (startswith(trimspace(var.public_hostname), "http")
       ? trimspace(var.public_hostname)
-      : "https://${trimspace(var.public_hostname)}")
+    : "https://${trimspace(var.public_hostname)}")
     : "${local.api_base}/tenancy"
   )
   # Sync endpoint path (same as K8s CronJob synchronize-partitions).
@@ -87,9 +87,30 @@ module "frame" {
   }
   # Tenancy is the registration target — skip self-registration loop.
   permissions_registration = false
+
+  # Authorization reconciles (authorization.service_account.sync) run inside the
+  # Pub/Sub push request; partition_tree service accounts write hundreds of Keto
+  # tuples, serialised platform-wide. The module default 30s ack deadline ended
+  # every delivery before large reconciles finished, so policies stayed pending
+  # (antinvestor/service-authentication#855). Same subscription, topic, endpoint
+  # and OIDC audience as the module default — only the ack deadline changes, to
+  # Cloud Run's 300s request timeout, which is the effective ceiling.
+  messaging_subscriptions = {
+    events = {
+      topic_key             = "events"
+      name                  = "${var.app_name}-events-push"
+      ack_deadline_seconds  = 300
+      push_endpoint         = local.tenancy_events_push_endpoint
+      enable_subscriber_iam = false
+    }
+  }
+  push_oidc_audience = local.tenancy_events_push_endpoint
 }
 
 locals {
+  # Mirrors frame-cloudrun-app's events_push_endpoint (run.app URL + Frame push path).
+  tenancy_events_push_endpoint = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app/_frame/queue/${var.app_name}-events"
+
   # Prefer direct Cloud Run URL for scheduler (reliable IAM; no CF hop).
   # Audience still includes path-gateway URL via custom_audiences for other callers.
   sync_invoke_base   = module.frame.service_uri
