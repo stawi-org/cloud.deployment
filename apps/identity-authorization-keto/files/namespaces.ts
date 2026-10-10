@@ -1188,6 +1188,7 @@ class service_profile implements Namespace {
     granted_address_manage: (profile_user | service_profile)[]
     granted_relationship_view: (profile_user | service_profile)[]
     granted_relationship_manage: (profile_user | service_profile)[]
+    granted_account_resolve: (profile_user | service_profile)[]
   }
 
   permits = {
@@ -1265,6 +1266,10 @@ class service_profile implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_relationship_manage.includes(ctx.subject),
+
+    account_resolve: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_account_resolve.includes(ctx.subject),
   }
 }
 
