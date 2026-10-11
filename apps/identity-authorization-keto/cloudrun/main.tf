@@ -42,6 +42,18 @@ resource "google_service_account" "runtime" {
   display_name = "Cloud Run runtime for ${var.app_name}"
 }
 
+# Kubernetes-cluster callers (no Workload Identity on the Talos cluster): the
+# chat drone + gateway in namespace `communications` (deployment.manifests)
+# mint Google ID tokens for authz*/authz-w* from this SA's JSON key. The key is
+# created out-of-band (never in tofu state), stored in Vault at
+# secret/stawi/communications/chat/gcp-invoker (property key.json) and
+# projected by an ExternalSecret.
+resource "google_service_account" "cluster_chat" {
+  project      = var.project_id
+  account_id   = "cluster-chat"
+  display_name = "K8s communications/chat → Keto invoker"
+}
+
 # Config objects larger than SM 64KB (namespaces.ts).
 resource "google_storage_bucket" "config" {
   name                        = "${var.project_id}-${var.app_name}-config"
@@ -179,6 +191,8 @@ locals {
       "serviceAccount:${id}@${var.project_id}.iam.gserviceaccount.com"
     ]),
     var.additional_invoker_members,
+    # Literal (not .email): for_each keys must be known at plan time.
+    toset(["serviceAccount:cluster-chat@${var.project_id}.iam.gserviceaccount.com"]),
   )
 
   is_prod          = var.platform == "stawi-prod"
@@ -265,6 +279,7 @@ module "service_read" {
     module.migrate,
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
+    google_service_account.cluster_chat,
   ]
 }
 
@@ -319,5 +334,6 @@ module "service_write" {
     module.migrate,
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
+    google_service_account.cluster_chat,
   ]
 }

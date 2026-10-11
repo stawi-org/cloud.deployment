@@ -80,3 +80,27 @@ variable "google_oauth_client_secret" {
   sensitive   = true
   description = "Optional. If set, written to Secret Manager and mounted on Cloud Run."
 }
+
+# ---------------------------------------------------------------------------
+# Genesis session proof (service-authentication docs/GENESIS_SESSION_PROOF.md)
+# ---------------------------------------------------------------------------
+# The Ed25519 signing key lives in Vault (KV v2 mount `secret`, path
+# `stawi/identity/authentication/genesis-proof`, property `private_key`, hex
+# 32-byte seed or 64-byte key) and is copied out-of-band into the Secret
+# Manager secret `identity-authentication-genesis-proof-key`. Cloud Run mounts
+# it at <mount_dir>/<key_id>, which is where the service resolves a vault://
+# reference. Leave the key id empty until the SM secret has a version: the
+# endpoints then answer 503 "not configured" instead of the revision failing to
+# start on a missing secret.
+
+variable "genesis_proof_signing_key_id" {
+  type        = string
+  default     = ""
+  description = "Active genesis session proof key id (e.g. gsp-k1). Empty disables the feature (503). Must match the SM secret's current version."
+}
+
+variable "genesis_proof_retired_keys" {
+  type        = string
+  default     = ""
+  description = "Retired verify-only keys, \"kid:pubhex,kid2:pubhex\" (GENESIS_PROOF_RETIRED_KEYS). Public keys only."
+}
