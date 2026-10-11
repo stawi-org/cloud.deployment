@@ -745,6 +745,9 @@ class service_ledger implements Namespace {
     granted_account_manage: (profile_user | service_ledger)[]
     granted_transaction_view: (profile_user | service_ledger)[]
     granted_transaction_manage: (profile_user | service_ledger)[]
+    granted_book_view: (profile_user | service_ledger)[]
+    granted_book_manage: (profile_user | service_ledger)[]
+    granted_report_view: (profile_user | service_ledger)[]
   }
 
   permits = {
@@ -793,6 +796,30 @@ class service_ledger implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_transaction_manage.includes(ctx.subject),
+
+    book_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_book_view.includes(ctx.subject),
+
+    book_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_book_manage.includes(ctx.subject),
+
+    report_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_report_view.includes(ctx.subject),
   }
 }
 
