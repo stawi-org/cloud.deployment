@@ -344,6 +344,7 @@ module "migrate" {
   args                  = var.migrate_args
   env                   = local.migrate_env_default
   secret_env            = local.migrate_secret_env_default
+  secret_volumes        = var.secret_volumes
   depends_on            = [module.secrets, module.db]
 }
 
@@ -380,7 +381,8 @@ module "service" {
     var.service_env_extra,
     var.app_env,
   )
-  secret_env = local.service_secret_env
+  secret_env     = local.service_secret_env
+  secret_volumes = var.secret_volumes
 
   depends_on = [
     module.secrets,

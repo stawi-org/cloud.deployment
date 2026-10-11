@@ -150,6 +150,19 @@ variable "migrate_secret_env_extra" {
   default = {}
 }
 
+# Secret Manager secrets mounted as files (service + setup job). Use for values
+# the app reads from a path (signing keys, large blobs) rather than env.
+variable "secret_volumes" {
+  type = map(object({
+    secret     = string
+    mount_path = string
+    file_name  = optional(string)
+    version    = optional(string, "latest")
+  }))
+  default     = {}
+  description = "Volume name → Secret Manager file mount, on the service and the migrate job"
+}
+
 # ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------

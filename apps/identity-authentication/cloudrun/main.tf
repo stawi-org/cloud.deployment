@@ -21,6 +21,18 @@ locals {
   tenancy_uri = "${local.api_base}/tenancy"
   devices_uri = "${local.api_base}/devices"
   files_uri   = "${local.api_base}/files"
+
+  # Genesis session proof signing key (see variables.tf). The vault:// ref
+  # names the source of truth; the service reads <mount_dir>/<key_id>.
+  genesis_proof_secret_id = "identity-authentication-genesis-proof-key"
+  genesis_proof_mount_dir = "/var/run/secrets/genesis-proof"
+  genesis_proof_enabled   = trimspace(var.genesis_proof_signing_key_id) != ""
+  genesis_proof_env = local.genesis_proof_enabled ? {
+    GENESIS_PROOF_SIGNING_KEY_REF       = "vault://stawi/identity/authentication/genesis-proof#private_key"
+    GENESIS_PROOF_SIGNING_KEY_ID        = var.genesis_proof_signing_key_id
+    GENESIS_PROOF_SIGNING_KEY_MOUNT_DIR = local.genesis_proof_mount_dir
+    GENESIS_PROOF_RETIRED_KEYS          = var.genesis_proof_retired_keys
+  } : {}
 }
 
 module "frame" {
@@ -60,6 +72,8 @@ module "frame" {
       "identity-authentication-cookie-block-key",
       "identity-authentication-google-oauth-client-id",
       "identity-authentication-google-oauth-client-secret",
+      # Container only; the version is seeded from Vault out-of-band.
+      "identity-authentication-genesis-proof-key",
     ],
   ))
   # Tofu-managed versions only for secrets with values this apply (generated + optional TF_VAR).
@@ -103,25 +117,34 @@ module "frame" {
     AUTH_PROVIDER_GOOGLE_SECRET    = { secret = "identity-authentication-google-oauth-client-secret" }
   }
 
+  # Genesis proof key as a file (the service has no env-value key source).
+  secret_volumes = local.genesis_proof_enabled ? {
+    genesis-proof = {
+      secret     = local.genesis_proof_secret_id
+      mount_path = local.genesis_proof_mount_dir
+      file_name  = var.genesis_proof_signing_key_id
+    }
+  } : {}
+
   # Colony service-authentication.yaml env parity (path gateway for product APIs).
-  app_env = {
-    EXPOSE_ERRORS                      = "false"
-    TRACE_REQUESTS                     = "false"
+  app_env = merge({
+    EXPOSE_ERRORS  = "false"
+    TRACE_REQUESTS = "false"
     # In-memory cache until Valkey/Memorystore is wired on GCP.
-    CACHE_URI                          = "mem://defaultCache"
-    PROFILE_SERVICE_URI                = local.profile_uri
-    TENANCY_SERVICE_URI                = local.tenancy_uri
-    DEVICE_SERVICE_URI                 = local.devices_uri
-    FILES_SERVICE_URI                  = local.files_uri
+    CACHE_URI           = "mem://defaultCache"
+    PROFILE_SERVICE_URI = local.profile_uri
+    TENANCY_SERVICE_URI = local.tenancy_uri
+    DEVICE_SERVICE_URI  = local.devices_uri
+    FILES_SERVICE_URI   = local.files_uri
     # Primary tenant/partition from cluster prod (stawi root).
-    DEFAULT_TENANT_ID                  = "c2f4j7au6s7f91uqnojg"
-    DEFAULT_PARTITION_ID               = "c2f4j7au6s7f91uqnokg"
-    FEDCM_PUBLIC_ORIGIN = local.accounts_origin
+    DEFAULT_TENANT_ID    = "c2f4j7au6s7f91uqnojg"
+    DEFAULT_PARTITION_ID = "c2f4j7au6s7f91uqnokg"
+    FEDCM_PUBLIC_ORIGIN  = local.accounts_origin
     # Hydra public host (oauth2.stawi.org) for browser and server-side token HTTP.
-    FEDCM_HYDRA_PUBLIC_URL           = local.oauth2_public
-    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL = local.oauth2_public
+    FEDCM_HYDRA_PUBLIC_URL             = local.oauth2_public
+    OAUTH2_HYDRA_PUBLIC_INTERNAL_URL   = local.oauth2_public
     NATIVE_CREDENTIAL_EXCHANGE_ENABLED = "true"
     AUTH_PROVIDER_GOOGLE_CALLBACK_URL  = "${local.accounts_origin}/s/social/callback"
     AUTH_PROVIDER_GOOGLE_SCOPES        = "openid email profile"
-  }
+  }, local.genesis_proof_env)
 }
