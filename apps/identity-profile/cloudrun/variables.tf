@@ -70,10 +70,20 @@ variable "public_hostname" {
 # ---------------------------------------------------------------------------
 # Profile accounts (service-profile >= v1.55.0, docs/PROFILE_ACCOUNTS.md)
 # ---------------------------------------------------------------------------
-# Off while vault_addr is empty: profiles are created without chain accounts
-# (the service's development posture). Setting vault_addr turns on the Vault
-# Transit salter AND the account derivation, so every value below must then be
-# set — the service refuses to start on a half configuration.
+# Off while accounts_enabled is false: profiles are created without chain
+# accounts (the service's development posture). Turning it on mounts
+# K_identity and the creation code as files and sets the account env on the
+# service and the setup job (backfill), so every value below must then be set —
+# the service refuses to start on a half configuration or a missing, empty or
+# short (< 32 bytes) key file.
+#
+# K_identity lives in the Secret Manager secret `identity-profile-accounts-salt`
+# as 32 raw random bytes, mounted at ACCOUNTS_SALT_FILE. Seed it once, never
+# add another version, and pin accounts_salt_version to the version created:
+#   openssl rand 32 > k_identity.bin
+#   gcloud secrets versions add identity-profile-accounts-salt \
+#     --project=stawi-identity --data-file=k_identity.bin
+#   shred -u k_identity.bin
 #
 # Chain values come from the Stawi testnet v4 deployment record
 # `deployments/14601.json` in stawilabs/stawi (written by `make testnet` at
@@ -92,40 +102,21 @@ variable "public_hostname" {
 # The service checks keccak256(creation code) against
 # stawi_account_creation_code_hash at startup.
 
-variable "vault_addr" {
+variable "accounts_enabled" {
+  type        = bool
+  default     = false
+  description = "Derive profile chain accounts: mounts K_identity (ACCOUNTS_SALT_FILE) and the creation code, and sets STAWI_ACCOUNT_*."
+}
+
+variable "accounts_salt_version" {
   type        = string
   default     = ""
-  description = "Vault/OpenBao address reachable from Cloud Run (VAULT_ADDR). Empty disables profile accounts."
-}
+  description = "Pinned Secret Manager version of identity-profile-accounts-salt (K_identity), e.g. \"1\". Never changed once accounts exist."
 
-variable "vault_gcp_auth_role" {
-  type        = string
-  default     = "service-profile"
-  description = "Vault GCP (IAM) auth role bound to this service's runtime SA (VAULT_GCP_AUTH_ROLE)"
-}
-
-variable "vault_gcp_auth_mount" {
-  type        = string
-  default     = "gcp"
-  description = "Vault GCP auth mount (VAULT_GCP_AUTH_MOUNT)"
-}
-
-variable "vault_transit_mount" {
-  type        = string
-  default     = "transit"
-  description = "Vault Transit mount (VAULT_TRANSIT_MOUNT)"
-}
-
-variable "stawi_identity_transit_key" {
-  type        = string
-  default     = "stawi-identity"
-  description = "Transit key holding K_identity (STAWI_IDENTITY_TRANSIT_KEY). Never rotated."
-}
-
-variable "stawi_identity_key_version" {
-  type        = string
-  default     = ""
-  description = "Pinned Transit key version (STAWI_IDENTITY_KEY_VERSION); `vault read -field=latest_version transit/keys/stawi-identity`"
+  validation {
+    condition     = var.accounts_salt_version == "" || can(regex("^[1-9][0-9]*$", var.accounts_salt_version))
+    error_message = "accounts_salt_version must be a numeric Secret Manager version (not \"latest\")."
+  }
 }
 
 variable "stawi_account_factory" {

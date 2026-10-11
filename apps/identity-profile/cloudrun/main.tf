@@ -13,19 +13,15 @@ locals {
   is_prod  = var.platform == "stawi-prod"
   api_base = local.is_prod ? "https://api.stawi.org" : "https://api.stawi.dev"
 
-  # Profile accounts (variables.tf). One switch: the Vault salter and the
+  # Profile accounts (variables.tf). One switch: the identity key and the
   # account derivation must be configured together.
-  accounts_enabled             = trimspace(var.vault_addr) != ""
+  accounts_enabled             = var.accounts_enabled
+  accounts_salt_secret         = "identity-profile-accounts-salt"
+  accounts_salt_dir            = "/var/run/secrets/stawi-identity"
   account_creation_code_secret = "identity-profile-stawi-account-creation-code"
   account_creation_code_dir    = "/var/run/secrets/stawi-account"
   accounts_env = local.accounts_enabled ? {
-    VAULT_ADDR                       = var.vault_addr
-    VAULT_AUTH_METHOD                = "gcp"
-    VAULT_GCP_AUTH_ROLE              = var.vault_gcp_auth_role
-    VAULT_GCP_AUTH_MOUNT             = var.vault_gcp_auth_mount
-    VAULT_TRANSIT_MOUNT              = var.vault_transit_mount
-    STAWI_IDENTITY_TRANSIT_KEY       = var.stawi_identity_transit_key
-    STAWI_IDENTITY_KEY_VERSION       = var.stawi_identity_key_version
+    ACCOUNTS_SALT_FILE               = "${local.accounts_salt_dir}/salt"
     STAWI_ACCOUNT_FACTORY            = var.stawi_account_factory
     STAWI_ACCOUNT_CREATION_CODE_FILE = "${local.account_creation_code_dir}/creation_code"
     STAWI_ACCOUNT_CREATION_CODE_HASH = var.stawi_account_creation_code_hash
@@ -36,12 +32,12 @@ locals {
 check "profile_accounts_complete" {
   assert {
     condition = !local.accounts_enabled || alltrue([
-      var.stawi_identity_key_version != "",
+      var.accounts_salt_version != "",
       var.stawi_account_factory != "",
       var.stawi_account_creation_code_hash != "",
       var.stawi_account_version != "",
     ])
-    error_message = "vault_addr is set, so stawi_identity_key_version, stawi_account_factory, stawi_account_creation_code_hash and stawi_account_version are required (service-profile refuses to start on a half configuration)."
+    error_message = "accounts_enabled is true, so accounts_salt_version, stawi_account_factory, stawi_account_creation_code_hash and stawi_account_version are required (service-profile refuses to start on a half configuration)."
   }
 }
 
@@ -75,6 +71,8 @@ module "frame" {
     "identity-profile-dek-hmac-key",
     # Container only; seeded from the chain (variables.tf), not secret data.
     "identity-profile-stawi-account-creation-code",
+    # Container only; K_identity, seeded once out-of-band (variables.tf).
+    "identity-profile-accounts-salt",
   ])
   extra_version_ids   = toset([])
   extra_secret_values = {}
@@ -97,6 +95,13 @@ module "frame" {
       mount_path = local.account_creation_code_dir
       file_name  = "creation_code"
     }
+    # Pinned: a different version of K_identity moves every address.
+    stawi-identity = {
+      secret     = local.accounts_salt_secret
+      mount_path = local.accounts_salt_dir
+      file_name  = "salt"
+      version    = var.accounts_salt_version
+    }
   } : {}
   migrate_env = local.accounts_env
 
@@ -106,14 +111,4 @@ module "frame" {
     # Colony: service-notification.communications.svc — not yet on Cloud Run.
     NOTIFICATION_SERVICE_URI = "${local.api_base}/notification"
   }, local.accounts_env)
-}
-
-# Vault GCP (IAM) auth: the service signs a JWT as its own runtime SA through
-# the IAM Credentials API (signJwt). The setup job runs as the same SA.
-resource "google_service_account_iam_member" "vault_gcp_auth_self_sign" {
-  count = local.accounts_enabled ? 1 : 0
-
-  service_account_id = module.frame.runtime_service_account_name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${module.frame.runtime_service_account_email}"
 }
