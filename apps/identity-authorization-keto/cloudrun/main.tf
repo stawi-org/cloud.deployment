@@ -54,7 +54,8 @@ resource "google_service_account" "cluster_chat" {
   display_name = "K8s communications/chat → Keto invoker"
 }
 
-# Same pattern for Stawi finance + settlement in namespace `stawi`: the key is
+# Same pattern for Stawi finance + settlement in namespace `stawi` (keto-read
+# invoker only; see keto_read_invoker_members): the key is
 # created out-of-band and stored in Vault at secret/stawi/stawi/common/gcp-invoker
 # (property key.json), projected by the gcp-sa-stawi-cluster ExternalSecret.
 resource "google_service_account" "cluster_stawi" {
@@ -213,10 +214,13 @@ locals {
     ]),
     var.additional_invoker_members,
     # Literal (not .email): for_each keys must be known at plan time.
-    toset([
-      "serviceAccount:cluster-chat@${var.project_id}.iam.gserviceaccount.com",
-      "serviceAccount:cluster-stawi@${var.project_id}.iam.gserviceaccount.com",
-    ]),
+    toset(["serviceAccount:cluster-chat@${var.project_id}.iam.gserviceaccount.com"]),
+  )
+  # Stawi finance + settlement only check permissions (no tuple writes), so
+  # cluster-stawi invokes keto-read only.
+  keto_read_invoker_members = setunion(
+    local.keto_invoker_members,
+    toset(["serviceAccount:cluster-stawi@${var.project_id}.iam.gserviceaccount.com"]),
   )
 
   is_prod          = var.platform == "stawi-prod"
@@ -292,7 +296,7 @@ module "service_read" {
   args             = ["serve", "read", "-c", "/etc/keto/keto.yml"]
   memory           = "512Mi"
   exposure         = var.exposure
-  invoker_members  = local.keto_invoker_members
+  invoker_members  = local.keto_read_invoker_members
   custom_audiences = local.keto_read_audiences
   env              = local.keto_common_env
   secret_env       = local.keto_secret_env
@@ -360,6 +364,5 @@ module "service_write" {
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
     google_service_account.cluster_chat,
-    google_service_account.cluster_stawi,
   ]
 }
