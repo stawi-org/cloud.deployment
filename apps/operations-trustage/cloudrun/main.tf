@@ -161,6 +161,10 @@ module "frame" {
     ADAPTER_HTTP_TIMEOUT_SECONDS   = "30"
     DATABASE_POOL_MAX_CONNS        = "50"
     WORKFLOW_ROW_RETENTION_HOURS   = "720"
+    # connect.call (>= v0.5.0) routes for the Stawi process contracts. Stawi
+    # finance + settlement run in the cluster (namespace stawi) behind their
+    # own gateway hosts, not the api.stawi.org path Worker.
+    TRUSTAGE_CONNECT_ROUTES = "finance.v1=https://finance.stawi.org,settlement.v1=https://settlement.stawi.org"
   }
 
   app_env = {}
