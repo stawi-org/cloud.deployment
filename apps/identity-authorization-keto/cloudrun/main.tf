@@ -54,6 +54,27 @@ resource "google_service_account" "cluster_chat" {
   display_name = "K8s communications/chat → Keto invoker"
 }
 
+# Same pattern for Stawi finance + settlement in namespace `stawi`: the key is
+# created out-of-band and stored in Vault at secret/stawi/stawi/common/gcp-invoker
+# (property key.json), projected by the gcp-sa-stawi-cluster ExternalSecret.
+resource "google_service_account" "cluster_stawi" {
+  project      = var.project_id
+  account_id   = "cluster-stawi"
+  display_name = "K8s stawi/finance+settlement → Keto invoker"
+}
+
+# Both cluster SAs were created with gcloud while this stack's apply was
+# blocked; adopt them instead of failing on 409.
+import {
+  to = google_service_account.cluster_chat
+  id = "projects/${var.project_id}/serviceAccounts/cluster-chat@${var.project_id}.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_service_account.cluster_stawi
+  id = "projects/${var.project_id}/serviceAccounts/cluster-stawi@${var.project_id}.iam.gserviceaccount.com"
+}
+
 # Config objects larger than SM 64KB (namespaces.ts).
 resource "google_storage_bucket" "config" {
   name                        = "${var.project_id}-${var.app_name}-config"
@@ -192,7 +213,10 @@ locals {
     ]),
     var.additional_invoker_members,
     # Literal (not .email): for_each keys must be known at plan time.
-    toset(["serviceAccount:cluster-chat@${var.project_id}.iam.gserviceaccount.com"]),
+    toset([
+      "serviceAccount:cluster-chat@${var.project_id}.iam.gserviceaccount.com",
+      "serviceAccount:cluster-stawi@${var.project_id}.iam.gserviceaccount.com",
+    ]),
   )
 
   is_prod          = var.platform == "stawi-prod"
@@ -280,6 +304,7 @@ module "service_read" {
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
     google_service_account.cluster_chat,
+    google_service_account.cluster_stawi,
   ]
 }
 
@@ -335,5 +360,6 @@ module "service_write" {
     google_storage_bucket_object.namespaces_ts,
     google_storage_bucket_iam_member.runtime_object_viewer,
     google_service_account.cluster_chat,
+    google_service_account.cluster_stawi,
   ]
 }
