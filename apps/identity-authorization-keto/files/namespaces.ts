@@ -3492,3 +3492,531 @@ class service_chat implements Namespace {
       this.related.granted_stawi_card_post.includes(ctx.subject),
   }
 }
+
+class finance_room implements Namespace {
+  related: {
+    granted_owner: profile_user[]
+    granted_admin: profile_user[]
+    granted_member: profile_user[]
+    granted_viewer: profile_user[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.granted_viewer.includes(ctx.subject) ||
+      this.related.granted_member.includes(ctx.subject) ||
+      this.related.granted_admin.includes(ctx.subject) ||
+      this.related.granted_owner.includes(ctx.subject),
+
+    member_act: (ctx: Context): boolean =>
+      this.related.granted_member.includes(ctx.subject) ||
+      this.related.granted_admin.includes(ctx.subject) ||
+      this.related.granted_owner.includes(ctx.subject),
+
+    manage: (ctx: Context): boolean =>
+      this.related.granted_admin.includes(ctx.subject) ||
+      this.related.granted_owner.includes(ctx.subject),
+  }
+}
+
+// finance_loan is a loan in a room: its borrower and guarantors act on it,
+// and the room's members see it.
+
+class finance_loan implements Namespace {
+  related: {
+    granted_borrower: profile_user[]
+    granted_guarantor: profile_user[]
+    room: finance_room[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.granted_borrower.includes(ctx.subject) ||
+      this.related.granted_guarantor.includes(ctx.subject) ||
+      this.related.room.traverse((r) => r.permits.view(ctx)),
+
+    repay: (ctx: Context): boolean =>
+      this.related.granted_borrower.includes(ctx.subject),
+
+    guarantee: (ctx: Context): boolean =>
+      this.related.granted_guarantor.includes(ctx.subject),
+
+    manage: (ctx: Context): boolean =>
+      this.related.room.traverse((r) => r.permits.manage(ctx)),
+  }
+}
+
+class service_finance implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_intent_view: (profile_user | service_finance)[]
+    granted_intent_authorize: (profile_user | service_finance)[]
+    granted_room_view: (profile_user | service_finance)[]
+    granted_room_manage: (profile_user | service_finance)[]
+    granted_member_view: (profile_user | service_finance)[]
+    granted_policy_view: (profile_user | service_finance)[]
+    granted_policy_propose: (profile_user | service_finance)[]
+    granted_workflow_execute: (profile_user | service_finance)[]
+    granted_finance_operate: (profile_user | service_finance)[]
+    granted_proposal_view: (profile_user | service_finance)[]
+    granted_proposal_manage: (profile_user | service_finance)[]
+    granted_vote_cast: (profile_user | service_finance)[]
+    granted_capability_view: (profile_user | service_finance)[]
+    granted_capability_manage: (profile_user | service_finance)[]
+    granted_check_view: (profile_user | service_finance)[]
+    granted_check_run: (profile_user | service_finance)[]
+    granted_escalation_manage: (profile_user | service_finance)[]
+    granted_country_policy_view: (profile_user | service_finance)[]
+    granted_country_policy_manage: (profile_user | service_finance)[]
+    granted_limit_view: (profile_user | service_finance)[]
+    granted_limit_manage: (profile_user | service_finance)[]
+    granted_genesis_policy_view: (profile_user | service_finance)[]
+    granted_plan_view: (profile_user | service_finance)[]
+    granted_plan_manage: (profile_user | service_finance)[]
+    granted_contribution_view: (profile_user | service_finance)[]
+    granted_contribution_create: (profile_user | service_finance)[]
+    granted_period_view: (profile_user | service_finance)[]
+    granted_loan_view: (profile_user | service_finance)[]
+    granted_loan_submit: (profile_user | service_finance)[]
+    granted_loan_manage: (profile_user | service_finance)[]
+    granted_repayment_create: (profile_user | service_finance)[]
+    granted_guarantee_manage: (profile_user | service_finance)[]
+    granted_bucket_view: (profile_user | service_finance)[]
+    granted_transfer_request: (profile_user | service_finance)[]
+    granted_distribution_view: (profile_user | service_finance)[]
+    granted_distribution_manage: (profile_user | service_finance)[]
+    granted_statement_view: (profile_user | service_finance)[]
+    granted_ledger_view: (profile_user | service_finance)[]
+    granted_reconciliation_view: (profile_user | service_finance)[]
+    granted_reconciliation_manage: (profile_user | service_finance)[]
+    granted_evidence_export: (profile_user | service_finance)[]
+    granted_dispute_view: (profile_user | service_finance)[]
+    granted_dispute_open: (profile_user | service_finance)[]
+    granted_dispute_manage: (profile_user | service_finance)[]
+  }
+
+  permits = {
+    intent_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_intent_view.includes(ctx.subject),
+
+    intent_authorize: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_intent_authorize.includes(ctx.subject),
+
+    room_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_room_view.includes(ctx.subject),
+
+    room_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_room_manage.includes(ctx.subject),
+
+    member_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_member_view.includes(ctx.subject),
+
+    policy_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_policy_view.includes(ctx.subject),
+
+    policy_propose: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_policy_propose.includes(ctx.subject),
+
+    workflow_execute: (ctx: Context): boolean =>
+      this.related.granted_workflow_execute.includes(ctx.subject),
+
+    finance_operate: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.granted_finance_operate.includes(ctx.subject),
+
+    proposal_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_proposal_view.includes(ctx.subject),
+
+    proposal_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_proposal_manage.includes(ctx.subject),
+
+    vote_cast: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_vote_cast.includes(ctx.subject),
+
+    capability_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_capability_view.includes(ctx.subject),
+
+    capability_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_capability_manage.includes(ctx.subject),
+
+    check_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_check_view.includes(ctx.subject),
+
+    check_run: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_check_run.includes(ctx.subject),
+
+    escalation_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_escalation_manage.includes(ctx.subject),
+
+    country_policy_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_country_policy_view.includes(ctx.subject),
+
+    country_policy_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_country_policy_manage.includes(ctx.subject),
+
+    limit_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_limit_view.includes(ctx.subject),
+
+    limit_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_limit_manage.includes(ctx.subject),
+
+    genesis_policy_view: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_genesis_policy_view.includes(ctx.subject),
+
+    plan_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_plan_view.includes(ctx.subject),
+
+    plan_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_plan_manage.includes(ctx.subject),
+
+    contribution_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_contribution_view.includes(ctx.subject),
+
+    contribution_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_contribution_create.includes(ctx.subject),
+
+    period_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_period_view.includes(ctx.subject),
+
+    loan_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_loan_view.includes(ctx.subject),
+
+    loan_submit: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_loan_submit.includes(ctx.subject),
+
+    loan_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_loan_manage.includes(ctx.subject),
+
+    repayment_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_repayment_create.includes(ctx.subject),
+
+    guarantee_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_guarantee_manage.includes(ctx.subject),
+
+    bucket_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_bucket_view.includes(ctx.subject),
+
+    transfer_request: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_transfer_request.includes(ctx.subject),
+
+    distribution_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_distribution_view.includes(ctx.subject),
+
+    distribution_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_distribution_manage.includes(ctx.subject),
+
+    statement_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_statement_view.includes(ctx.subject),
+
+    ledger_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_ledger_view.includes(ctx.subject),
+
+    reconciliation_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_reconciliation_view.includes(ctx.subject),
+
+    reconciliation_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_reconciliation_manage.includes(ctx.subject),
+
+    evidence_export: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_evidence_export.includes(ctx.subject),
+
+    dispute_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_dispute_view.includes(ctx.subject),
+
+    dispute_open: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_dispute_open.includes(ctx.subject),
+
+    dispute_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_dispute_manage.includes(ctx.subject),
+  }
+}
+
+class service_settlement implements Namespace {
+  related: {
+    owner: profile_user[]
+    admin: profile_user[]
+    operator: profile_user[]
+    viewer: profile_user[]
+    member: profile_user[]
+    service: (profile_user | tenancy_access)[]
+
+    granted_intent_submit: (profile_user | service_settlement)[]
+    granted_intent_view: (profile_user | service_settlement)[]
+    granted_observation_view: (profile_user | service_settlement)[]
+    granted_anchor_view: (profile_user | service_settlement)[]
+    granted_process_execute: (profile_user | service_settlement)[]
+    granted_account_view: (profile_user | service_settlement)[]
+    granted_account_manage: (profile_user | service_settlement)[]
+    granted_room_view: (profile_user | service_settlement)[]
+    granted_room_manage: (profile_user | service_settlement)[]
+  }
+
+  permits = {
+    intent_submit: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_intent_submit.includes(ctx.subject),
+
+    intent_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_intent_view.includes(ctx.subject),
+
+    observation_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_observation_view.includes(ctx.subject),
+
+    anchor_view: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_anchor_view.includes(ctx.subject),
+
+    process_execute: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_process_execute.includes(ctx.subject),
+
+    account_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_account_view.includes(ctx.subject),
+
+    account_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.granted_account_manage.includes(ctx.subject),
+
+    room_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_room_view.includes(ctx.subject),
+
+    room_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_room_manage.includes(ctx.subject),
+  }
+}
