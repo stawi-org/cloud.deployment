@@ -3546,6 +3546,15 @@ class finance_loan implements Namespace {
   }
 }
 
+// finance_credit_record is a borrower's credit record (LoanBook.recordOf).
+// The object id is the borrower's account, lowercase "0x" + 40 hex: the
+// record is the chain's, keyed by the account, and GetCreditRecord names it
+// so. The owner is the profile holding the account (finance reads that from
+// the profile service, the source of truth, and writes no owner tuple); a
+// granted_viewer is a P2P lender, or a group's approver, while the
+// borrower's ask or request to them is open. Finance writes and deletes the
+// granted_viewer tuples from its credit_record_grants and checks the row too.
+
 class service_finance implements Namespace {
   related: {
     owner: profile_user[]
@@ -3581,12 +3590,9 @@ class service_finance implements Namespace {
     granted_plan_manage: (profile_user | service_finance)[]
     granted_contribution_view: (profile_user | service_finance)[]
     granted_contribution_create: (profile_user | service_finance)[]
-    granted_period_view: (profile_user | service_finance)[]
     granted_loan_view: (profile_user | service_finance)[]
-    granted_loan_submit: (profile_user | service_finance)[]
-    granted_loan_manage: (profile_user | service_finance)[]
-    granted_repayment_create: (profile_user | service_finance)[]
-    granted_guarantee_manage: (profile_user | service_finance)[]
+    granted_vault_view: (profile_user | service_finance)[]
+    granted_vault_manage: (profile_user | service_finance)[]
     granted_bucket_view: (profile_user | service_finance)[]
     granted_transfer_request: (profile_user | service_finance)[]
     granted_distribution_view: (profile_user | service_finance)[]
@@ -3794,15 +3800,6 @@ class service_finance implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.granted_contribution_create.includes(ctx.subject),
 
-    period_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_period_view.includes(ctx.subject),
-
     loan_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
@@ -3812,33 +3809,21 @@ class service_finance implements Namespace {
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_loan_view.includes(ctx.subject),
 
-    loan_submit: (ctx: Context): boolean =>
+    vault_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
-      this.related.granted_loan_submit.includes(ctx.subject),
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_vault_view.includes(ctx.subject),
 
-    loan_manage: (ctx: Context): boolean =>
+    vault_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
-      this.related.granted_loan_manage.includes(ctx.subject),
-
-    repayment_create: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_repayment_create.includes(ctx.subject),
-
-    guarantee_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_guarantee_manage.includes(ctx.subject),
+      this.related.granted_vault_manage.includes(ctx.subject),
 
     bucket_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
@@ -3953,6 +3938,7 @@ class service_settlement implements Namespace {
     granted_process_execute: (profile_user | service_settlement)[]
     granted_account_view: (profile_user | service_settlement)[]
     granted_account_manage: (profile_user | service_settlement)[]
+    granted_profile_account_view: (profile_user | service_settlement)[]
     granted_room_view: (profile_user | service_settlement)[]
     granted_room_manage: (profile_user | service_settlement)[]
   }
@@ -4003,6 +3989,10 @@ class service_settlement implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.granted_account_manage.includes(ctx.subject),
 
+    profile_account_view: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_profile_account_view.includes(ctx.subject),
+
     room_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
@@ -4018,5 +4008,18 @@ class service_settlement implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_room_manage.includes(ctx.subject),
+  }
+}
+
+class finance_credit_record implements Namespace {
+  related: {
+    owner: profile_user[]
+    granted_viewer: profile_user[]
+  }
+
+  permits = {
+    view: (ctx: Context): boolean =>
+      this.related.owner.includes(ctx.subject) ||
+      this.related.granted_viewer.includes(ctx.subject),
   }
 }
