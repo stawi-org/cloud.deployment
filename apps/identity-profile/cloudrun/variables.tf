@@ -85,9 +85,9 @@ variable "public_hostname" {
 #     --project=stawi-identity --data-file=k_identity.bin
 #   shred -u k_identity.bin
 #
-# Chain values come from the Stawi testnet v4 deployment record
-# `deployments/14601.json` in stawilabs/stawi (written by `make testnet` at
-# execute time, 2026-10-14):
+# Chain values come from the Stawi testnet v6 deployment record
+# `deployments/14601.json` in stawilabs/stawi (proposed 2026-10-15, timelock
+# executable 2026-10-18 09:17:45 UTC):
 #   stawi_account_factory            = .account.factory
 #   stawi_account_creation_code_hash = .account.creation_code_hash
 #   stawi_account_version            = .account.account_version
