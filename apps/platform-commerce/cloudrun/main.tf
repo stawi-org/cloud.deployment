@@ -1,6 +1,7 @@
 # platform-commerce — Frame Cloud Run via modules/frame-cloudrun-app.
-# Multi-shop commerce: calls checkout, ledger, notification and trustage over
-# the path gateway; trustage calls back for scheduled runs.
+# Multi-shop commerce: calls checkout, ledger, notification, settings, devices,
+# profile and trustage over the path gateway; trustage calls back for
+# scheduled runs.
 
 provider "neon" {
   api_key = var.neon_api_key
@@ -12,15 +13,24 @@ provider "google" {
 }
 
 locals {
-  # Peers reached over the path gateway; shared by the service and its setup job.
-  peer_env = {
-    CHECKOUT_SERVICE_URI     = "https://api.stawi.org/checkout"
-    LEDGER_SERVICE_URI       = "https://api.stawi.org/ledger"
+  # What the setup job talks to: it registers notification templates and the
+  # (embedded) trustage workflows, whose callbacks point at COMMERCE_SERVICE_URI.
+  setup_env = {
     NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
     TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
     COMMERCE_SERVICE_URI     = "https://api.stawi.org/commerce"
-    WORKFLOWS_PATH           = "/workflows"
   }
+
+  # Runtime peers reached over the path gateway. Settings, devices and profile
+  # supply a new shop's default currency (the caller's currency setting, then
+  # device locale, then address country).
+  peer_env = merge(local.setup_env, {
+    CHECKOUT_SERVICE_URI = "https://api.stawi.org/checkout"
+    LEDGER_SERVICE_URI   = "https://api.stawi.org/ledger"
+    SETTINGS_SERVICE_URI = "https://api.stawi.org/settings"
+    DEVICE_SERVICE_URI   = "https://api.stawi.org/devices"
+    PROFILE_SERVICE_URI  = "https://api.stawi.org/profile"
+  })
 }
 
 module "frame" {
@@ -51,10 +61,17 @@ module "frame" {
   # (tenancy migration 20260906_01_service_commerce.sql).
   oauth2_service_client_id = "service-commerce"
 
-  # The setup job registers notification templates and trustage workflows,
-  # so it needs the same peer URIs as the runtime (migrate_env is the only
-  # env the module forwards to the job).
-  migrate_env = local.peer_env
+  # migrate_env is the only env the module forwards to the setup job.
+  migrate_env = local.setup_env
+
+  # Literal ids only (never keys() of sensitive maps — OpenTofu for_each panic).
+  extra_secret_ids    = toset(["platform-commerce-webhook-secret-key"])
+  extra_version_ids   = toset(["platform-commerce-webhook-secret-key"])
+  extra_secret_values = local.generated_secret_values
+  # Runtime only: the setup job never touches webhook secrets.
+  secret_env_extra = {
+    WEBHOOK_SECRET_KEY = { secret = "platform-commerce-webhook-secret-key" }
+  }
 
   app_env = merge(local.peer_env, {
     CHECKOUT_RETURN_URL  = var.checkout_return_url
