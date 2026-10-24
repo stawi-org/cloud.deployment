@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-fintech-seed:v1.96.27"
+image                    = "ghcr.io/antinvestor/service-fintech-seed:v1.96.32"
 resource_path            = "/seed"
 has_database             = true
 memory                   = "512Mi"
