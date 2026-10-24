@@ -48,4 +48,9 @@ module "frame" {
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/auth/sa/service-tenancy"
     NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
   }
+  # The setup Job registers the client and workforce message templates with
+  # the notification service; it does not inherit app_env.
+  migrate_env = {
+    NOTIFICATION_SERVICE_URI = local.notification_uri
+  }
 }

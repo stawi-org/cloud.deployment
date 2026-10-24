@@ -38,14 +38,16 @@ module "frame" {
 
   grant_oauth_signer_accessor = true
   permissions_registration    = true
-  startup_probe_path         = "/readyz"
-  liveness_probe_path        = "/livez"
+  startup_probe_path          = "/readyz"
+  liveness_probe_path         = "/livez"
 
   app_env = {
     PROFILE_SERVICE_URI                 = "https://api.stawi.org/profile"
     TENANCY_SERVICE_URI                 = "https://api.stawi.org/tenancy"
     POLICY_CACHE_TTL_SECONDS            = "60"
     SUBJECT_ATTRIBUTE_CACHE_TTL_SECONDS = "60"
+    AUDIT_SERVICE_URI                   = "https://api.stawi.org/audit"
+    IDENTITY_SERVICE_URI                = "https://api.stawi.org/identity"
     SECURELY_RUN_SERVICE                = "true"
   }
 }

@@ -56,7 +56,10 @@ module "frame" {
   app_env = merge(local.peer_env, {
     SECURELY_RUN_SERVICE = "true"
     SEED_CURRENCY_CODE   = "KES"
-    LOG_FORMAT           = "json"
+    # Client data fields that must be verified before seed submits a loan
+    # request; the service refuses to start securely without them.
+    SEED_KYC_REQUIRED_FIELDS = "national_id"
+    LOG_FORMAT               = "json"
   })
   # v1.96.27 binaries still use the legacy DO_MIGRATION gate for the setup
   # path (ShouldRunSetup lands in the next release); keep both until then.

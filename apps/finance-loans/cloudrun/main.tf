@@ -38,8 +38,8 @@ module "frame" {
 
   grant_oauth_signer_accessor = true
   permissions_registration    = true
-  startup_probe_path         = "/readyz"
-  liveness_probe_path        = "/livez"
+  startup_probe_path          = "/readyz"
+  liveness_probe_path         = "/livez"
 
   app_env = {
     PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
@@ -49,6 +49,16 @@ module "frame" {
     PAYMENT_SERVICE_URI      = "https://api.stawi.org/payment"
     NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
     TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
+    AUDIT_SERVICE_URI        = "https://api.stawi.org/audit"
+    FIELD_SERVICE_URI        = "https://api.stawi.org/identity"
+    FUNDING_SERVICE_URI      = "https://api.stawi.org/funding"
+    IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
+    LIMITS_SERVICE_URI       = "https://api.stawi.org/limits"
     SECURELY_RUN_SERVICE     = "true"
+  }
+  # The setup Job registers the borrower message templates with the
+  # notification service; it does not inherit app_env.
+  migrate_env = {
+    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
   }
 }
