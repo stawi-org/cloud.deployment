@@ -833,9 +833,18 @@ class service_identity implements Namespace {
       this.related.granted_membership_manage.includes(ctx.subject),
 
     investor_account_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
       this.related.granted_investor_account_view.includes(ctx.subject),
 
     investor_account_manage: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_investor_account_manage.includes(ctx.subject),
 
     client_data_view: (ctx: Context): boolean =>
