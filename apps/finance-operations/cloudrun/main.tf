@@ -50,6 +50,7 @@ module "frame" {
     AUDIT_SERVICE_URI        = "https://api.stawi.org/audit"
     IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
     LIMITS_SERVICE_URI       = "https://api.stawi.org/limits"
+    LOAN_MGMT_SERVICE_URI    = "https://api.stawi.org/loans"
     SECURELY_RUN_SERVICE     = "true"
   }
 }
