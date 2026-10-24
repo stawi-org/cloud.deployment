@@ -46,6 +46,7 @@ module "frame" {
     TENANCY_SERVICE_URI                           = local.tenancy_uri
     NOTIFICATION_SERVICE_URI                      = local.notification_uri
     AUDIT_SERVICE_URI                             = local.audit_uri
+    OAUTH_REDIRECT_URIS                           = local.is_prod ? "https://app.antinvestor.com/auth/callback" : "https://app-dev.antinvestor.com/auth/callback"
     PROFILE_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/profile/sa/service-profile"
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/auth/sa/service-tenancy"
     NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
