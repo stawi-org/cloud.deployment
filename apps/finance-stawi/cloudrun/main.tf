@@ -64,10 +64,12 @@ module "frame" {
   liveness_probe_path         = "/livez"
 
   app_env = merge(local.peer_env, {
-    SECURELY_RUN_SERVICE                       = "true"
-    LIMITS_GATE_ENABLED_STAWI_LOAN_DISBURSEMENT = "true"
-    LIMITS_GATE_MODE_STAWI_LOAN_DISBURSEMENT    = "enforce"
-    LOG_FORMAT                                 = "json"
+    SECURELY_RUN_SERVICE = "true"
+    # Stawi loans are limited by the loans service; stawi's in-process
+    # transfer orders take the operations gate settings.
+    LIMITS_GATE_ENABLED_OPERATIONS_TRANSFER = "true"
+    LIMITS_GATE_MODE_OPERATIONS_TRANSFER    = "enforce"
+    LOG_FORMAT                              = "json"
   })
   # v1.96.27 binaries still use the legacy DO_MIGRATION gate for the setup
   # path (ShouldRunSetup lands in the next release); keep both until then.

@@ -37,8 +37,8 @@ module "frame" {
 
   grant_oauth_signer_accessor = true
   permissions_registration    = true
-  startup_probe_path         = "/readyz"
-  liveness_probe_path        = "/livez"
+  startup_probe_path          = "/readyz"
+  liveness_probe_path         = "/livez"
 
   app_env = {
     PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
@@ -46,6 +46,12 @@ module "frame" {
     LEDGER_SERVICE_URI       = "https://api.stawi.org/ledger"
     PAYMENT_SERVICE_URI      = "https://api.stawi.org/payment"
     NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    AUDIT_SERVICE_URI        = "https://api.stawi.org/audit"
+    IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
+    LIMITS_SERVICE_URI       = "https://api.stawi.org/limits"
+    LOAN_MGMT_SERVICE_URI    = "https://api.stawi.org/loans"
+    OPERATIONS_SERVICE_URI   = "https://api.stawi.org/operations"
+    SAVINGS_SERVICE_URI      = "https://api.stawi.org/savings"
     SECURELY_RUN_SERVICE     = "true"
   }
 }
