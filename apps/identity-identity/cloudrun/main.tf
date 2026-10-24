@@ -16,6 +16,7 @@ locals {
   profile_uri      = "${local.api_base}/profile"
   tenancy_uri      = "${local.api_base}/tenancy"
   notification_uri = "${local.api_base}/notification"
+  audit_uri        = "${local.api_base}/audit"
 }
 
 module "frame" {
@@ -35,7 +36,7 @@ module "frame" {
   neon_region_id = var.neon_region_id
 
   resource_path            = "/identity"
-  requested_audience_paths = ["/profile", "/tenancy", "/notification"]
+  requested_audience_paths = ["/profile", "/tenancy", "/notification", "/audit"]
   enable_keto_admin        = false
 
   app_env = {
@@ -44,6 +45,7 @@ module "frame" {
     PROFILE_SERVICE_URI                           = local.profile_uri
     TENANCY_SERVICE_URI                           = local.tenancy_uri
     NOTIFICATION_SERVICE_URI                      = local.notification_uri
+    AUDIT_SERVICE_URI                             = local.audit_uri
     PROFILE_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/profile/sa/service-profile"
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/auth/sa/service-tenancy"
     NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
