@@ -54,6 +54,7 @@ module "frame" {
     FUNDING_SERVICE_URI      = "https://api.stawi.org/funding"
     IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
     LIMITS_SERVICE_URI       = "https://api.stawi.org/limits"
+    SEED_SERVICE_URI         = "https://api.stawi.org/seed"
     SECURELY_RUN_SERVICE     = "true"
   }
   # The setup Job registers the borrower message templates with the
