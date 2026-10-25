@@ -7,7 +7,8 @@ neon_extensions = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "b
 # /commerce: scheduled commerce workflows (reconcile payments, end-of-day ledger)
 # /stawi-finance, /stawi-settlement: Stawi process contracts (connect.call to
 # finance.v1 / settlement.v1; tenancy grants the trustage client both audiences)
-requested_audience_paths = ["/profile", "/tenancy", "/commerce", "/stawi-finance", "/stawi-settlement"]
+# /loans: fintech loans scheduled jobs (connect.call to loans.v1 LoanJobRun)
+requested_audience_paths = ["/profile", "/tenancy", "/commerce", "/stawi-finance", "/stawi-settlement", "/loans"]
 public_hostname          = "" # product surface: api.stawi.org/<path> only
 
 # Supabase migration phase 1: provision project + staging secrets (cutover separate)
