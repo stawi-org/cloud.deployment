@@ -40,6 +40,14 @@ additional_invoker_members = [
   # ledger (stawi-ledger) — ledger + billing
   "serviceAccount:ledger-ledger@stawi-ledger.iam.gserviceaccount.com",
   "serviceAccount:ledger-billing@stawi-ledger.iam.gserviceaccount.com",
+  # finance (stawi-finance) — every fintech service checks permissions in Keto
+  "serviceAccount:finance-loans@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-operations@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-funding@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-savings@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-limits@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-seed@stawi-finance.iam.gserviceaccount.com",
+  "serviceAccount:finance-stawi@stawi-finance.iam.gserviceaccount.com",
 ]
 
 # Supabase migration phase 1: provision project + staging secrets (cutover separate)
