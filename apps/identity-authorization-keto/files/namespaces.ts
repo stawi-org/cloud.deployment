@@ -1109,6 +1109,7 @@ class service_loans implements Namespace {
     granted_portfolio_view: (profile_user | service_loans)[]
     granted_portfolio_export: (profile_user | service_loans)[]
     granted_loan_view_own: (profile_user | service_loans)[]
+    granted_loan_job_run: (profile_user | service_loans)[]
   }
 
   permits = {
@@ -1273,6 +1274,10 @@ class service_loans implements Namespace {
     loan_view_own: (ctx: Context): boolean =>
       this.related.member.includes(ctx.subject) ||
       this.related.granted_loan_view_own.includes(ctx.subject),
+
+    loan_job_run: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_loan_job_run.includes(ctx.subject),
   }
 }
 
