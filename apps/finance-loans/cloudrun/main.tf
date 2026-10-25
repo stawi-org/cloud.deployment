@@ -58,8 +58,10 @@ module "frame" {
     SECURELY_RUN_SERVICE     = "true"
   }
   # The setup Job registers the borrower message templates with the
-  # notification service; it does not inherit app_env.
+  # notification service and the loans job schedules with trustage; it does
+  # not inherit app_env.
   migrate_env = {
     NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
   }
 }
