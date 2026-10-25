@@ -163,8 +163,9 @@ module "frame" {
     WORKFLOW_ROW_RETENTION_HOURS   = "720"
     # connect.call (>= v0.5.0) routes for the Stawi process contracts. Stawi
     # finance + settlement run in the cluster (namespace stawi) behind their
-    # own gateway hosts, not the api.stawi.org path Worker.
-    TRUSTAGE_CONNECT_ROUTES = "finance.v1=https://finance.stawi.org,settlement.v1=https://settlement.stawi.org"
+    # own gateway hosts, not the api.stawi.org path Worker. Fintech loans'
+    # scheduled jobs (LoanJobRun) are reached through the api.stawi.org gateway.
+    TRUSTAGE_CONNECT_ROUTES = "finance.v1=https://finance.stawi.org,settlement.v1=https://settlement.stawi.org,loans.v1=https://api.stawi.org/loans"
   }
 
   app_env = {}
