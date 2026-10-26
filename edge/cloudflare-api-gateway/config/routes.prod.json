@@ -374,6 +374,22 @@
       "notes": "Enable after Cloud Run apply + refresh-origins on stawi-communications."
     },
     {
+      "id": "ussd",
+      "prefix": "/ussd",
+      "service": "communications-ussd",
+      "project": "stawi-communications",
+      "origin": "https://communications-ussd-fskjzid7ta-ew.a.run.app",
+      "strip_prefix": true,
+      "enabled": true,
+      "public": true,
+      "docs": {
+        "enabled": false,
+        "title": "USSD",
+        "openapi_path": "/openapi.yaml"
+      },
+      "notes": "USSD engine: telco gateway callbacks (auth_key per service) and the service-account management API."
+    },
+    {
       "id": "notification-africastalking",
       "prefix": "/notification-africastalking",
       "service": "communications-at",

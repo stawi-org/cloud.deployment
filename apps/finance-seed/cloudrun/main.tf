@@ -15,11 +15,22 @@ provider "google" {
 
 locals {
   peer_env = {
-    IDENTITY_SERVICE_URI   = "https://api.stawi.org/identity"
-    LOAN_MGMT_SERVICE_URI  = "https://api.stawi.org/loans"
-    OPERATIONS_SERVICE_URI = "https://api.stawi.org/operations"
-    TENANCY_SERVICE_URI    = "https://api.stawi.org/tenancy"
-    AUDIT_SERVICE_URI      = "https://api.stawi.org/audit"
+    IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
+    LOAN_MGMT_SERVICE_URI    = "https://api.stawi.org/loans"
+    OPERATIONS_SERVICE_URI   = "https://api.stawi.org/operations"
+    TENANCY_SERVICE_URI      = "https://api.stawi.org/tenancy"
+    AUDIT_SERVICE_URI        = "https://api.stawi.org/audit"
+    NOTIFICATION_SERVICE_URI = "https://api.stawi.org/notification"
+    # Borrower USSD (ussd.tf): the engine's management API, this service's
+    # session-start endpoint as the engine reaches it, and the inbound topic.
+    USSD_SERVICE_URI      = "https://api.stawi.org/ussd"
+    SEED_USSD_SERVICE_ID  = "seed"
+    SEED_USSD_STATE_URL   = "https://api.stawi.org/seed/api/v1/seed/internal/ussd/state"
+    SEED_USSD_INBOUND_URI = "push://seed-ussd-inbound?protocol=gcppubsub"
+  }
+  ussd_secret_env = {
+    SEED_USSD_SECRET_KEY       = { secret = "${var.app_name}-ussd-secret-key" }
+    SEED_USSD_GATEWAY_AUTH_KEY = { secret = "${var.app_name}-ussd-gateway-auth-key" }
   }
 }
 
@@ -64,4 +75,9 @@ module "frame" {
   # v1.96.27 binaries still use the legacy DO_MIGRATION gate for the setup
   # path (ShouldRunSetup lands in the next release); keep both until then.
   migrate_env = merge(local.peer_env, { LOG_FORMAT = "json", DO_MIGRATION = "true" })
+
+  # The setup Job registers the USSD menu (both secrets); the service opens
+  # sealed PINs (the private key).
+  secret_env_extra         = local.ussd_secret_env
+  migrate_secret_env_extra = local.ussd_secret_env
 }
