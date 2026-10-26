@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-notification-ussd:v1.23.0"
+image                    = "ghcr.io/antinvestor/service-notification-ussd:v1.23.1"
 resource_path            = "/ussd"
 has_database             = true
 memory                   = "512Mi"
