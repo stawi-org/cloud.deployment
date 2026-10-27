@@ -27,6 +27,7 @@ module "frame" {
   neon_region_id           = var.neon_region_id
   neon_extensions          = var.neon_extensions
   has_database             = var.has_database
+  runtime_db_role          = "finance_funding_rt"
   container_port           = var.container_port
   memory                   = var.memory
   migrate_args             = ["setup"]

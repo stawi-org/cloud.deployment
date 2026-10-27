@@ -36,6 +36,8 @@ module "frame" {
   neon_org_id    = var.neon_org_id
   neon_region_id = var.neon_region_id
 
+  runtime_db_role = "identity_identity_rt"
+
   resource_path            = "/identity"
   requested_audience_paths = ["/profile", "/tenancy", "/notification", "/audit", "/files"]
   enable_keto_admin        = false

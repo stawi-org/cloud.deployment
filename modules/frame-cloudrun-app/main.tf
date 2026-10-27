@@ -82,6 +82,14 @@ locals {
   database_secret_id        = "${var.app_name}-database-url"
   database_direct_secret_id = "${var.app_name}-database-url-direct"
 
+  # Runtime role (see var.runtime_db_role): the setup Job keeps it, the service
+  # connects as it once active. The id is a plain conditional string so it can
+  # drive for_each; the password itself is sensitive.
+  runtime_role_enabled    = var.has_database && var.runtime_db_role != ""
+  runtime_role_active     = local.runtime_role_enabled && var.runtime_db_role_active
+  runtime_password_secret = local.runtime_role_enabled ? "${var.app_name}-database-runtime-password" : ""
+  runtime_role_secret_ids = local.runtime_role_enabled ? [local.runtime_password_secret] : []
+
   # for_each keys must never be sensitive.
   # Do NOT use keys()/length() of sensitive maps (extra_secret_values) — OpenTofu
   # 1.10 marks the whole ternary and panics on for_each ("value is marked").
@@ -101,13 +109,22 @@ locals {
       (local.database_secret_id) = (
         var.database_url_override != null
         ? var.database_url_override
-        : module.db[0].pooled_connection_uri
+        : (
+          local.runtime_role_active
+          # Same pooled endpoint and database, logged in as the runtime role.
+          ? replace(module.db[0].pooled_connection_uri, "/^([a-z]+://)[^@]+@/",
+          "$${1}${var.runtime_db_role}:${random_password.runtime_db[0].result}@")
+          : module.db[0].pooled_connection_uri
+        )
       )
       (local.database_direct_secret_id) = (
         var.database_url_direct_override != null
         ? var.database_url_direct_override
         : module.db[0].connection_uri
       )
+    } : {},
+    local.runtime_role_enabled ? {
+      (local.runtime_password_secret) = random_password.runtime_db[0].result
     } : {},
     var.extra_secret_values,
   )
@@ -204,6 +221,7 @@ locals {
       OTEL_LOGS_EXPORTER    = "none"
     },
     var.migrate_env,
+    local.runtime_role_enabled ? { DATABASE_RUNTIME_ROLE = var.runtime_db_role } : {},
   )
 
   service_secret_env = merge(
@@ -228,6 +246,9 @@ locals {
     # App secrets needed at migrate/setup time (e.g. ENCRYPTION_PHRASE for files).
     var.secret_env_extra,
     var.migrate_secret_env_extra,
+    local.runtime_role_enabled ? {
+      DATABASE_RUNTIME_PASSWORD = { secret = module.secrets.secret_ids[local.runtime_password_secret] }
+    } : {},
   )
 }
 
@@ -272,10 +293,12 @@ module "secrets" {
   # Literal string lists only — never keys() of sensitive maps.
   secret_ids = toset(concat(
     var.has_database ? [local.database_secret_id, local.database_direct_secret_id] : [],
+    local.runtime_role_secret_ids,
     sort(tolist(var.extra_secret_ids)),
   ))
   version_ids = toset(concat(
     var.has_database ? [local.database_secret_id, local.database_direct_secret_id] : [],
+    local.runtime_role_secret_ids,
     sort(tolist(local.extra_version_ids)),
   ))
   secret_values    = local.secret_values
@@ -293,6 +316,14 @@ resource "google_secret_manager_secret_iam_member" "oauth_signer" {
   secret_id = var.oauth_signer_secret
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+# Password of the runtime database role (var.runtime_db_role). Alphanumeric so
+# it needs no escaping in the connection URI.
+resource "random_password" "runtime_db" {
+  count   = local.runtime_role_enabled ? 1 : 0
+  length  = 40
+  special = false
 }
 
 # ---------------------------------------------------------------------------
@@ -380,6 +411,7 @@ module "service" {
     local.frame_oauth_env,
     var.service_env_extra,
     var.app_env,
+    local.runtime_role_active ? { DATABASE_REQUIRE_RLS = "true" } : {},
   )
   secret_env     = local.service_secret_env
   secret_volumes = var.secret_volumes
