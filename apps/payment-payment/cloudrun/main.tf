@@ -106,6 +106,17 @@ resource "google_pubsub_topic_iam_member" "publish_prompt" {
   member   = "serviceAccount:${module.frame.runtime_service_account_email}"
 }
 
+# Payouts: payment routes each payment out to its integration's payments
+# topic (tx routes in the payment database, chosen by partition and the
+# payee's contact kind).
+resource "google_pubsub_topic_iam_member" "publish_rail_payments" {
+  for_each = local.prompt_topics
+  project  = var.project_id
+  topic    = google_pubsub_topic.rail_payments[each.key].name
+  role     = "roles/pubsub.publisher"
+  member   = "serviceAccount:${module.frame.runtime_service_account_email}"
+}
+
 resource "google_pubsub_topic_iam_member" "publish_polar_payments" {
   project = var.project_id
   topic   = google_pubsub_topic.rail_payments["polar"].name
