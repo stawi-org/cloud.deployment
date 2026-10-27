@@ -30,6 +30,7 @@ locals {
     AUDIT_SERVICE_URI        = "https://api.stawi.org/audit"
     TRUSTAGE_SERVICE_URI     = "https://api.stawi.org/trustage"
     TRUSTAGE_URL             = "https://api.stawi.org/trustage"
+    OPERATIONS_SERVICE_URI   = "https://api.stawi.org/operations"
   }
 }
 

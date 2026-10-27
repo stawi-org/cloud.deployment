@@ -11,6 +11,18 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+locals {
+  service_run_url = "https://${var.app_name}-${data.google_project.this.number}.${var.region}.run.app"
+  # Payments the rail received: service-payment publishes each one to the
+  # receive route whose uri is this topic, and operations books it.
+  payment_received_topic = "${var.app_name}-payment-received"
+  payment_received_ref   = "operations-payment-received"
+}
+
 module "frame" {
   source = "../../../modules/frame-cloudrun-app"
 
@@ -41,6 +53,31 @@ module "frame" {
   startup_probe_path          = "/readyz"
   liveness_probe_path         = "/livez"
 
+  messaging_topics = {
+    events           = { name = "${var.app_name}-events" }
+    payment_received = { name = local.payment_received_topic }
+  }
+  messaging_subscriptions = {
+    events = {
+      topic_key             = "events"
+      name                  = "${var.app_name}-events-push"
+      push_endpoint         = "${local.service_run_url}/_frame/queue/${var.app_name}-events"
+      enable_subscriber_iam = false
+    }
+    payment_received = {
+      topic_key             = "payment_received"
+      name                  = "${local.payment_received_topic}-push"
+      push_endpoint         = "${local.service_run_url}/_frame/queue/${local.payment_received_ref}"
+      enable_subscriber_iam = false
+      ack_deadline_seconds  = 60
+    }
+  }
+
+  service_env_extra = {
+    OPERATIONS_PAYMENT_RECEIVED_NAME = local.payment_received_ref
+    OPERATIONS_PAYMENT_RECEIVED_URI  = "push://${local.payment_received_ref}?protocol=gcppubsub"
+  }
+
   app_env = {
     PROFILE_SERVICE_URI      = "https://api.stawi.org/profile"
     TENANCY_SERVICE_URI      = "https://api.stawi.org/tenancy"
@@ -51,6 +88,22 @@ module "frame" {
     IDENTITY_SERVICE_URI     = "https://api.stawi.org/identity"
     LIMITS_SERVICE_URI       = "https://api.stawi.org/limits"
     LOAN_MGMT_SERVICE_URI    = "https://api.stawi.org/loans"
+    SAVINGS_SERVICE_URI      = "https://api.stawi.org/savings"
+    FUNDING_SERVICE_URI      = "https://api.stawi.org/funding"
     SECURELY_RUN_SERVICE     = "true"
   }
+
+  migrate_env = {
+    TRUSTAGE_SERVICE_URI = "https://api.stawi.org/trustage"
+  }
+}
+
+# service-payment publishes received payments to the receive route's topic.
+resource "google_pubsub_topic_iam_member" "payment_publishes_received" {
+  project = var.project_id
+  topic   = local.payment_received_topic
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:payment-payment@stawi-payments.iam.gserviceaccount.com"
+
+  depends_on = [module.frame]
 }

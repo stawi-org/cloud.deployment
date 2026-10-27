@@ -50,4 +50,9 @@ module "frame" {
     IDENTITY_SERVICE_URI                = "https://api.stawi.org/identity"
     SECURELY_RUN_SERVICE                = "true"
   }
+
+  # The setup Job registers the service's trustage workflows.
+  migrate_env = {
+    TRUSTAGE_SERVICE_URI = "https://api.stawi.org/trustage"
+  }
 }

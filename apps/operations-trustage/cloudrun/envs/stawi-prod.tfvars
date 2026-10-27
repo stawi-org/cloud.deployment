@@ -1,4 +1,4 @@
-image           = "ghcr.io/antinvestor/service-trustage:v0.5.1"
+image           = "ghcr.io/antinvestor/service-trustage:v0.6.1"
 container_port  = 8080
 resource_path   = "/trustage"
 memory          = "768Mi"
@@ -8,7 +8,7 @@ neon_extensions = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "b
 # /stawi-finance, /stawi-settlement: Stawi process contracts (connect.call to
 # finance.v1 / settlement.v1; tenancy grants the trustage client both audiences)
 # /loans: fintech loans scheduled jobs (connect.call to loans.v1 LoanJobRun)
-requested_audience_paths = ["/profile", "/tenancy", "/commerce", "/stawi-finance", "/stawi-settlement", "/loans"]
+requested_audience_paths = ["/profile", "/tenancy", "/commerce", "/stawi-finance", "/stawi-settlement", "/loans", "/operations", "/savings", "/limits", "/stawi"]
 public_hostname          = "" # product surface: api.stawi.org/<path> only
 
 # Supabase migration phase 1: provision project + staging secrets (cutover separate)

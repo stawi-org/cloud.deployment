@@ -165,7 +165,10 @@ module "frame" {
     # finance + settlement run in the cluster (namespace stawi) behind their
     # own gateway hosts, not the api.stawi.org path Worker. Fintech loans'
     # scheduled jobs (LoanJobRun) are reached through the api.stawi.org gateway.
-    TRUSTAGE_CONNECT_ROUTES = "finance.v1=https://finance.stawi.org,settlement.v1=https://settlement.stawi.org,loans.v1=https://api.stawi.org/loans"
+    # A workflow's connect.call names its own service's gateway URL
+    # (https://api.stawi.org/<path>); trustage sends its token only to these hosts.
+    TRUSTAGE_URL_TRUSTED_HOST_SUFFIXES = ".svc,.svc.cluster.local,api.stawi.org"
+    TRUSTAGE_CONNECT_ROUTES            = "finance.v1=https://finance.stawi.org,settlement.v1=https://settlement.stawi.org,loans.v1=https://api.stawi.org/loans"
   }
 
   app_env = {}
