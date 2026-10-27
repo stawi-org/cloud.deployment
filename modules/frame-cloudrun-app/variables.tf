@@ -404,20 +404,3 @@ variable "neon_enabled" {
     then DESTROYS the Neon project and its data.
   EOT
 }
-
-variable "runtime_db_role" {
-  type        = string
-  default     = ""
-  description = "Runtime database role the setup Job keeps (fintech pkg/dbrole: DATABASE_RUNTIME_ROLE/PASSWORD): login, no BYPASSRLS, so row-level security applies to the running service. Empty = none. The service keeps connecting as the owner until runtime_db_role_active."
-
-  validation {
-    condition     = can(regex("^([a-z_][a-z0-9_]{0,62})?$", var.runtime_db_role))
-    error_message = "runtime_db_role must be a plain lower-case identifier (or empty)."
-  }
-}
-
-variable "runtime_db_role_active" {
-  type        = bool
-  default     = false
-  description = "Connect the running service as runtime_db_role (pooled DATABASE_URL) and set DATABASE_REQUIRE_RLS=true so it refuses to start on a role that bypasses RLS. Turn on only after the setup Job has created the role."
-}

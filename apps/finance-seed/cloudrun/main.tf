@@ -51,7 +51,6 @@ module "frame" {
   neon_region_id           = var.neon_region_id
   neon_extensions          = var.neon_extensions
   has_database             = var.has_database
-  runtime_db_role          = "finance_seed_rt"
   container_port           = var.container_port
   memory                   = var.memory
   migrate_args             = ["setup"]
@@ -65,20 +64,34 @@ module "frame" {
   startup_probe_path          = "/readyz"
   liveness_probe_path         = "/livez"
 
-  app_env = merge(local.peer_env, {
+  app_env = merge(merge(local.peer_env, {
     SECURELY_RUN_SERVICE = "true"
     SEED_CURRENCY_CODE   = "KES"
     # Client data fields that must be verified before seed submits a loan
     # request; the service refuses to start securely without them.
     SEED_KYC_REQUIRED_FIELDS = "national_id"
     LOG_FORMAT               = "json"
-  })
+  }), module.runtime_db.service_env)
   # v1.96.27 binaries still use the legacy DO_MIGRATION gate for the setup
   # path (ShouldRunSetup lands in the next release); keep both until then.
-  migrate_env = merge(local.peer_env, { LOG_FORMAT = "json", DO_MIGRATION = "true" })
+  migrate_env = merge(merge(local.peer_env, { LOG_FORMAT = "json", DO_MIGRATION = "true" }), module.runtime_db.migrate_env)
 
   # The setup Job registers the USSD menu (both secrets); the service opens
   # sealed PINs (the private key).
-  secret_env_extra         = local.ussd_secret_env
-  migrate_secret_env_extra = local.ussd_secret_env
+  secret_env_extra         = merge(local.ussd_secret_env, module.runtime_db.service_secret_env)
+  migrate_secret_env_extra = merge(local.ussd_secret_env, module.runtime_db.migrate_secret_env)
+}
+
+# Row-level security applies to the role the service connects as; the setup
+# Job keeps it (fintech pkg/dbrole). See modules/runtime-db-role.
+module "runtime_db" {
+  source = "../../../modules/runtime-db-role"
+
+  app_name                      = var.app_name
+  project_id                    = var.project_id
+  labels                        = var.labels
+  role                          = "finance_seed_rt"
+  runtime_service_account_email = module.frame.runtime_service_account_email
+  pooled_secret_id              = module.frame.database_secret_id
+  direct_secret_id              = module.frame.database_direct_secret_id
 }
