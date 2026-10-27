@@ -1,4 +1,4 @@
-image                    = "ghcr.io/antinvestor/service-payment-integration-jenga-api:v0.5.72"
+image                    = "ghcr.io/antinvestor/service-payment-integration-jenga-api:v0.8.1"
 resource_path            = "/payment-jenga"
 has_database             = false
 memory                   = "512Mi"
