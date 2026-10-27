@@ -70,4 +70,5 @@ module "runtime_db" {
   runtime_service_account_email = module.frame.runtime_service_account_email
   pooled_secret_id              = module.frame.database_secret_id
   direct_secret_id              = module.frame.database_direct_secret_id
+  active                        = true
 }
