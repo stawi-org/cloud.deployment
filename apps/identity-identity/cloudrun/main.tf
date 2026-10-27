@@ -17,6 +17,7 @@ locals {
   tenancy_uri      = "${local.api_base}/tenancy"
   notification_uri = "${local.api_base}/notification"
   audit_uri        = "${local.api_base}/audit"
+  files_uri        = "${local.api_base}/files"
 }
 
 module "frame" {
@@ -36,7 +37,7 @@ module "frame" {
   neon_region_id = var.neon_region_id
 
   resource_path            = "/identity"
-  requested_audience_paths = ["/profile", "/tenancy", "/notification", "/audit"]
+  requested_audience_paths = ["/profile", "/tenancy", "/notification", "/audit", "/files"]
   enable_keto_admin        = false
 
   app_env = {
@@ -46,6 +47,7 @@ module "frame" {
     TENANCY_SERVICE_URI                           = local.tenancy_uri
     NOTIFICATION_SERVICE_URI                      = local.notification_uri
     AUDIT_SERVICE_URI                             = local.audit_uri
+    FILES_SERVICE_URI                             = local.files_uri
     OAUTH_REDIRECT_URIS                           = local.is_prod ? "https://app.antinvestor.com/auth/callback" : "https://app-dev.antinvestor.com/auth/callback"
     PROFILE_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/profile/sa/service-profile"
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/auth/sa/service-tenancy"
