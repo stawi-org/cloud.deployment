@@ -492,6 +492,7 @@ class service_funding implements Namespace {
     granted_investor_account_view: (profile_user | service_funding)[]
     granted_investor_account_manage: (profile_user | service_funding)[]
     granted_fund_manage: (profile_user | service_funding)[]
+    granted_payout_outcome_apply: (profile_user | service_funding)[]
   }
 
   permits = {
@@ -516,6 +517,10 @@ class service_funding implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_fund_manage.includes(ctx.subject),
+
+    payout_outcome_apply: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payout_outcome_apply.includes(ctx.subject),
   }
 }
 
@@ -1016,6 +1021,7 @@ class service_limits implements Namespace {
     granted_limits_ledger_view: (profile_user | service_limits)[]
     granted_limits_audit_view: (profile_user | service_limits)[]
     granted_limits_archive: (profile_user | service_limits)[]
+    granted_limits_job_run: (profile_user | service_limits)[]
   }
 
   permits = {
@@ -1075,6 +1081,9 @@ class service_limits implements Namespace {
 
     limits_archive: (ctx: Context): boolean =>
       this.related.granted_limits_archive.includes(ctx.subject),
+
+    limits_job_run: (ctx: Context): boolean =>
+      this.related.granted_limits_job_run.includes(ctx.subject),
   }
 }
 
@@ -1110,6 +1119,9 @@ class service_loans implements Namespace {
     granted_portfolio_export: (profile_user | service_loans)[]
     granted_loan_view_own: (profile_user | service_loans)[]
     granted_loan_job_run: (profile_user | service_loans)[]
+    granted_commission_view: (profile_user | service_loans)[]
+    granted_commission_payout: (profile_user | service_loans)[]
+    granted_payout_outcome_apply: (profile_user | service_loans)[]
   }
 
   permits = {
@@ -1249,6 +1261,7 @@ class service_loans implements Namespace {
     collection_manage: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_collection_manage.includes(ctx.subject),
@@ -1274,6 +1287,22 @@ class service_loans implements Namespace {
     loan_job_run: (ctx: Context): boolean =>
       this.related.service.includes(ctx.subject) ||
       this.related.granted_loan_job_run.includes(ctx.subject),
+
+    commission_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
+      this.related.granted_commission_view.includes(ctx.subject),
+
+    commission_payout: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.granted_commission_payout.includes(ctx.subject),
+
+    payout_outcome_apply: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payout_outcome_apply.includes(ctx.subject),
   }
 }
 
@@ -1364,6 +1393,8 @@ class service_operations implements Namespace {
     granted_payment_notify: (profile_user | service_operations)[]
     granted_payment_allocate: (profile_user | service_operations)[]
     granted_payment_view: (profile_user | service_operations)[]
+    granted_operations_job_run: (profile_user | service_operations)[]
+    granted_group_obligation_manage: (profile_user | service_operations)[]
   }
 
   permits = {
@@ -1404,6 +1435,14 @@ class service_operations implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_payment_view.includes(ctx.subject),
+
+    operations_job_run: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_operations_job_run.includes(ctx.subject),
+
+    group_obligation_manage: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_group_obligation_manage.includes(ctx.subject),
   }
 }
 
@@ -1618,6 +1657,8 @@ class service_savings implements Namespace {
     granted_withdrawal_manage: (profile_user | service_savings)[]
     granted_interest_view: (profile_user | service_savings)[]
     granted_savings_balance_view: (profile_user | service_savings)[]
+    granted_payout_outcome_apply: (profile_user | service_savings)[]
+    granted_savings_job_run: (profile_user | service_savings)[]
   }
 
   permits = {
@@ -1700,6 +1741,14 @@ class service_savings implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
       this.related.granted_savings_balance_view.includes(ctx.subject),
+
+    payout_outcome_apply: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_payout_outcome_apply.includes(ctx.subject),
+
+    savings_job_run: (ctx: Context): boolean =>
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_savings_job_run.includes(ctx.subject),
   }
 }
 
@@ -4351,6 +4400,7 @@ class service_seed implements Namespace {
     granted_seed_credit_profile_admin: (profile_user | service_seed)[]
     granted_seed_loan_paid_off_notify: (profile_user | service_seed)[]
     granted_seed_ussd_state: (profile_user | service_seed)[]
+    granted_seed_credit_profile_cap: (profile_user | service_seed)[]
   }
 
   permits = {
@@ -4387,6 +4437,14 @@ class service_seed implements Namespace {
     seed_ussd_state: (ctx: Context): boolean =>
       this.related.service.includes(ctx.subject) ||
       this.related.granted_seed_ussd_state.includes(ctx.subject),
+
+    seed_credit_profile_cap: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_seed_credit_profile_cap.includes(ctx.subject),
   }
 }
 
@@ -4399,85 +4457,11 @@ class service_stawi implements Namespace {
     member: profile_user[]
     service: (profile_user | tenancy_access)[]
 
-    granted_stawi_group_view: (profile_user | service_stawi)[]
-    granted_stawi_group_manage: (profile_user | service_stawi)[]
-    granted_stawi_tenure_manage: (profile_user | service_stawi)[]
-    granted_stawi_period_manage: (profile_user | service_stawi)[]
-    granted_stawi_obligation_view: (profile_user | service_stawi)[]
-    granted_stawi_obligation_manage: (profile_user | service_stawi)[]
-    granted_stawi_loan_window_manage: (profile_user | service_stawi)[]
-    granted_stawi_loan_offer_manage: (profile_user | service_stawi)[]
     granted_stawi_loan_offer_respond: (profile_user | service_stawi)[]
-    granted_stawi_loan_view: (profile_user | service_stawi)[]
-    granted_stawi_loan_fund: (profile_user | service_stawi)[]
-    granted_stawi_loan_create: (profile_user | service_stawi)[]
-    granted_stawi_loan_disburse: (profile_user | service_stawi)[]
-    granted_stawi_payment_view: (profile_user | service_stawi)[]
-    granted_stawi_payment_allocate: (profile_user | service_stawi)[]
-    granted_stawi_ledger_transfer: (profile_user | service_stawi)[]
+    granted_stawi_job_run: (profile_user | service_stawi)[]
   }
 
   permits = {
-    stawi_group_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_stawi_group_view.includes(ctx.subject),
-
-    stawi_group_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_group_manage.includes(ctx.subject),
-
-    stawi_tenure_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_tenure_manage.includes(ctx.subject),
-
-    stawi_period_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_period_manage.includes(ctx.subject),
-
-    stawi_obligation_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_stawi_obligation_view.includes(ctx.subject),
-
-    stawi_obligation_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_obligation_manage.includes(ctx.subject),
-
-    stawi_loan_window_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_window_manage.includes(ctx.subject),
-
-    stawi_loan_offer_manage: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_offer_manage.includes(ctx.subject),
-
     stawi_loan_offer_respond: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.member.includes(ctx.subject) ||
@@ -4486,57 +4470,8 @@ class service_stawi implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.granted_stawi_loan_offer_respond.includes(ctx.subject),
 
-    stawi_loan_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
+    stawi_job_run: (ctx: Context): boolean =>
       this.related.service.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_view.includes(ctx.subject),
-
-    stawi_loan_fund: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_fund.includes(ctx.subject),
-
-    stawi_loan_create: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_create.includes(ctx.subject),
-
-    stawi_loan_disburse: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_loan_disburse.includes(ctx.subject),
-
-    stawi_payment_view: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.viewer.includes(ctx.subject) ||
-      this.related.granted_stawi_payment_view.includes(ctx.subject),
-
-    stawi_payment_allocate: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_payment_allocate.includes(ctx.subject),
-
-    stawi_ledger_transfer: (ctx: Context): boolean =>
-      this.related.admin.includes(ctx.subject) ||
-      this.related.operator.includes(ctx.subject) ||
-      this.related.owner.includes(ctx.subject) ||
-      this.related.service.includes(ctx.subject) ||
-      this.related.granted_stawi_ledger_transfer.includes(ctx.subject),
+      this.related.granted_stawi_job_run.includes(ctx.subject),
   }
 }
