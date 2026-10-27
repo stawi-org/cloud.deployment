@@ -40,7 +40,7 @@ module "frame" {
   requested_audience_paths = ["/profile", "/tenancy", "/notification", "/audit", "/files"]
   enable_keto_admin        = false
 
-  app_env = {
+  app_env = merge({
     PREFER_SIMPLE_PROTOCOL                        = "true"
     MAX_AGENT_DEPTH                               = "5"
     PROFILE_SERVICE_URI                           = local.profile_uri
@@ -52,10 +52,26 @@ module "frame" {
     PROFILE_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/profile/sa/service-profile"
     TENANCY_SERVICE_WORKLOAD_API_TARGET_PATH      = "/ns/auth/sa/service-tenancy"
     NOTIFICATION_SERVICE_WORKLOAD_API_TARGET_PATH = "/ns/notifications/sa/service-notification"
-  }
+  }, module.runtime_db.service_env)
   # The setup Job registers the client and workforce message templates with
   # the notification service; it does not inherit app_env.
-  migrate_env = {
+  migrate_env = merge({
     NOTIFICATION_SERVICE_URI = local.notification_uri
-  }
+  }, module.runtime_db.migrate_env)
+  migrate_secret_env_extra = module.runtime_db.migrate_secret_env
+  secret_env_extra         = module.runtime_db.service_secret_env
+}
+
+# Row-level security applies to the role the service connects as; the setup
+# Job keeps it (fintech pkg/dbrole). See modules/runtime-db-role.
+module "runtime_db" {
+  source = "../../../modules/runtime-db-role"
+
+  app_name                      = var.app_name
+  project_id                    = var.project_id
+  labels                        = var.labels
+  role                          = "identity_identity_rt"
+  runtime_service_account_email = module.frame.runtime_service_account_email
+  pooled_secret_id              = module.frame.database_secret_id
+  direct_secret_id              = module.frame.database_direct_secret_id
 }

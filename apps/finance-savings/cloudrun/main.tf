@@ -40,7 +40,7 @@ module "frame" {
   startup_probe_path          = "/readyz"
   liveness_probe_path         = "/livez"
 
-  app_env = {
+  app_env = merge({
     PROFILE_SERVICE_URI    = "https://api.stawi.org/profile"
     TENANCY_SERVICE_URI    = "https://api.stawi.org/tenancy"
     AUDIT_SERVICE_URI      = "https://api.stawi.org/audit"
@@ -48,10 +48,26 @@ module "frame" {
     LIMITS_SERVICE_URI     = "https://api.stawi.org/limits"
     OPERATIONS_SERVICE_URI = "https://api.stawi.org/operations"
     SECURELY_RUN_SERVICE   = "true"
-  }
+  }, module.runtime_db.service_env)
 
   # The setup Job registers the service's trustage workflows.
-  migrate_env = {
+  migrate_env = merge({
     TRUSTAGE_SERVICE_URI = "https://api.stawi.org/trustage"
-  }
+  }, module.runtime_db.migrate_env)
+  migrate_secret_env_extra = module.runtime_db.migrate_secret_env
+  secret_env_extra         = module.runtime_db.service_secret_env
+}
+
+# Row-level security applies to the role the service connects as; the setup
+# Job keeps it (fintech pkg/dbrole). See modules/runtime-db-role.
+module "runtime_db" {
+  source = "../../../modules/runtime-db-role"
+
+  app_name                      = var.app_name
+  project_id                    = var.project_id
+  labels                        = var.labels
+  role                          = "finance_savings_rt"
+  runtime_service_account_email = module.frame.runtime_service_account_email
+  pooled_secret_id              = module.frame.database_secret_id
+  direct_secret_id              = module.frame.database_direct_secret_id
 }
