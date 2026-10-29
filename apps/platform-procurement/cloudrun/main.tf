@@ -59,9 +59,8 @@ module "frame" {
 
 # Row-level security applies to the role the service connects as; the setup
 # Job keeps it (service-commerce pkg/dbrole). See modules/runtime-db-role.
-# Leave active = false until a setup Job of a release with pkg/dbrole has
-# created the role; then set it to true so the service connects as the role
-# with DATABASE_REQUIRE_RLS=true.
+# The v0.6.0 setup Job created the role, so the service connects as it with
+# DATABASE_REQUIRE_RLS=true.
 module "runtime_db" {
   source = "../../../modules/runtime-db-role"
 
@@ -72,5 +71,5 @@ module "runtime_db" {
   runtime_service_account_email = module.frame.runtime_service_account_email
   pooled_secret_id              = module.frame.database_secret_id
   direct_secret_id              = module.frame.database_direct_secret_id
-  active                        = false
+  active                        = true
 }
