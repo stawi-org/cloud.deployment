@@ -2,7 +2,7 @@ image                    = "ghcr.io/antinvestor/service-commerce:v0.4.3"
 resource_path            = "/commerce"
 has_database             = true
 memory                   = "512Mi"
-requested_audience_paths = ["/profile", "/tenancy", "/checkout", "/ledger", "/notification", "/trustage"]
+requested_audience_paths = ["/profile", "/tenancy", "/checkout", "/payment", "/ledger", "/notification", "/trustage"]
 neon_extensions          = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "btree_gist"]
 # Storefront page buyers are forwarded to after commerce verifies their
 # payment at https://api.stawi.org/commerce/payments/return. Empty shows
