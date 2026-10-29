@@ -2,5 +2,5 @@ image                    = "ghcr.io/antinvestor/service-commerce-procurement:v0.
 resource_path            = "/procurement"
 has_database             = true
 memory                   = "512Mi"
-requested_audience_paths = ["/profile", "/tenancy"]
+requested_audience_paths = ["/profile", "/tenancy", "/commerce", "/manufacturing", "/trustage"]
 neon_extensions          = ["uuid-ossp", "pg_stat_statements", "pg_trgm", "btree_gin", "btree_gist"]
