@@ -2162,7 +2162,7 @@ class commerce_shop implements Namespace {
   }
 
   permits = {
-    // --- View permits: any role on the shop (incl. viewer/member) ---
+    // --- Catalogue view permits: any role on the shop, buyers included ---
     shop_view: (ctx: Context): boolean =>
       this.related.owner.includes(ctx.subject) ||
       this.related.admin.includes(ctx.subject) ||
@@ -2181,12 +2181,12 @@ class commerce_shop implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.granted_products_view.includes(ctx.subject),
 
+    // --- Staff view permits: viewer and up; buyers excluded ---
     orders_view: (ctx: Context): boolean =>
       this.related.owner.includes(ctx.subject) ||
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_orders_view.includes(ctx.subject),
 
@@ -2195,7 +2195,6 @@ class commerce_shop implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_fulfilment_view.includes(ctx.subject),
 
@@ -2204,7 +2203,6 @@ class commerce_shop implements Namespace {
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
       this.related.viewer.includes(ctx.subject) ||
-      this.related.member.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_price_list_view.includes(ctx.subject),
 
@@ -2291,6 +2289,7 @@ class service_commerce implements Namespace {
     granted_discount_approve: (profile_user | service_commerce)[]
     granted_shops_list: (profile_user | service_commerce)[]
     granted_ledger_post: (profile_user | service_commerce)[]
+    granted_stock_receive: (profile_user | service_commerce)[]
   }
 
   permits = {
@@ -2427,6 +2426,9 @@ class service_commerce implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_ledger_post.includes(ctx.subject),
+
+    stock_receive: (ctx: Context): boolean =>
+      this.related.granted_stock_receive.includes(ctx.subject),
   }
 }
 
@@ -2516,6 +2518,8 @@ class service_procurement implements Namespace {
     granted_purchase_order_cancel: (profile_user | service_procurement)[]
     granted_goods_receipt_view: (profile_user | service_procurement)[]
     granted_goods_receipt_create: (profile_user | service_procurement)[]
+    granted_goods_receipt_deliver: (profile_user | service_procurement)[]
+    granted_goods_receipt_resolve: (profile_user | service_procurement)[]
   }
 
   permits = {
@@ -2575,6 +2579,18 @@ class service_procurement implements Namespace {
       this.related.owner.includes(ctx.subject) ||
       this.related.service.includes(ctx.subject) ||
       this.related.granted_goods_receipt_create.includes(ctx.subject),
+
+    goods_receipt_deliver: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_deliver.includes(ctx.subject),
+
+    goods_receipt_resolve: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.granted_goods_receipt_resolve.includes(ctx.subject),
   }
 }
 
