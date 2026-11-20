@@ -97,6 +97,7 @@ class service_billing implements Namespace {
     granted_invoice_manage: (profile_user | service_billing)[]
     granted_payment_record: (profile_user | service_billing)[]
     granted_payment_collect: (profile_user | service_billing)[]
+    granted_provider_subscription_sync: (profile_user | service_billing)[]
     granted_credit_view: (profile_user | service_billing)[]
     granted_credit_manage: (profile_user | service_billing)[]
     granted_discount_view: (profile_user | service_billing)[]
@@ -209,6 +210,11 @@ class service_billing implements Namespace {
       this.related.service.includes(ctx.subject) ||
       this.related.granted_payment_collect.includes(ctx.subject),
 
+    // Only integration service accounts mirror provider subscriptions:
+    // no role implies it, it must be granted explicitly.
+    provider_subscription_sync: (ctx: Context): boolean =>
+      this.related.granted_provider_subscription_sync.includes(ctx.subject),
+
     credit_view: (ctx: Context): boolean =>
       this.related.admin.includes(ctx.subject) ||
       this.related.operator.includes(ctx.subject) ||
@@ -246,6 +252,7 @@ class service_checkout implements Namespace {
     operator: profile_user[]
     viewer: profile_user[]
     member: profile_user[]
+    service: (profile_user | tenancy_access)[]
 
     granted_checkout_session_create: (profile_user | service_checkout)[]
     granted_checkout_session_view: (profile_user | service_checkout)[]
@@ -254,15 +261,26 @@ class service_checkout implements Namespace {
 
   permits = {
     checkout_session_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_checkout_session_create.includes(ctx.subject),
 
     checkout_session_view: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.member.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
+      this.related.viewer.includes(ctx.subject) ||
       this.related.granted_checkout_session_view.includes(ctx.subject),
 
     checkout_link_create: (ctx: Context): boolean =>
+      this.related.admin.includes(ctx.subject) ||
+      this.related.operator.includes(ctx.subject) ||
       this.related.owner.includes(ctx.subject) ||
+      this.related.service.includes(ctx.subject) ||
       this.related.granted_checkout_link_create.includes(ctx.subject),
   }
 }
